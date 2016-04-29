@@ -1,0 +1,24 @@
+<Bindings>
+	<Binding name="CLICK com_mithrandir_whollyFrameHiddenToggleButton:LeftButton" header="WHOLLY" />
+	<Binding name="WHOLLY_TOGGLEMAPPINS" header="WHOLLY">
+		Wholly:ToggleSwitch("displaysMapPins")
+	</Binding>
+	<Binding name="WHOLLY_TOGGLESHOWNEEDSPREREQUISITES" header="WHOLLY">
+		Wholly:ToggleSwitch("showsQuestsThatFailPrerequsites")
+	</Binding>
+	<Binding name="WHOLLY_TOGGLESHOWDAILIES" header="WHOLLY">
+		Wholly:ToggleSwitch("showsDailyQuests")
+	</Binding>
+	<Binding name="WHOLLY_TOGGLESHOWWEEKLIES" header="WHOLLY">
+		Wholly:ToggleSwitch("showsWeeklyQuests")
+	</Binding>
+	<Binding name="WHOLLY_TOGGLESHOWREPEATABLES" header="WHOLLY">
+		Wholly:ToggleSwitch("showsRepeatableQuests")
+	</Binding>
+	<Binding name="WHOLLY_TOGGLESHOWUNOBTAINABLES" header="WHOLLY">
+		Wholly:ToggleSwitch("showsUnobtainableQuests")
+	</Binding>
+	<Binding name="WHOLLY_TOGGLESHOWCOMPLETED" header="WHOLLY">
+		Wholly:ToggleSwitch("showsCompletedQuests")
+	</Binding>
+</Bindings>
