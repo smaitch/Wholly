@@ -308,6 +308,7 @@
 --		056	Updates German localization by pas06.
 --			Adds the ability to filter quests based on PVP.
 --			Adds the ability to support Grail's ability to indicate working buildings.
+--		057	Changed the ability to display quest rewards without the need for Grail to have the information.
 --
 --	Known Issues
 --
@@ -648,9 +649,9 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 						self.configurationScript14()
 					end
 
-					if WDB.loadRewardData then
-						self.configurationScript15()
-					end
+--					if WDB.loadRewardData then
+--						self.configurationScript15()
+--					end
 
 					-- We steal the TomTom:RemoveWaypoint() function because we want to override it ourselves
 					if TomTom and TomTom.RemoveWaypoint then
@@ -1033,7 +1034,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		end,
 
 		--	This adds a line to the "current" tooltip, creating a new one as needed.
-		_AddLine = function(self, value, value2)
+		_AddLine = function(self, value, value2, texture)
 			if not self.onlyAddingTooltipToGameTooltip then
 				local tt = self.tt[self.currentTt]
 				if tt:NumLines() >= self.currentMaximumTooltipLines then
@@ -1052,11 +1053,17 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				else
 					tt:AddLine(value)
 				end
+				if nil ~= texture then
+					tt:AddTexture(texture)
+				end
 			else
 				if nil ~= value2 then
 					GameTooltip:AddDoubleLine(value, value2)
 				else
 					GameTooltip:AddLine(value)
+				end
+				if nil ~= texture then
+					GameTooltip:AddTexture(texture)
 				end
 			end
 		end,
@@ -2992,46 +2999,74 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				end
 			end
 
-			if nil ~= Grail.questRewards then
-				local rewardString = Grail.questRewards[questId]
-				if nil ~= rewardString then
-					self:_AddLine(" ")
-					self:_AddLine(self.s.QUEST_REWARDS .. ":")
-					local rewards = { strsplit(":", rewardString) }
-					local reward
-					local rewardType, restOfReward
-					local displayedBanner = false
-					for counter = 1, #rewards do
-						reward = rewards[counter]
-						if reward ~= "" then
-							rewardType = strsub(reward, 1, 1)
-							restOfReward = strsub(reward, 2)
-							if 'X' == rewardType then
-								local experience = tonumber(restOfReward)
-								self:_AddLine(strformat(self.s.GAIN_EXPERIENCE_FORMAT, experience))
-							elseif 'M' == rewardType then
-								local coppers = tonumber(restOfReward)
---								local golds = coppers / 10000
---								local silvers = (coppers - (golds * 10000)) / 100
---								coppers = coppers % 100
-								self:_AddLine(GetCoinTextureString(coppers))
-							elseif 'R' == rewardType then
-								local itemIdString, itemCount = strsplit("-", restOfReward)
-								local _, itemLink = GetItemInfo(itemIdString)
-								self:_AddLine(itemLink, itemCount)
-							elseif 'C' == rewardType then
-								if not displayedBanner then
-									displayedBanner = true
-									self:_AddLine(self.s.REWARD_CHOICES)
-								end
-								local itemIdString, itemCount = strsplit("-", restOfReward)
-								local _, itemLink = GetItemInfo(itemIdString)
-								self:_AddLine(itemLink, itemCount)
-							end
-						end
-					end
-				end
+			-- Technically we should be able to fetch quest reward information for quests that are not in our quest log
+			self:_AddLine(" ")
+			self:_AddLine(self.s.QUEST_REWARDS .. ":")
+			local rewardXp = GetQuestLogRewardXP(questId)
+			if 0 ~= rewardXp then
+				self:_AddLine(strformat(self.s.GAIN_EXPERIENCE_FORMAT, rewardXp))
 			end
+			local rewardMoney = GetQuestLogRewardMoney(questId)
+			if 0 ~= rewardMoney then
+				self:_AddLine(GetCoinTextureString(rewardMoney))
+			end
+			for counter = 1, GetNumQuestLogRewardCurrencies(questId) do
+				local currencyName, currencyTexture, currencyCount = GetQuestLogRewardCurrencyInfo(counter, questId)
+				self:_AddLine(currencyName, currencyCount, currencyTexture)
+			end
+			for counter = 1, GetNumQuestLogRewards(questId) do
+				local name, texture, count, quality, isUsable = GetQuestLogRewardInfo(counter, questId)
+				self:_AddLine(name, count, texture)
+			end
+			local numberQuestChoiceRewards = GetNumQuestLogChoices(questId)
+			if 1 < numberQuestChoiceRewards then
+				self:_AddLine(self.s.REWARD_CHOICES)
+			end
+			for counter = 1, numberQuestChoiceRewards do
+				local name, texture, numItems, quality, isUsable = GetQuestLogChoiceInfo(counter, questId)
+				self:_AddLine(name, count, texture)
+			end
+
+--			if nil ~= Grail.questRewards then
+--				local rewardString = Grail.questRewards[questId]
+--				if nil ~= rewardString then
+--					self:_AddLine(" ")
+--					self:_AddLine(self.s.QUEST_REWARDS .. ":")
+--					local rewards = { strsplit(":", rewardString) }
+--					local reward
+--					local rewardType, restOfReward
+--					local displayedBanner = false
+--					for counter = 1, #rewards do
+--						reward = rewards[counter]
+--						if reward ~= "" then
+--							rewardType = strsub(reward, 1, 1)
+--							restOfReward = strsub(reward, 2)
+--							if 'X' == rewardType then
+--								local experience = tonumber(restOfReward)
+--								self:_AddLine(strformat(self.s.GAIN_EXPERIENCE_FORMAT, experience))
+--							elseif 'M' == rewardType then
+--								local coppers = tonumber(restOfReward)
+----								local golds = coppers / 10000
+----								local silvers = (coppers - (golds * 10000)) / 100
+----								coppers = coppers % 100
+--								self:_AddLine(GetCoinTextureString(coppers))
+--							elseif 'R' == rewardType then
+--								local itemIdString, itemCount = strsplit("-", restOfReward)
+--								local _, itemLink = GetItemInfo(itemIdString)
+--								self:_AddLine(itemLink, itemCount)
+--							elseif 'C' == rewardType then
+--								if not displayedBanner then
+--									displayedBanner = true
+--									self:_AddLine(self.s.REWARD_CHOICES)
+--								end
+--								local itemIdString, itemCount = strsplit("-", restOfReward)
+--								local _, itemLink = GetItemInfo(itemIdString)
+--								self:_AddLine(itemLink, itemCount)
+--							end
+--						end
+--					end
+--				end
+--			end
 
 			self:_NPCInfoSection(self.s.WHEN_KILL, Grail:QuestNPCKills(questId), frame, false)
 
@@ -5132,7 +5167,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		{ S.ACHIEVEMENTS, 'loadAchievementData', 'configurationScript9' },
 		{ S.REPUTATION_CHANGES, 'loadReputationData', 'configurationScript10', },
 		{ S.COMPLETION_DATES, 'loadDateData', 'configurationScript14', },
-		{ S.QUEST_REWARDS, 'loadRewardData', 'configurationScript15', },
+--		{ S.QUEST_REWARDS, 'loadRewardData', 'configurationScript15', },
 		}
 	Wholly.configuration[S.OTHER_PREFERENCE] = {
 		{ S.OTHER_PREFERENCE },
