@@ -309,6 +309,7 @@
 --			Adds the ability to filter quests based on PVP.
 --			Adds the ability to support Grail's ability to indicate working buildings.
 --		057	Changed the ability to display quest rewards without the need for Grail to have the information.
+--			Updates Traditional Chinese localization by gaspy10.
 --
 --	Known Issues
 --
@@ -4985,7 +4986,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["COMPLETION_DATES"] = "完成日期"
 		S["DROP_TO_START_FORMAT"] = "掉落 %s 開始  [%s]"
 		S["EMPTY_ZONES"] = "顯示空的區域" -- Needs review
-		S["ENABLE_COORDINATES"] = "啟用顯示玩家座標"
+		S["ENABLE_COORDINATES"] = "在資訊列插件上顯示玩家座標"
 		S["ENTER_ZONE"] = "進入區域時取得"
 		S["ESCORT"] = "護送"
 		S["EVER_CAST"] = "曾經施放"
