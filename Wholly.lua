@@ -308,8 +308,9 @@
 --		056	Updates German localization by pas06.
 --			Adds the ability to filter quests based on PVP.
 --			Adds the ability to support Grail's ability to indicate working buildings.
---		057	Changed the ability to display quest rewards without the need for Grail to have the information.
+--		057	Changes the ability to display quest rewards without the need for Grail to have the information.
 --			Updates Traditional Chinese localization by gaspy10.
+--			Adds the ability to display prerequisites for classes.
 --
 --	Known Issues
 --
@@ -2635,6 +2636,11 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			elseif questCode == 'L' or questCode == 'l' then
 				local lessThanString = (questCode == 'l') and "<" or ""
 				return format("|c%s%s %s%d|r", colorCode, self.s.LEVEL, lessThanString, numeric)
+			elseif questCode == 'N' then
+				local englishName = Grail.classMapping[subcode]
+				local localizedGenderClassName = Grail:CreateClassNameLocalizedGenderized(englishName)
+				local classColor = RAID_CLASS_COLORS[englishName]
+				return format("|c%s%s |r|cff%.2x%.2x%.2x%s|r", colorCode, CLASS, classColor.r*255, classColor.g*255, classColor.b*255, localizedGenderClassName)
 			elseif questCode == 'P' then
 				local meetsRequirement, actualSkillLevel = GRAIL:ProfessionExceeds(subcode, numeric)
 				local levelCode
@@ -2688,6 +2694,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					typeString = format(" [%s]", self.s.IN_LOG)
 				elseif questCode == 'C' then
 					typeString = format(" [%s, %s]", self.s.IN_LOG, self.s.TURNED_IN)
+				elseif questCode == 'c' then
+					typeString = format(" ![%s, %s]", self.s.IN_LOG, self.s.TURNED_IN)
 				elseif questCode == 'D' then
 					typeString = format(" [%s]", self.s.COMPLETE)
 				elseif questCode == 'e' then
@@ -2698,7 +2706,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					typeString = format(" [%s]", self.s.EVER_COMPLETED)
 				elseif questCode == 'M' then
 					typeString = format(" [%s]", self.s.ABANDONED)
-				elseif questCode == 'N' then
+				elseif questCode == 'm' then
 					typeString = format(" [%s]", self.s.NEVER_ABANDONED)
 				elseif questCode == 'O' then
 					typeString = format(" [%s]", self.s.ACCEPTED)
