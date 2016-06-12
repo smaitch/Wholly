@@ -1568,13 +1568,16 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
 		_DroppedItemMatchesQuest = function(self, dropNPCCode, matchingQuestId)
 			local retval = true
-			local questCodes = Grail:CodesWithPrefixNPC(dropNPCCode, "Q:")
-			if nil ~= questCodes then
-				retval = false
-				for i = 1, #questCodes do
-					local quests = { strsplit(",", strsub(questCodes[i], 3)) }
-					for j = 1, #quests do
-						if tonumber(quests[j]) == tonumber(matchingQuestId) then retval = true end
+			dropNPCCode = tonumber(dropNPCCode)
+			matchingQuestId = tonumber(matchingQuestId)
+			if nil ~= dropNPCCode and nil ~= matchingQuestId then
+				local questCodes = Grail:AssociatedQuestsForNPC(dropNPCCode)
+				if nil ~= questCodes then
+					retval = false
+					for _, questId in pairs(questCodes) do
+						if questId == matchingQuestId then
+							retval = true
+						end
 					end
 				end
 			end
