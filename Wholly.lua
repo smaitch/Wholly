@@ -312,6 +312,7 @@
 --			Updates Traditional Chinese localization by gaspy10.
 --			Adds the ability to display prerequisites for classes.
 --			Updates Spanish (Spain) localization by Ehren_H.
+--			Changes the Interface to 70000.
 --
 --	Known Issues
 --
