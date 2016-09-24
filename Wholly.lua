@@ -315,6 +315,7 @@
 --			Changes the Interface to 70000.
 --		058	Adds the ability to control the display of some Blizzard world map icons.
 --			Fixes the placement of the Wholly world map button so it appears when the world map is opened.
+--			Fixes presenting a window when attempting to load an on-demand addon fails.
 --
 --	Known Issues
 --
@@ -350,6 +351,7 @@ local InterfaceOptions_AddCategory			= InterfaceOptions_AddCategory
 local InterfaceOptionsFrame_OpenToCategory	= InterfaceOptionsFrame_OpenToCategory
 local IsControlKeyDown						= IsControlKeyDown
 local IsShiftKeyDown						= IsShiftKeyDown
+local LoadAddOn								= LoadAddOn
 local PlaySound								= PlaySound
 local SetMapByID							= SetMapByID
 local ToggleDropDownMenu					= ToggleDropDownMenu
@@ -402,6 +404,13 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
 	Wholly = {
 
+		addonLoad = function(self, addonName)
+						local success, failureReason = LoadAddOn(addonName)
+						if not success then
+							print("|cFFFF0000Wholly|r failed to load addon", addonName, failureReason)
+						end
+						return success
+					end,
 		cachedMapCounts = {},
 		cachedPanelQuests = {},		-- quests and their status for map area self.zoneInfo.panel.mapId
 		cachedPinQuests = {},		-- quests and their status for map area self.zoneInfo.pins.mapId
@@ -463,11 +472,15 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 									Wholly:UpdateCoordinateSystem()
 								end,
 		configurationScript9 = function(self)
-									UIParentLoadAddOn("Grail-Achievements")
+									if WhollyDatabase.loadAchievementData then
+										Wholly:addonLoad("Grail-Achievements")
+									end
 									Wholly:_InitializeLevelOneData()
 								end,
 		configurationScript10 = function(self)
-									UIParentLoadAddOn("Grail-Reputations")
+									if WhollyDatabase.loadReputationData then
+										Wholly:addonLoad("Grail-Reputations")
+									end
 									Wholly:_InitializeLevelOneData()
 								end,
 		configurationScript11 = function(self)
@@ -479,10 +492,14 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		configurationScript13 = function(self)
 								end,
 		configurationScript14 = function(self)
-									UIParentLoadAddOn("Grail-When")
+									if WhollyDatabase.loadDateData then
+										Wholly:addonLoad("Grail-When")
+									end
 								end,
 		configurationScript15 = function(self)
-									UIParentLoadAddOn("Grail-Rewards")
+									if WhollyDatabase.loadRewardData then
+										Wholly:addonLoad("Grail-Rewards")
+									end
 								end,
 		configurationScript16 = function(self)
 									WorldMapFrame_Update()
@@ -2297,7 +2314,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 							nameToUse = nameToUse .. " (" .. npc.dropName .. ')'
 						end
 						self:_QuestInfoSection({self:_PrettyNPCString(nameToUse, npc.kill, npc.realArea), locationString}, preqTable)
-						if meetsCriteria then
+						if meetsCriteria and npc.name then
 							local desiredMacroValue = self.s.SLASH_TARGET .. ' ' .. npc.name
 							if button:GetAttribute("macrotext") ~= desiredMacroValue and not InCombatLockdown() then
 								button:SetAttribute("macrotext", desiredMacroValue)
