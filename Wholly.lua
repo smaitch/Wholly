@@ -316,6 +316,8 @@
 --		058	Adds the ability to control the display of some Blizzard world map icons.
 --			Fixes the placement of the Wholly world map button so it appears when the world map is opened.
 --			Fixes presenting a window when attempting to load an on-demand addon fails.
+--		059	Fixes the problem where hiding Blizzard map POIs in combat causes Lua errors.
+--			Adds the ability to control the display of Blizzard story line quest markers.
 --
 --	Known Issues
 --
@@ -520,7 +522,14 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
 		eventDispatch = {
 			['PLAYER_REGEN_ENABLED'] = function(self, frame)
-				self:ScrollFrame_Update()
+				if self.combatScrollUpdate then
+					self.combatScrollUpdate = false
+					self:ScrollFrame_Update()
+				end
+				if self.combatHidePOI then
+					self.combatHidePOI = false
+					self:_HidePOIs()
+				end
 				frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
 			end,
 			--	So in Blizzard's infinite wisdom it turns out that normal quests that just appear with the
@@ -3354,7 +3363,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			if not InCombatLockdown() then
 				Wholly:ScrollFrame_Update()
 			else
-				com_mithrandir_whollyFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+				self.combatScrollUpdate = true
+				self.notificationFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 			end
 		end,
 
@@ -5203,7 +5213,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		{ S.HIDE_WORLD_MAP_FLIGHT_POINTS, 'hidesWorldMapFlightPoints', 'configurationScript16' },
 		{ S.HIDE_BLIZZARD_WORLD_MAP_TREASURES, 'hidesWorldMapTreasures', 'configurationScript16' },
 		{ S.HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES, 'hidesBlizzardWorldMapBonusObjectives', 'configurationScript17' },
---		{ S.HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS, 'hidesBlizzardWorldMapQuestPins', 'configurationScript17' },
+		{ S.HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS, 'hidesBlizzardWorldMapQuestPins', 'configurationScript16' },
 		}
 	Wholly.configuration[S.WIDE_PANEL] = {
 		{ S.WIDE_PANEL },
@@ -5234,7 +5244,22 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		{ S.ADD_ADVENTURE_GUIDE, 'shouldAddAdventureGuideQuests', 'configurationScript4' },
 		}
 
+	Wholly.poisToHide = {}
+	Wholly._HidePOIs = function(self)
+		if not InCombatLockdown() then
+			local wpth = self.poisToHide
+			for i = 1, #wpth do
+				wpth[i]:Hide()
+			end
+			Wholly.poisToHide = {}
+		else
+			self.combatHidePOI = true
+			self.notificationFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+		end
+	end
+
 hooksecurefunc("WorldMapFrame_Update", function()
+	local wpth = Wholly.poisToHide
 	if WhollyDatabase.hidesWorldMapFlightPoints or WhollyDatabase.hidesWorldMapTreasures then
 		for i = 1, GetNumMapLandmarks() do
 			local _, name, _, textureIndex = GetMapLandmarkInfo(i)
@@ -5246,11 +5271,21 @@ hooksecurefunc("WorldMapFrame_Update", function()
 				if poi then
 				-- The "if poi then" check is probably not needed, but better safe than sorry!
 --					print("Hiding icon for",name)
-					poi:Hide()
+--					poi:Hide()
+					wpth[#wpth + 1] = poi
 				end
 			end
 		end
 	end
+	if WhollyDatabase.hidesBlizzardWorldMapQuestPins then
+		for i = 1, C_Questline.GetNumAvailableQuestlines() do
+			local poi = _G["WorldMapStoryLine"..i]
+			if poi then
+				wpth[#wpth + 1] = poi
+			end
+		end
+	end
+	Wholly:_HidePOIs()
 end)
 
 hooksecurefunc("WorldMap_UpdateQuestBonusObjectives", function()
@@ -5263,12 +5298,15 @@ hooksecurefunc("WorldMap_UpdateQuestBonusObjectives", function()
 		end
 		local taskIconCount = 1;
 		if ( numTaskPOIs > 0 ) then
+			local wpth = Wholly.poisToHide
 			for _, info  in next, taskInfo do
 				local taskPOIName = "WorldMapFrameTaskPOI"..taskIconCount;
 				local taskPOI = _G[taskPOIName];
-				taskPOI:Hide();
+--				taskPOI:Hide();
+				wpth[#wpth + 1] = taskPOI
 				taskIconCount = taskIconCount + 1;
 			end
+			Wholly:_HidePOIs()
 		end
 	end
 end)
