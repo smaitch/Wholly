@@ -318,6 +318,8 @@
 --			Fixes presenting a window when attempting to load an on-demand addon fails.
 --		059	Fixes the problem where hiding Blizzard map POIs in combat causes Lua errors.
 --			Adds the ability to control the display of Blizzard story line quest markers.
+--			Updates French translation by coldragon78.
+--			Updates Traditional Chinese localization by gaspy10.
 --
 --	Known Issues
 --
@@ -587,6 +589,9 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					if nil == WDB.ignoredQuests then
 						WDB.ignoredQuests = {}
 					end
+
+					-- load all the localized quest names
+					self:addonLoad("Grail-Quests-" .. Grail.playerLocale)
 
 					-- Setup the colors, only setting those that do not already exist
 					WDB.color = WDB.color or {}
@@ -3580,8 +3585,10 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			end
 		end,
 
+-- TODO: Cause the loadable addons to be loaded if they are not already done so for any search...use the current locale
+
 		SearchForAllQuests = function(self)
-			Grail:SetMapAreaQuests(0, SEARCH .. ' ' .. Wholly.s.SEARCH_ALL_QUESTS, Grail.questNames, true)
+			Grail:SetMapAreaQuests(0, SEARCH .. ' ' .. Wholly.s.SEARCH_ALL_QUESTS, Grail.quest.name, true)
 --			Grail.indexedQuests[0] = {}
 --			Grail.mapAreaMapping[0] = SEARCH .. ' ' .. Wholly.s.SEARCH_ALL_QUESTS
 --			for q, v in pairs(Grail.questNames) do
@@ -3597,14 +3604,14 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			for i = 1, #terms do
 				if terms[i] ~= "" then
 					if not started then
-						for qid, questName in pairs(Grail.questNames) do
+						for qid, questName in pairs(Grail.quest.name) do
 							if strfind(questName, terms[i]) then tinsert(results, qid) end
 						end
 						started = true
 					else
 						local newResults = {}
 						for _, q in pairs(results) do
-							if strfind(Grail.questNames[q], terms[i]) then tinsert(newResults, q) end
+							if strfind(Grail.quest.name[q], terms[i]) then tinsert(newResults, q) end
 						end
 						results = newResults
 					end
@@ -4431,6 +4438,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["ABANDONED"] = "Abandonnée"
 		S["ACCEPTED"] = "Acceptée"
 		S["ACHIEVEMENT_COLORS"] = "Afficher les couleurs de progression des hauts faits"
+		S["ADD_ADVENTURE_GUIDE"] = "Afficher le Guide de l'Aventurier dans la section Autres"
+		S["ALL_FACTION_REPUTATIONS"] = "Affiche toutes les réputations de factions"
 		S["APPEND_LEVEL"] = "Ajouter le niveau minimum requis après le nom de la quête"
 		S["BASE_QUESTS"] = "Quête de départ"
 		BINDING_NAME_WHOLLY_TOGGLEMAPPINS = "Afficher/cacher les marqueurs sur la carte"
@@ -4439,7 +4448,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		BINDING_NAME_WHOLLY_TOGGLESHOWNEEDSPREREQUISITES = "Afficher/cacher les quêtes nécessitants des prérequis"
 		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "Afficher/cacher les répétables"
 		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Afficher/cacher les quêtes impossibles à obtenir"
-		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "Afficher/cacher les quêtes hebdomadaires" -- Needs review
+		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "Afficher/cacher les quêtes hebdomadaires"
 		S["BLIZZARD_TOOLTIP"] = "Apparition des info-bulles sur le Journal de quêtes"
 		S["BREADCRUMB"] = "Quêtes précédentes (suite de quêtes) :"
 		S["BUGGED"] = "*** BOGUÉE ***"
@@ -4451,8 +4460,9 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["COMPLETED"] = "Complétées"
 		S["COMPLETION_DATES"] = "Date de restitution"
 		S["DROP_TO_START_FORMAT"] = "Ramasser %s (butin) pour commencer [%s]"
+		S["EMPTY_ZONES"] = "Afficher les zones vides"
 		S["ENABLE_COORDINATES"] = "Activer les coordonnées du joueur"
-		S["ENTER_ZONE"] = "Accepté(e) lors de l'entrée dans la zone" -- Needs review
+		S["ENTER_ZONE"] = "Accepté(e) lors de l'entrée dans la zone"
 		S["ESCORT"] = "Escorte"
 		S["EVER_CAST"] = "N'a jamais lancé "
 		S["EVER_COMPLETED"] = "N'a jamais été effectuée"
@@ -4463,11 +4473,16 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["GENDER_BOTH"] = "Les deux"
 		S["GENDER_NONE"] = "Aucun"
 		S["GRAIL_NOT_HAVE"] = "Grail n'a pas cette quête dans sa base de données"
+		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Masquer les objectifs bonus de Blizzard"
+		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Masquer les marqueur de quêtes de Blizzard"
+		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Masquer les trésors de Blizzard"
+		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "Masquer les points de vol"
 		S["HIGH_LEVEL"] = "Haut niveau"
-		S["HOLIDAYS_ONLY"] = "Disponible uniquement pendant un évènement mondial :" -- Needs review
+		S["HOLIDAYS_ONLY"] = "Disponible uniquement pendant un évènement mondial :"
+		S["IGNORE_REPUTATION_SECTION"] = "Ignorer la section réputation des quêtes"
 		S["IN_LOG"] = "Dans le journal"
 		S["IN_LOG_STATUS"] = "Afficher l'état des quêtes dans le journal"
-		S["INVALIDATE"] = "Invalidé(e) de par les quêtes :" -- Needs review
+		S["INVALIDATE"] = "Invalidé(e) par les quêtes :"
 		S["IS_BREADCRUMB"] = "Quête suivante (suite) : " -- Needs review
 		S["ITEM"] = "Objet"
 		S["ITEM_LACK"] = "Objet manquant"
@@ -4476,7 +4491,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["LOAD_DATA"] = "Chargement des données"
 		S["LOREMASTER_AREA"] = "Zone de maître des traditions"
 		S["LOW_LEVEL"] = "Bas niveau"
-		S["MAP"] = "Carte" -- Needs review
+		S["MAP"] = "Carte"
 		S["MAPAREA_NONE"] = "Aucune"
 		S["MAP_BUTTON"] = "Afficher le bouton sur la carte du monde"
 		S["MAP_DUNGEONS"] = "Afficher les quêtes de donjons sur la carte extérieure"
@@ -4488,9 +4503,9 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["NEAR"] = "Proche"
 		S["NEEDS_PREREQUISITES"] = "Prérequis nécessaires"
 		S["NEVER_ABANDONED"] = "Jamais abandonnée"
-		S["OAC"] = "Quêtes complétées dès obtention :" -- Needs review
-		S["OCC"] = "Quêtes complétées dès complétion des objectifs :" -- Needs review
-		S["OTC"] = "Quêtes complétées lorsque rendues :" -- Needs review
+		S["OAC"] = "Quêtes complétées dès obtention :"
+		S["OCC"] = "Quêtes complétées dès complétion des objectifs :"
+		S["OTC"] = "Quêtes complétées lorsque rendues :"
 		S["OTHER"] = "Autres"
 		S["OTHER_PREFERENCE"] = "Autres"
 		S["PANEL_UPDATES"] = "Mise à jour du journal de quêtes lors d'un changement de zone"
@@ -4502,11 +4517,13 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["QUEST_TYPE_NORMAL"] = "Normal"
 		S["RACE_ANY"] = "Toutes"
 		S["RACE_NONE"] = "Aucune"
+		S["RARE_MOBS"] = "Monstres Rare"
 		S["REPEATABLE"] = "Répétable"
 		S["REPEATABLE_COMPLETED"] = "Afficher si les quêtes répétables ont déjà été terminées auparavant"
 		S["REPUTATION_REQUIRED"] = "Réputation nécessaire :"
 		S["REQUIRED_LEVEL"] = "Niveau requis"
 		S["REQUIRES_FORMAT"] = "Wholly nécessite Grail version %s ou ultérieure"
+		S["RESTORE_DIRECTIONAL_ARROWS"] = "Ne devrait pas restaurer les flèches directionnelles"
 		S["SEARCH_ALL_QUESTS"] = "Toutes les quêtes"
 		S["SEARCH_CLEAR"] = "Effacer"
 		S["SEARCH_NEW"] = "Nouvelle"
@@ -4515,10 +4532,11 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["SHOW_LOREMASTER"] = "Afficher uniquement les quêtes comptant pour le haut fait de \"Maître des traditions\""
 		S["SINGLE_BREADCRUMB_FORMAT"] = "Quête préalable disponible"
 		S["SP_MESSAGE"] = "Certaines quêtes spéciales ne sont jamais affichées dans le journal de quêtes de Blizzard"
-		S["TAGS"] = "Tags" -- Needs review
-		S["TAGS_DELETE"] = "Supprimer le tag" -- Needs review
-		S["TAGS_NEW"] = "Ajouter un tag" -- Needs review
+		S["TAGS"] = "Tags"
+		S["TAGS_DELETE"] = "Supprimer le tag"
+		S["TAGS_NEW"] = "Ajouter un tag"
 		S["TITLE_APPEARANCE"] = "Apparence de l'intitulé des quêtes"
+		S["TREASURE"] = "Trésor"
 		S["TURNED_IN"] = "Rendue"
 		S["UNOBTAINABLE"] = "Impossible à obtenir"
 		S["WHEN_KILL"] = "Accepté(e) en tuant :"
@@ -5052,6 +5070,10 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["GENDER_BOTH"] = "男女皆可"
 		S["GENDER_NONE"] = "無"
 		S["GRAIL_NOT_HAVE"] = "Grail 資料庫內無此任務"
+		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "隱藏暴雪獎勵目標圖示"
+		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "隱藏暴雪地圖任務圖示"
+		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "隱藏暴雪寶藏圖示"
+		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "隱藏飛行鳥點圖示"
 		S["HIGH_LEVEL"] = "高等級"
 		S["HOLIDAYS_ONLY"] = "僅在節日時可取得："
 		S["IGNORE_REPUTATION_SECTION"] = "忽略任務的聲望部分" -- Needs review
