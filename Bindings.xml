@@ -21,4 +21,7 @@
 	<Binding name="WHOLLY_TOGGLESHOWCOMPLETED" header="WHOLLY">
 		Wholly:ToggleSwitch("showsCompletedQuests")
 	</Binding>
+	<Binding name="WHOLLY_TOGGLESHOWWORLDQUESTS" header="WHOLLY">
+		Wholly:ToggleSwitch("showsWorldQuests")
+	</Binding>
 </Bindings>

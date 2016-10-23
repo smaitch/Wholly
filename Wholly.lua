@@ -320,6 +320,8 @@
 --			Adds the ability to control the display of Blizzard story line quest markers.
 --			Updates French translation by coldragon78.
 --			Updates Traditional Chinese localization by gaspy10.
+--		060 Adds the ability to control the display of World Quests, including a key binding.
+--			Adds a Legion Repuation Changes section.
 --
 --	Known Issues
 --
@@ -366,7 +368,6 @@ local UIDropDownMenu_Initialize				= UIDropDownMenu_Initialize
 local UIDropDownMenu_JustifyText			= UIDropDownMenu_JustifyText
 local UIDropDownMenu_SetText				= UIDropDownMenu_SetText
 local UIDropDownMenu_SetWidth				= UIDropDownMenu_SetWidth
-local UIParentLoadAddOn						= UIParentLoadAddOn
 local UnitIsPlayer							= UnitIsPlayer
 
 local GameTooltip = GameTooltip
@@ -381,7 +382,7 @@ local directoryName, _ = ...
 local versionFromToc = GetAddOnMetadata(directoryName, "Version")
 local _, _, versionValueFromToc = strfind(versionFromToc, "(%d+)")
 local Wholly_File_Version = tonumber(versionValueFromToc)
-local requiredGrailVersion = 67
+local requiredGrailVersion = 83
 
 --	Set up the bindings to use the localized name Blizzard supplies.  Note that the Bindings.xml file cannot
 --	just contain the TOGGLEQUESTLOG because then the entry for Wholly does not show up.  So, we use a version
@@ -396,6 +397,7 @@ BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "Toggle shows weeklies"
 BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "Toggle shows repeatables"
 BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Toggle shows unobtainables"
 BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = "Toggle shows completed"
+BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Toggle shows World Quests"
 
 if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
@@ -408,13 +410,6 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
 	Wholly = {
 
-		addonLoad = function(self, addonName)
-						local success, failureReason = LoadAddOn(addonName)
-						if not success then
-							print("|cFFFF0000Wholly|r failed to load addon", addonName, failureReason)
-						end
-						return success
-					end,
 		cachedMapCounts = {},
 		cachedPanelQuests = {},		-- quests and their status for map area self.zoneInfo.panel.mapId
 		cachedPinQuests = {},		-- quests and their status for map area self.zoneInfo.pins.mapId
@@ -477,13 +472,13 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 								end,
 		configurationScript9 = function(self)
 									if WhollyDatabase.loadAchievementData then
-										Wholly:addonLoad("Grail-Achievements")
+										Grail:LoadAddOn("Grail-Achievements")
 									end
 									Wholly:_InitializeLevelOneData()
 								end,
 		configurationScript10 = function(self)
 									if WhollyDatabase.loadReputationData then
-										Wholly:addonLoad("Grail-Reputations")
+										Grail:LoadAddOn("Grail-Reputations")
 									end
 									Wholly:_InitializeLevelOneData()
 								end,
@@ -497,12 +492,12 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 								end,
 		configurationScript14 = function(self)
 									if WhollyDatabase.loadDateData then
-										Wholly:addonLoad("Grail-When")
+										Grail:LoadAddOn("Grail-When")
 									end
 								end,
 		configurationScript15 = function(self)
 									if WhollyDatabase.loadRewardData then
-										Wholly:addonLoad("Grail-Rewards")
+										Grail:LoadAddOn("Grail-Rewards")
 									end
 								end,
 		configurationScript16 = function(self)
@@ -591,7 +586,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					end
 
 					-- load all the localized quest names
-					self:addonLoad("Grail-Quests-" .. Grail.playerLocale)
+					Grail:LoadAddOn("Grail-Quests-" .. Grail.playerLocale)
 
 					-- Setup the colors, only setting those that do not already exist
 					WDB.color = WDB.color or {}
@@ -648,6 +643,9 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					end
 					if WDB.version < 56 then
 						WDB.showsPVPQuests = true
+					end
+					if WDB.version < 60 then
+						WDB.showsWorldQuests = true
 					end
 					WDB.version = Wholly.versionNumber
 
@@ -1001,6 +999,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			['HIDE_BLIZZARD_WORLD_MAP_TREASURES'] = 'Hide Blizzard treasures',
 			['HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES'] = 'Hide Blizzard bonus objectives',
 			['HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS'] = 'Hide Blizzard quest map pins',
+			['WORLD_QUEST'] = 'World Quests',
 			},
 		supportedControlMaps = { WorldMapFrame, OmegaMapFrame, },	-- the frame to check for visibility
 		supportedMaps = { WorldMapDetailFrame, OmegaMapDetailFrame, },	-- the frame that is the parent of the pins
@@ -1720,34 +1719,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			if not WDB.showsLegendaryQuests and Grail:IsLegendary(questId) then return false end
 			if not WDB.showsPetBattleQuests and Grail:IsPetBattle(questId) then return false end
 			if not WDB.showsPVPQuests and Grail:IsPVP(questId) then return false end
+			if not WDB.showsWorldQuests and Grail:IsWorldQuest(questId) then return false end
 			return true
-		end,
-
-		--	Returns false if the settings say this should not be used
-		OLD_FilterQuestsBasedOnSettings = function(self, questId, status)
-			status = status or Grail:StatusCode(questId)
-			local WDB = WhollyDatabase
-			local shouldAdd = true
-
---	TODO:	Think about whether any of these should be short-circuited, and if so, perhaps ordering them based on likelihood of
---			one of them being chosen to return false, or perhaps based on cost of evaluating...
-			if Grail:IsRepeatable(questId) and not WDB.showsRepeatableQuests then shouldAdd = false end
-			if Grail:IsDaily(questId) and not WDB.showsDailyQuests then shouldAdd = false end
-			if 0 < bitband(status, Grail.bitMaskInLog) and not WDB.showsQuestsInLog then shouldAdd = false end
-			if Grail:IsLowLevel(questId) and not WDB.showsLowLevelQuests then shouldAdd = false end
-			if bitband(status, Grail.bitMaskLevelTooLow) > 0 and not WDB.showsHighLevelQuests then shouldAdd = false end
-			if Grail:IsScenario(questId) and not WDB.showsScenarioQuests then shouldAdd = false end
-			if Grail:CodeHoliday(questId) ~= 0 and not WDB.showsHolidayQuests and not dealingWithHolidays then shouldAdd = false end
-			if self:_IsIgnoredQuest(questId) and not WDB.showsIgnoredQuests then shouldAdd = false end
-			if Grail:IsWeekly(questId) and not WDB.showsWeeklyQuests then shouldAdd = false end
-			if questObsoleteOrPending and not WDB.showsUnobtainableQuests then shouldAdd = false end
-			if Grail:IsBonusObjective(questId) and not WDB.showsBonusObjectiveQuests then shouldAdd = false end
-			if Grail:IsRareMob(questId) and not WDB.showsRareMobQuests then shouldAdd = false end
-			if Grail:IsTreasure(questId) and not WDB.showsTreasureQuests then shouldAdd = false end
-			if Grail:IsLegendary(questId) and not WDB.showsLegendaryQuests then shouldAdd = false end
-			if Grail:IsPetBattle(questId) and not WDB.showsPetBattleQuests then shouldAdd = false end
-
-			return shouldAdd
 		end,
 
 		_FilterPanelQuests = function(self)
@@ -1832,7 +1805,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
 				self.texture = self:CreateTexture()
 				-- WoD beta does not allow custom textures so we go back to the old way
-				if Grail.blizzardRelease < 18505 or Grail.blizzardRelease >= 18663 then
+				if not Grail.existsWoD or Grail.blizzardRelease >= 18663 then
 					if 'R' == texType then
 						self.texture:SetTexture("Interface\\Addons\\Wholly\\question")
 					else
@@ -1933,7 +1906,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			end
 			tablesort(entries, function(a, b) return a.displayName < b.displayName end)
 			
-			if Grail.blizzardRelease < 18505 then
+			if not Grail.existsWoD then
 			--	Dungeons
 			t1 = { displayName = BUG_CATEGORY3, header = 1, children = {} }
 			for mapId, continentTable in pairs(Grail.continents) do
@@ -1983,22 +1956,20 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
 			--	Reputation Changes
 			if WDB.loadReputationData then
-
-				-- 15640 is the 5.0.1 release
-				local _, release = GetBuildInfo()
-				release = tonumber(release)
-
 				t1 = { displayName = COMBAT_TEXT_SHOW_REPUTATION_TEXT, header = 3, children = {} }
 				tinsert(t1.children, { displayName = EXPANSION_NAME0, index = 61 })
 				tinsert(t1.children, { displayName = EXPANSION_NAME1, index = 62 })
 				tinsert(t1.children, { displayName = EXPANSION_NAME2, index = 63 })
 				tinsert(t1.children, { displayName = EXPANSION_NAME3, index = 64 })
-				if release >= 15640 then
+				if Grail.existsPandaria then
 					tinsert(t1.children, { displayName = EXPANSION_NAME4, index = 65 })
 				end
-				if release >= 18505 then
+				if Grail.existsWoD then
 					tinsert(t1.children, { displayName = EXPANSION_NAME5, index = 66 })
-				end				
+				end
+				if Grail.existsLegion then
+					tinsert(t1.children, { displayName = EXPANSION_NAME6, index = 67 })
+				end
 				tinsert(entries, t1)
 			end
 
@@ -2265,17 +2236,21 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			db.showsHolidayQuests = true
 			db.showsWeeklyQuests = true
 			db.showsLegendaryQuests = true
+			db.showsPetBattleQuests = true
+			db.showsPVPQuests = true
+			db.showsWorldQuests = true
 			db.loadDataData = true
 			db.version = Wholly.versionNumber
 			WhollyDatabase = db
 			return db
 		end,
 
-		_NPCInfoSection = function(self, heading, table, button, meetsCriteria)
+		_NPCInfoSectionCore = function(self, heading, table, button, meetsCriteria, processingPrerequisites)
 			if nil == table then return end
 			self:_AddLine(" ")
 			self:_AddLine(heading)
-			for _, npcId in pairs(table) do
+			for first, second in pairs(table) do
+				local npcId = processingPrerequisites and first or second
 				local locations = Grail:NPCLocations(npcId)
 				if nil ~= locations then
 					for _, npc in pairs(locations) do
@@ -2289,13 +2264,19 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 						elseif nil ~= npc.x then
 							locationString = locationString .. strformat(' %.2f, %.2f', npc.x, npc.y)
 						end
-						local nameToUse = npc.name or "**"
+						local rawNameToUse = npc.name or "**"
+						local nameToUse = rawNameToUse
 						if npc.dropName then
 							nameToUse = nameToUse .. " (" .. npc.dropName .. ')'
 						end
-						self:_AddLine(self:_PrettyNPCString(nameToUse, npc.kill, npc.realArea), locationString)
+						local prettiness = self:_PrettyNPCString(nameToUse, npc.kill, npc.realArea)
+						if processingPrerequisites then
+							self:_QuestInfoSection({prettiness, locationString}, second)
+						else
+							self:_AddLine(prettiness, locationString)
+						end
 						if meetsCriteria then
-							local desiredMacroValue = SLASH_TARGET1 .. ' ' .. (npc.name or "**")
+							local desiredMacroValue = self.s.SLASH_TARGET .. ' ' .. rawNameToUse
 							if button:GetAttribute("macrotext") ~= desiredMacroValue and not InCombatLockdown() then
 								button:SetAttribute("macrotext", desiredMacroValue)
 							end
@@ -2305,38 +2286,12 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			end
 		end,
 
+		_NPCInfoSection = function(self, heading, table, button, meetsCriteria)
+			self:_NPCInfoSectionCore(heading, table, button, meetsCriteria)
+		end,
+
 		_NPCInfoSectionPrerequisites = function(self, heading, table, button, meetsCriteria)
-			if nil == table then return end
-			self:_AddLine(" ")
-			self:_AddLine(heading)
-			for npcId, preqTable in pairs(table) do
-				local locations = Grail:NPCLocations(npcId)
-				if nil ~= locations then
-					for _, npc in pairs(locations) do
-						local locationString = npc.mapArea and Grail:MapAreaName(npc.mapArea) or ""
-						if npc.near then
-							locationString = locationString .. ' ' .. self.s.NEAR
-						elseif npc.mailbox then
-							locationString = locationString .. ' ' .. self.s.MAILBOX
-						elseif npc.created then
-							locationString = locationString .. ' ' .. self.s.CREATED_ITEMS
-						elseif nil ~= npc.x then
-							locationString = locationString .. strformat(' %.2f, %.2f', npc.x, npc.y)
-						end
-						local nameToUse = npc.name
-						if npc.dropName then
-							nameToUse = nameToUse .. " (" .. npc.dropName .. ')'
-						end
-						self:_QuestInfoSection({self:_PrettyNPCString(nameToUse, npc.kill, npc.realArea), locationString}, preqTable)
-						if meetsCriteria and npc.name then
-							local desiredMacroValue = self.s.SLASH_TARGET .. ' ' .. npc.name
-							if button:GetAttribute("macrotext") ~= desiredMacroValue and not InCombatLockdown() then
-								button:SetAttribute("macrotext", desiredMacroValue)
-							end
-						end
-					end
-				end
-			end
+			self:_NPCInfoSectionCore(heading, table, button, meetsCriteria, true)
 		end,
 
 		_OnEnterBlizzardQuestButton = function(blizzardQuestButton)
@@ -2431,7 +2386,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			local f = CreateFrame("Button", nil, WorldMapFrame.BorderFrame, "UIPanelButtonTemplate")
 			f:SetSize(100, 25)
 			if nil == Gatherer_WorldMapDisplay then
-				if Grail.blizzardRelease < 18505 then
+				if not Grail.existsWoD then
 					f:SetPoint("TOPLEFT", WorldMapPositioningGuide, "TOPLEFT", 4, -4)
 				else
 					f:SetPoint("TOPLEFT", WorldMapFrameTutorialButton, "TOPRIGHT", 0, -30)
@@ -2444,7 +2399,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			f:SetText("Wholly")
 			f:SetScript("OnShow", function(self)
 									if nil == Gatherer_WorldMapDisplay then
-										if Grail.blizzardRelease < 18505 then
+										if not Grail.existsWoD then
 											if not(GetCVarBool("miniWorldMap")) then
 												f:SetPoint("TOPLEFT", WorldMapPositioningGuide, "TOPLEFT", 4, -4)
 											else
@@ -2497,7 +2452,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			end
 
 			-- Make it so the Blizzard quest log can display our tooltips
-			if GRAIL.blizzardRelease < 18505 then	-- technically there were a few WoD releases before this
+			if not GRAIL.existsWoD then
 				local buttons = QuestLogScrollFrame.buttons
 				local buttonCount = #buttons
 				for i = 1, buttonCount do
@@ -2526,7 +2481,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			end
 
 			-- Our frame positions are wrong for MoP, so we change them here.
-			if GRAIL.blizzardRelease >= 15640 then
+			if GRAIL.existsPandaria then
 				com_mithrandir_whollyQuestInfoFrame:SetPoint("TOPRIGHT", QuestFrame, "TOPRIGHT", -15, -35)
 				com_mithrandir_whollyQuestInfoBuggedFrame:SetPoint("TOPLEFT", QuestFrame, "TOPLEFT", 100, -35)
 				com_mithrandir_whollyBreadcrumbFrame:SetPoint("TOPLEFT", QuestFrame, "BOTTOMLEFT", 16, -10)
@@ -2546,7 +2501,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
 			com_mithrandir_whollyFrameSwitchZoneButton:SetText(self.s.MAP)
 			com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
-			if GRAIL.blizzardRelease < 18505 then
+			if not GRAIL.existsWoD then
 				com_mithrandir_whollyFrameWideReallySwitchZoneButton:Hide()
 			end
 
@@ -2855,9 +2810,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			self:_AddLine("|c"..colorCode..self.s.MAX_LEVEL.."|r", (notToExceedLevel * Grail.bitMaskQuestMaxLevelOffset == Grail.bitMaskQuestMaxLevel) and self.s.MAXIMUM_LEVEL_NONE or notToExceedLevel)
 
 			if "" == questType then questType = self.s.QUEST_TYPE_NORMAL end
-			local len = strlen(questType)
-			if len > 0 and ' ' == strsub(questType, len, len) then questType = strsub(questType, 1, len - 1) end
-			self:_AddLine(TYPE, questType)
+			self:_AddLine(TYPE, trim(questType))
 
 			local loremasterString = self.s.MAPAREA_NONE
 			local loremasterMapArea = Grail:LoremasterMapArea(questId)
@@ -2891,8 +2844,6 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 						classString = classString .. format("|cff%.2x%.2x%.2x%s|r ", classColor.r*255, classColor.g*255, classColor.b*255, localizedGenderClassName)
 					end
 				end
---				len = strlen(classString)
---				if 0 > len and ' ' == strsub(classString, len, len) then classString = strsub(classString, 1, len - 1) end
 				trim(classString)
 			end
 			if bitband(statusCode, Grail.bitMaskClass) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorClass) > 0 then colorCode = orangeColor else colorCode = normalColor end
@@ -2925,8 +2876,6 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 						raceString = raceString .. localizedGenderRaceName .. " "
 					end
 				end
---				len = strlen(raceString)
---				if 0 > len and ' ' == strsub(raceString, len, len) then raceString = strsub(raceString, 1, len - 1) end
 				raceString = trim(raceString)
 			end
 			if bitband(statusCode, Grail.bitMaskRace) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorRace) > 0 then colorCode = orangeColor else colorCode = normalColor end
@@ -2943,7 +2892,6 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				end
 			end
 
---			if Grail.quests[questId]['SP'] then
 			if bitband(Grail:CodeType(questId), Grail.bitMaskQuestSpecial) > 0 then
 				self:_AddLine(" ")
 				self:_AddLine(self.s.SP_MESSAGE)
@@ -3031,19 +2979,14 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				end
 			end
 
---			if nil ~= Grail.quests[questId][6] and 0 < #(Grail.quests[questId][6]) then
 			local reputationCodes = Grail.questReputations[questId]
 			if nil ~= reputationCodes then
 				local reputationCount = strlen(reputationCodes) / 4
 				self:_AddLine(" ")
 				self:_AddLine(self.s.REPUTATION_CHANGES .. ':')
 				local index, value
---				for _, repString in pairs(Grail.quests[questId][6]) do
 				for i = 1, reputationCount do
 					index, value = Grail:ReputationDecode(strsub(reputationCodes, i * 4 - 3, i * 4))
---				for _, repString in pairs(Grail.questReputations[questId]) do
---					index = strsub(repString, 1, 3)
---					value = tonumber(strsub(repString, 4))
 					if value > 0 then
 						colorCode = greenColor
 					else
@@ -3071,6 +3014,9 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				local currencyName, currencyTexture, currencyCount = GetQuestLogRewardCurrencyInfo(counter, questId)
 				self:_AddLine(currencyName, currencyCount, currencyTexture)
 			end
+--	TODO:	Determine whether these API work properly for quests because we are getting Wholly displaying values
+--			that seem to be for the previous quest dealt with.  It is as if the internal counter that Blizzard is
+--			using is wrong.
 			for counter = 1, GetNumQuestLogRewards(questId) do
 				local name, texture, count, quality, isUsable = GetQuestLogRewardInfo(counter, questId)
 				self:_AddLine(name, count, texture)
@@ -3247,6 +3193,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				if bitband(bitValue, Grail.bitMaskQuestBonus) > 0 then retval = retval .. self.s.BONUS_OBJECTIVE .. " " end
 				if bitband(bitValue, Grail.bitMaskQuestRareMob) > 0 then retval = retval .. self.s.RARE_MOBS .. " " end
 				if bitband(bitValue, Grail.bitMaskQuestTreasure) > 0 then retval = retval .. self.s.TREASURE .. " " end
+				if bitband(bitValue, Grail.bitMaskQuestWorldQuest) > 0 then retval = retval .. self.s.WORLD_QUEST .. " " end
 			end
 			return trim(retval)
 		end,
@@ -3589,11 +3536,6 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
 		SearchForAllQuests = function(self)
 			Grail:SetMapAreaQuests(0, SEARCH .. ' ' .. Wholly.s.SEARCH_ALL_QUESTS, Grail.quest.name, true)
---			Grail.indexedQuests[0] = {}
---			Grail.mapAreaMapping[0] = SEARCH .. ' ' .. Wholly.s.SEARCH_ALL_QUESTS
---			for q, v in pairs(Grail.questNames) do
---				Grail:AddQuestToMapArea(q, 0)
---			end
 		end,
 
 		SearchForQuestNamesMatching = function(self, searchTerm)
@@ -3619,11 +3561,6 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			end
 			-- clear the mapArea 0 because that is what we use for computed results
 			Grail:SetMapAreaQuests(0, SEARCH .. ': ' .. searchTerm, results)
---			Grail.indexedQuests[0] = {}
---			Grail.mapAreaMapping[0] = SEARCH .. ': ' .. searchTerm
---			for _, q in pairs(results) do
---				Grail:AddQuestToMapArea(q, 0)
---			end
 		end,
 
 		SearchForQuestsWithTag = function(self, tagName)
@@ -3640,11 +3577,6 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				end
 			end
 			Grail:SetMapAreaQuests(0, Wholly.s.TAGS .. ': ' .. tagName, results)
---			Grail.indexedQuests[0] = {}
---			Grail.mapAreaMapping[0] = Wholly.s.TAGS .. ': ' .. tagName
---			for _, q in pairs(results) do
---				Grail:AddQuestToMapArea(q, 0)
---			end
 		end,
 
 		-- This is really setting to the current map
@@ -3735,7 +3667,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 								pin.questId = id
 								if frame ~= NxMap1 then
 									local baseFrameLevel = self.supportedPOIMaps[index]:GetFrameLevel()
-									local releaseDelta = (Grail.blizzardRelease < 18505) and -1 or 1
+									local releaseDelta = (not Grail.existsWoD) and -1 or 1
 									local pinTypeDelta = (pin.texType == 'G' or pin.texType == 'W') and 1 or 0
 									pin:SetFrameStrata("DIALOG")	-- treasure map icons still rule when I am set to this level
 									pin:SetFrameStrata("TOOLTIP")
@@ -5218,6 +5150,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		{ S.LEGENDARY, 'showsLegendaryQuests', 'configurationScript1', nil, nil, 'Y' },
 		{ S.PET_BATTLES, 'showsPetBattleQuests', 'configurationScript1' },
 		{ S.PVP, 'showsPVPQuests', 'configurationScript1' },
+		{ S.WORLD_QUEST, 'showsWorldQuests', 'configurationScript1' },
 		}
 	Wholly.configuration[S.TITLE_APPEARANCE] = {
 		{ S.TITLE_APPEARANCE },
