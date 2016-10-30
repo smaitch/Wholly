@@ -322,6 +322,7 @@
 --			Updates Traditional Chinese localization by gaspy10.
 --		060 Adds the ability to control the display of World Quests, including a key binding.
 --			Adds a Legion Repuation Changes section.
+--			Fixes the problem where the coordinates would cause issues in instances.
 --
 --	Known Issues
 --
@@ -787,6 +788,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				self.zoneInfo.map.dungeonLevel = GetCurrentMapDungeonLevel()
 				self.zoneInfo.zone.mapId = self.zoneInfo.map.mapId
 				self.zoneInfo.zone.dungeonLevel = self.zoneInfo.map.dungeonLevel
+				self:UpdateCoordinateSystem()
 			end,
 			['ZONE_CHANGED_NEW_AREA'] = function(self, frame)
 				local mapWeSupportIsVisible = false
@@ -3958,7 +3960,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		end,
 
 		UpdateCoordinateSystem = function(self)
-			if WhollyDatabase.enablesPlayerCoordinates then
+			if WhollyDatabase.enablesPlayerCoordinates and not Grail:IsInInstance() then
 				self.notificationFrame:SetScript("OnUpdate", function(frame, ...) self:_OnUpdate(frame, ...) end)
 			else
 				self.notificationFrame:SetScript("OnUpdate", nil)
