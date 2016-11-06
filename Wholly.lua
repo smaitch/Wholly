@@ -323,6 +323,8 @@
 --		060 Adds the ability to control the display of World Quests, including a key binding.
 --			Adds a Legion Repuation Changes section.
 --			Fixes the problem where the coordinates would cause issues in instances.
+--		061	Adds ability to show "available" prerequisite used for world quests.
+--			Updates German localization by Broesel01.
 --
 --	Known Issues
 --
@@ -2691,6 +2693,10 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				local phaseLocation = GRAIL:MapAreaName(subcode) or "UNKNOWN"
 				local phaseString = format(self.s.STAGE_FORMAT, numeric)
 				return format("|c%s%s %s [%s]|r", colorCode, phaseLocation, questCode, phaseString)
+			elseif questCode == 'x' then
+				return format("|c%s"..ARTIFACTS_KNOWLEDGE_TOOLTIP_LEVEL.."|r", colorCode, numeric)
+			elseif questCode == 'a' then
+				return format("|c%s"..AVAILABLE_QUEST.."|r", colorCode)
 			else
 				questId = numeric
 				local typeString = ""
@@ -3019,18 +3025,18 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 --	TODO:	Determine whether these API work properly for quests because we are getting Wholly displaying values
 --			that seem to be for the previous quest dealt with.  It is as if the internal counter that Blizzard is
 --			using is wrong.
-			for counter = 1, GetNumQuestLogRewards(questId) do
-				local name, texture, count, quality, isUsable = GetQuestLogRewardInfo(counter, questId)
-				self:_AddLine(name, count, texture)
-			end
-			local numberQuestChoiceRewards = GetNumQuestLogChoices(questId)
-			if 1 < numberQuestChoiceRewards then
-				self:_AddLine(self.s.REWARD_CHOICES)
-			end
-			for counter = 1, numberQuestChoiceRewards do
-				local name, texture, numItems, quality, isUsable = GetQuestLogChoiceInfo(counter, questId)
-				self:_AddLine(name, count, texture)
-			end
+--			for counter = 1, GetNumQuestLogRewards(questId) do
+--				local name, texture, count, quality, isUsable = GetQuestLogRewardInfo(counter, questId)
+--				self:_AddLine(name, count, texture)
+--			end
+--			local numberQuestChoiceRewards = GetNumQuestLogChoices(questId)
+--			if 1 < numberQuestChoiceRewards then
+--				self:_AddLine(self.s.REWARD_CHOICES)
+--			end
+--			for counter = 1, numberQuestChoiceRewards do
+--				local name, texture, numItems, quality, isUsable = GetQuestLogChoiceInfo(counter, questId)
+--				self:_AddLine(name, count, texture)
+--			end
 
 --			if nil ~= Grail.questRewards then
 --				local rewardString = Grail.questRewards[questId]
@@ -4090,6 +4096,10 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["GENDER_BOTH"] = "Beide"
 		S["GENDER_NONE"] = "Keins"
 		S["GRAIL_NOT_HAVE"] = "Grail kennt diese Quest nicht"
+-- 		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = ""
+-- 		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = ""
+-- 		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = ""
+		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "verstecke Flugpunkt"
 		S["HIGH_LEVEL"] = "Hochstufig"
 		S["HOLIDAYS_ONLY"] = "Verfügbar nur an Feiertagen:"
 		S["IGNORE_REPUTATION_SECTION"] = "Rufabschnitt bei Quests ignorieren"
@@ -4136,7 +4146,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["REPUTATION_REQUIRED"] = "Ruf erforderlich:"
 		S["REQUIRED_LEVEL"] = "Benötigte Stufe:"
 		S["REQUIRES_FORMAT"] = "Wholly benötigt Grail-Version %s oder neuer"
-		S["RESTORE_DIRECTIONAL_ARROWS"] = "Sollte nicht die Richtungspfeile wiederherstellen" -- Needs review
+		S["RESTORE_DIRECTIONAL_ARROWS"] = "Sollte nicht die Richtungspfeile wiederherstellen"
 		S["SEARCH_ALL_QUESTS"] = "Alle Quests"
 		S["SEARCH_CLEAR"] = "Suche löschen"
 		S["SEARCH_NEW"] = "Neue Suche"
@@ -4144,7 +4154,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["SHOW_BREADCRUMB"] = "Detaillierte Questinformationen im Questfenster anzeigen"
 		S["SHOW_LOREMASTER"] = "Zeige nur Meister-der-Lehren-Quests"
 		S["SINGLE_BREADCRUMB_FORMAT"] = "Brotkrumen-Quest verfügbar"
-		S["SP_MESSAGE"] = "Spezialquest taucht niemals in Blizzards Questlog auf" -- Needs review
+		S["SP_MESSAGE"] = "Spezial-Quests tauchen niemals in Blizzards Quest-Log auf"
 		S["TAGS"] = "Tags"
 		S["TAGS_DELETE"] = "Tag entfernen"
 		S["TAGS_NEW"] = "Tag hinzufügen"
@@ -4156,6 +4166,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["WIDE_PANEL"] = "Breites Wholly-Questfenster"
 		S["WIDE_SHOW"] = "Zeige"
 		S["WORLD_EVENTS"] = "Weltereignisse"
+		S["WORLD_QUEST"] = "Weltquest"
 		S["YEARLY"] = "Jährlich"
 	elseif "esES" == locale then
 		S["ABANDONED"] = "ABANDONADA"
