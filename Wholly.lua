@@ -325,6 +325,7 @@
 --			Fixes the problem where the coordinates would cause issues in instances.
 --		061	Adds ability to show "available" prerequisite used for world quests.
 --			Updates German localization by Broesel01.
+--			Updates Korean localization by netaras.
 --
 --	Known Issues
 --
@@ -4096,9 +4097,12 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["GENDER_BOTH"] = "Beide"
 		S["GENDER_NONE"] = "Keins"
 		S["GRAIL_NOT_HAVE"] = "Grail kennt diese Quest nicht"
--- 		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = ""
--- 		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = ""
--- 		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = ""
+--Translation missing 
+		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Hide Blizzard bonus objectives"
+--Translation missing 
+		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Hide Blizzard quest map pins"
+--Translation missing 
+		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Hide Blizzard treasures"
 		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "verstecke Flugpunkt"
 		S["HIGH_LEVEL"] = "Hochstufig"
 		S["HOLIDAYS_ONLY"] = "Verfügbar nur an Feiertagen:"
@@ -4115,11 +4119,11 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["LOREMASTER_AREA"] = "Bereich 'Meister der Lehren'"
 		S["LOW_LEVEL"] = "Niedrigstufig"
 		S["MAP"] = "Karte"
-		S["MAPAREA_NONE"] = "Keine"
 		S["MAP_BUTTON"] = "Button auf Weltkarte anzeigen"
 		S["MAP_DUNGEONS"] = "Dungeonquests in Umgebungskarte anzeigen"
 		S["MAP_PINS"] = "Kartensymbole für Questgeber anzeigen"
 		S["MAP_UPDATES"] = "Weltkarte aktualisieren, wenn Zone wechselt"
+		S["MAPAREA_NONE"] = "Keine"
 		S["MAXIMUM_LEVEL_NONE"] = "Keine"
 		S["MULTIPLE_BREADCRUMB_FORMAT"] = "%d Brotkrumen-Quests verfügbar"
 		S["MUST_KILL_PIN_FORMAT"] = "%s [Kill]"
@@ -4571,109 +4575,132 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["WORLD_EVENTS"] = "Eventi mondiali" -- Needs review
 		S["YEARLY"] = "Annuale" -- Needs review
 	elseif "koKR" == locale then
-		S["ABANDONED"] = "버림" -- Needs review
-		S["ACCEPTED"] = "수락" -- Needs review
-		S["ACHIEVEMENT_COLORS"] = "업적 완료 색상 표시" -- Needs review
--- 		S["ALL_FACTION_REPUTATIONS"] = ""
-		S["APPEND_LEVEL"] = "요구 레벨 표시"
-		S["BASE_QUESTS"] = "퀘스트 일반" -- Needs review
--- 		BINDING_NAME_WHOLLY_TOGGLEMAPPINS = ""
--- 		BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = ""
--- 		BINDING_NAME_WHOLLY_TOGGLESHOWDAILIES = ""
--- 		BINDING_NAME_WHOLLY_TOGGLESHOWNEEDSPREREQUISITES = ""
--- 		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = ""
--- 		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = ""
--- 		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = ""
--- 		S["BLIZZARD_TOOLTIP"] = ""
+		S["ABANDONED"] = "포기"
+		S["ACCEPTED"] = "수락함"
+		S["ACHIEVEMENT_COLORS"] = "업적 완료 색상을 표시"
+		S["ADD_ADVENTURE_GUIDE"] = "모든 지역에서 모험 안내서 퀘스트 표시"
+		S["ALL_FACTION_REPUTATIONS"] = "모든 진영 평판 표시"
+		S["APPEND_LEVEL"] = "요구 레벨 추가"
+		S["BASE_QUESTS"] = "기본 퀘스트"
+		BINDING_NAME_WHOLLY_TOGGLEMAPPINS = "지도 핀 표시 여부 전환"
+--Translation missing 
+		BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = "Toggle shows completed"
+		BINDING_NAME_WHOLLY_TOGGLESHOWDAILIES = "일일 퀘스트 표시 여부 전환"
+--Translation missing 
+		BINDING_NAME_WHOLLY_TOGGLESHOWNEEDSPREREQUISITES = "Toggle shows needs prerequisites"
+		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "반복 가능 퀘스트 표시 여부 전환"
+--Translation missing 
+		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Toggle shows unobtainables"
+		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "주간 퀘스트 표시 여부 전환"
+		S["BLIZZARD_TOOLTIP"] = "Blizzard 퀘스트 목록에 툴팁 표시"
 		S["BREADCRUMB"] = "추가 목표 퀘스트:"
-		S["BUGGED"] = "|cffff0000*** 오류 ***|r" -- Needs review
-		S["BUGGED_UNOBTAINABLE"] = "불가능한 퀘스트는 오류로 결정" -- Needs review
--- 		S["BUILDING"] = ""
+		S["BUGGED"] = "|cffff0000*** 오류 ***|r"
+		S["BUGGED_UNOBTAINABLE"] = "불가능한 퀘스트는 오류로 결정"
+--Translation missing 
+		S["BUILDING"] = "Building"
 		S["CHRISTMAS_WEEK"] = "한겨울 축제 주간"
 		S["CLASS_ANY"] = "모두"
 		S["CLASS_NONE"] = "없음"
-		S["COMPLETED"] = "|cFF00FF00완료된 퀘스트|r" -- Needs review
--- 		S["COMPLETION_DATES"] = ""
--- 		S["DROP_TO_START_FORMAT"] = ""
--- 		S["EMPTY_ZONES"] = ""
-		S["ENABLE_COORDINATES"] = "플레이어 캐릭터 좌표 사용" -- Needs review
-		S["ENTER_ZONE"] = "지역에 진입할 떄 수락" -- Needs review
+		S["COMPLETED"] = "|cFF00FF00완료한 퀘스트|r"
+		S["COMPLETION_DATES"] = "완료 날짜"
+--Translation missing 
+		S["DROP_TO_START_FORMAT"] = "Drops %s to start [%s]"
+		S["EMPTY_ZONES"] = "빈 지역 표시"
+		S["ENABLE_COORDINATES"] = "플레이어 좌표 사용"
+		S["ENTER_ZONE"] = "지역에 진입할 떄 수락"
 		S["ESCORT"] = "호위"
--- 		S["EVER_CAST"] = ""
-		S["EVER_COMPLETED"] = "완료 되었습니다." -- Needs review
--- 		S["EVER_EXPERIENCED"] = ""
+		S["EVER_CAST"] = "시전한 적 있음"
+		S["EVER_COMPLETED"] = "완료한 적 있음"
+		S["EVER_EXPERIENCED"] = "받은 적 있음"
 		S["FACTION_BOTH"] = "둘다"
--- 		S["FIRST_PREREQUISITE"] = ""
+--Translation missing 
+		S["FIRST_PREREQUISITE"] = "First in Prerequisite Chain:"
 		S["GENDER"] = "성별"
 		S["GENDER_BOTH"] = "둘다"
 		S["GENDER_NONE"] = "없음"
 		S["GRAIL_NOT_HAVE"] = "Grail에 이 퀘스트가 없습니다."
-		S["HIGH_LEVEL"] = "고레벨 퀘스트" -- Needs review
-		S["HOLIDAYS_ONLY"] = "현재 가능한 이벤트:"
--- 		S["IGNORE_REPUTATION_SECTION"] = ""
-		S["IN_LOG"] = "|cFFFF00FF목록에 있는 퀘스트|r" -- Needs review
-		S["IN_LOG_STATUS"] = "퀘스트 목록의 진행 표시"
-		S["INVALIDATE"] = "퀘스트 무효화" -- Needs review
--- 		S["IS_BREADCRUMB"] = ""
-		S["ITEM"] = "아이템" -- Needs review
--- 		S["ITEM_LACK"] = ""
--- 		S["KILL_TO_START_FORMAT"] = ""
-		S["LIVE_COUNTS"] = "수행중인 퀘스트 갱신"
-		S["LOAD_DATA"] = "데이터 불러오기" -- Needs review
+--Translation missing 
+		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Hide Blizzard bonus objectives"
+		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Blizzard 퀘스트 지도 핀 숨김"
+--Translation missing 
+		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Hide Blizzard treasures"
+--Translation missing 
+		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "Hide flight points"
+		S["HIGH_LEVEL"] = "고레벨"
+		S["HOLIDAYS_ONLY"] = "축제 동안에만 이용 가능:"
+		S["IGNORE_REPUTATION_SECTION"] = "퀘스트의 평판 부분 무시"
+		S["IN_LOG"] = "|cFFFF00FF목록에 있는 퀘스트|r"
+		S["IN_LOG_STATUS"] = "퀘스트 진행 상태를 목록에 표시"
+		S["INVALIDATE"] = "퀘스트 무효화"
+--Translation missing 
+		S["IS_BREADCRUMB"] = "Is breadcrumb quest for:"
+		S["ITEM"] = "아이템"
+		S["ITEM_LACK"] = "아이템 부족"
+--Translation missing 
+		S["KILL_TO_START_FORMAT"] = "Kill to start [%s]"
+		S["LIVE_COUNTS"] = "실시간 퀘스트 수 갱신"
+		S["LOAD_DATA"] = "데이터 불러오기"
 		S["LOREMASTER_AREA"] = "현자 애드온 지역"
-		S["LOW_LEVEL"] = "|cFF666666저레벨 퀘스트|r" -- Needs review
+		S["LOW_LEVEL"] = "|cFF666666저레벨|r"
 		S["MAP"] = "지도에"
-		S["MAPAREA_NONE"] = "없음"
-		S["MAP_BUTTON"] = "세계지도에 버튼 표시"
+		S["MAP_BUTTON"] = "세계 지도에 버튼 표시"
 		S["MAP_DUNGEONS"] = "지도에 던전 퀘스트 표시"
-		S["MAP_PINS"] = "퀘스트 제보자를 지도에 표시"
-		S["MAP_UPDATES"] = "지역 이동시 세계지도 갱신"
+		S["MAP_PINS"] = "퀘스트 주는 이를 지도에 핀으로 표시"
+		S["MAP_UPDATES"] = "지역이 바뀔 때 세계 지도 갱신"
+		S["MAPAREA_NONE"] = "없음"
 		S["MAXIMUM_LEVEL_NONE"] = "없음"
 		S["MULTIPLE_BREADCRUMB_FORMAT"] = "%d 개의 추가 목표 퀘스트가 가능합니다."
 		S["MUST_KILL_PIN_FORMAT"] = "%s [죽임]"
-		S["NEAR"] = "근처" -- Needs review
-		S["NEEDS_PREREQUISITES"] = "|cFFFF0000전제조건이 필요한 퀘스트|r" -- Needs review
-		S["NEVER_ABANDONED"] = "버릴 수 없음" -- Needs review
-		S["OAC"] = "접수 완료 퀘스트:" -- Needs review
-		S["OCC"] = "목표 완료 퀘스트:" -- Needs review
--- 		S["OTC"] = ""
+		S["NEAR"] = "근처"
+		S["NEEDS_PREREQUISITES"] = "|cFFFF0000전제조건이 필요한 퀘스트|r"
+		S["NEVER_ABANDONED"] = "버릴 수 없음"
+		S["OAC"] = "접수 완료 퀘스트:"
+		S["OCC"] = "목표 완료 퀘스트:"
+--Translation missing 
+		S["OTC"] = "On turn in complete quests:"
 		S["OTHER"] = "기타"
-		S["OTHER_PREFERENCE"] = "기타" -- Needs review
+		S["OTHER_PREFERENCE"] = "기타"
 		S["PANEL_UPDATES"] = "지역 이동시 퀘스트 목록 갱신"
--- 		S["PLOT"] = ""
+--Translation missing 
+		S["PLOT"] = "Plot"
 		S["PREPEND_LEVEL"] = "퀘스트 레벨 표시"
 		S["PREREQUISITES"] = "퀘스트 조건:"
-		S["QUEST_COUNTS"] = "퀘스트 숫자 표시" -- Needs review
+		S["QUEST_COUNTS"] = "퀘스트 개수 표시"
 		S["QUEST_ID"] = "퀘스트 ID:"
 		S["QUEST_TYPE_NORMAL"] = "일반"
 		S["RACE_ANY"] = "모두"
 		S["RACE_NONE"] = "없음"
--- 		S["RARE_MOBS"] = ""
+		S["RARE_MOBS"] = "희귀 몹"
 		S["REPEATABLE"] = "반복"
 		S["REPEATABLE_COMPLETED"] = "완료한 반복 퀘스트 표시"
 		S["REPUTATION_REQUIRED"] = "평판 요구 사항:"
 		S["REQUIRED_LEVEL"] = "요구 레벨"
 		S["REQUIRES_FORMAT"] = "Wholly 애드온은 Grail의 %s 버전 이상을 요구합니다."
--- 		S["RESTORE_DIRECTIONAL_ARROWS"] = ""
-		S["SEARCH_ALL_QUESTS"] = "모든 퀘스트" -- Needs review
-		S["SEARCH_CLEAR"] = "초기화" -- Needs review
+--Translation missing 
+		S["RESTORE_DIRECTIONAL_ARROWS"] = "Should not restore directional arrows"
+		S["SEARCH_ALL_QUESTS"] = "모든 퀘스트"
+		S["SEARCH_CLEAR"] = "초기화"
 		S["SEARCH_NEW"] = "신규"
 		S["SELF"] = "자신"
 		S["SHOW_BREADCRUMB"] = "퀘스트 창에 여러 퀘스트 정보 표시"
 		S["SHOW_LOREMASTER"] = "Loremaster 퀘스트만 표시"
 		S["SINGLE_BREADCRUMB_FORMAT"] = "추가 목표 퀘스트가 가능합니다."
--- 		S["SP_MESSAGE"] = ""
+--Translation missing 
+		S["SP_MESSAGE"] = "Special quest never enters Blizzard quest log"
 		S["TAGS"] = "태그"
 		S["TAGS_DELETE"] = "태그 삭제"
 		S["TAGS_NEW"] = "태그 추가"
-		S["TITLE_APPEARANCE"] = "퀘스트 제목 표시" -- Needs review
--- 		S["TREASURE"] = ""
--- 		S["TURNED_IN"] = ""
-		S["UNOBTAINABLE"] = "|cFF996600불가능한 퀘스트|r" -- Needs review
-		S["WHEN_KILL"] = "죽일 때 수락:" -- Needs review
-		S["WIDE_PANEL"] = "넓은 Wholly 퀘스트 목록" -- Needs review
-		S["WIDE_SHOW"] = "표시" -- Needs review
+		S["TITLE_APPEARANCE"] = "퀘스트 제목 모양"
+--Translation missing 
+		S["TREASURE"] = "Treasure"
+--Translation missing 
+		S["TURNED_IN"] = "Turned in"
+		S["UNOBTAINABLE"] = "|cFF996600불가능한 퀘스트|r"
+		S["WHEN_KILL"] = "죽일 때 수락:"
+		S["WIDE_PANEL"] = "넓은 Wholly 퀘스트 목록"
+		S["WIDE_SHOW"] = "표시"
 		S["WORLD_EVENTS"] = "월드 이벤트"
+		S["WORLD_QUEST"] = "전역 퀘스트"
 		S["YEARLY"] = "연간"
 	elseif "ptBR" == locale then
 		S["ABANDONED"] = "Abandonada"
