@@ -333,6 +333,9 @@
 --			Updates Korean localization.
 --			Updates Spanish (Latin America) localization.
 --			Adds support for world quests to have their own pin color.
+--		063	Updates the Interface to 70200.
+--			Adds support for artifact level prerequisites.
+--			Updates Spanish (Latin America) localization.
 --
 --	Known Issues
 --
@@ -2711,6 +2714,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				return format("|c%s"..ARTIFACTS_KNOWLEDGE_TOOLTIP_LEVEL.."|r", colorCode, numeric)
 			elseif questCode == 'a' then
 				return format("|c%s"..AVAILABLE_QUEST.."|r", colorCode)
+			elseif questCode == '@' then
+				return format("|c%s%s %s %d|r", colorCode, Grail:NPCName(100000000 + subcode), self.s.LEVEL, numeric)
 			else
 				questId = numeric
 				local typeString = ""
@@ -4396,9 +4401,9 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["SEARCH_CLEAR"] = "Limpiar buscador"
 		S["SEARCH_NEW"] = "Nueva búsqueda"
 		S["SELF"] = "Auto"
-		S["SHOW_BREADCRUMB"] = "Mostrar la información del sendero de la búsqueda en la Cuadra de la Búsqueda"
+		S["SHOW_BREADCRUMB"] = "Mostrar la información de la Mision El Sendero de Migas en la Cuadra de Búsqueda"
 		S["SHOW_LOREMASTER"] = "Solo mostrar misiones del Maestro Cultural"
-		S["SINGLE_BREADCRUMB_FORMAT"] = "Búsqueda de senderos migas de pan disponibles"
+		S["SINGLE_BREADCRUMB_FORMAT"] = "Mision El Sendero de Migas de Pan Disponible"
 		S["SP_MESSAGE"] = "Misiones especiales nunca entran al registro de misiones de Blizzard"
 		S["TAGS"] = "Etiquetas"
 		S["TAGS_DELETE"] = "Eliminar Etiqueta"
