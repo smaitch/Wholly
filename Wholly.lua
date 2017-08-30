@@ -338,6 +338,8 @@
 --			Updates Spanish (Latin America) localization.
 --			Updates French localization by sk8cravis.
 --			Updates German localization by RobbyOGK.
+--		064	Updates the Interface to 70300.
+--			Updates the use of PlaySound based on Blizzard's changes based on Gello's post.
 --
 --	Known Issues
 --
@@ -1582,7 +1584,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			UIDropDownMenu_SetWidth(self.dropdown, 240, 0)
 			UIDropDownMenu_JustifyText(self.dropdown, "LEFT")
 			-- By default, the dropdown has it clicking work with the little button on the right.  This makes it work for the whole button:
-			self.dropdown:SetScript("OnClick", function(self) ToggleDropDownMenu(nil, nil, Wholly.dropdown) PlaySound("igMainMenuOptionCheckBoxOn") end)
+			self.dropdown:SetScript("OnClick", function(self) ToggleDropDownMenu(nil, nil, Wholly.dropdown) PlaySound(PlaySoundKitID and "igMainMenuOptionCheckBoxOn" or 856) end)
 		end,
 
 		_Dropdown_GetText = function(self)

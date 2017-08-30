@@ -577,11 +577,11 @@
 			</OnLoad>
 			<OnShow>
 				Wholly:OnShow(self)
-				PlaySound("igCharacterInfoOpen");
+				PlaySound(PlaySoundKitID and "igCharacterInfoOpen" or 839);
 			</OnShow>
 			<OnHide>
 				Wholly:OnHide(self)
-				PlaySound("igCharacterInfoClose");
+				PlaySound(PlaySoundKitID and "igCharacterInfoClose" or 840);
 				if self.isMoving then
 					self:StopMovingOrSizing()
 					self.isMoving = false
@@ -813,11 +813,11 @@
 			</OnLoad>
 			<OnShow>
 				Wholly:OnShow(self)
-				PlaySound("igCharacterInfoOpen");
+				PlaySound(PlaySoundKitID and "igCharacterInfoOpen" or 839);
 			</OnShow>
 			<OnHide>
 				Wholly:OnHide(self)
-				PlaySound("igCharacterInfoClose");
+				PlaySound(PlaySoundKitID and "igCharacterInfoClose" or 840);
 				if self.isMoving then
 					self:StopMovingOrSizing()
 					self.isMoving = false
