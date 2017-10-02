@@ -340,6 +340,7 @@
 --			Updates German localization by RobbyOGK.
 --		064	Updates the Interface to 70300.
 --			Updates the use of PlaySound based on Blizzard's changes based on Gello's post.
+--		065	Corrects a timing problem where the notification frame might be sent events before initialized properly.
 --
 --	Known Issues
 --
@@ -2513,9 +2514,9 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			end
 
 			local nf = CreateFrame("Frame")
+			self.notificationFrame = nf
 			nf:SetScript("OnEvent", function(frame, event, ...) self:_OnEvent(frame, event, ...) end)
 			nf:RegisterEvent("ADDON_LOADED")
-			self.notificationFrame = nf
 
 			if "deDE" == GetLocale() then
 				com_mithrandir_whollyFramePreferencesButton:SetText("Einstellungen")
