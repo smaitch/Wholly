@@ -341,6 +341,7 @@
 --		064	Updates the Interface to 70300.
 --			Updates the use of PlaySound based on Blizzard's changes based on Gello's post.
 --		065	Corrects a timing problem where the notification frame might be sent events before initialized properly.
+--			Adds a binding to toggle Loremaster quests.
 --
 --	Known Issues
 --
@@ -417,6 +418,7 @@ BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "Toggle shows repeatables"
 BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Toggle shows unobtainables"
 BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = "Toggle shows completed"
 BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Toggle shows World Quests"
+BINDING_NAME_WHOLLY_TOGGLESHOWLOREMASTER = "Toggle shows Loremaster quests"
 
 if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 

@@ -24,4 +24,7 @@
 	<Binding name="WHOLLY_TOGGLESHOWWORLDQUESTS" header="WHOLLY">
 		Wholly:ToggleSwitch("showsWorldQuests")
 	</Binding>
+	<Binding name="WHOLLY_TOGGLESHOWLOREMASTER" header="WHOLLY">
+		Wholly:ToggleSwitch("showsLoremasterOnly")
+	</Binding>
 </Bindings>
