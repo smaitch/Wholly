@@ -342,6 +342,9 @@
 --			Updates the use of PlaySound based on Blizzard's changes based on Gello's post.
 --		065	Corrects a timing problem where the notification frame might be sent events before initialized properly.
 --			Adds a binding to toggle Loremaster quests.
+--			Updates technique to hide flight points on Blizzard map.
+--			Adds ability to hide dungeon entrances on Blizzard map.
+--			Updates Russian localization from iGreenGO and EragonJKee.
 --
 --	Known Issues
 --
@@ -1024,6 +1027,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			['HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES'] = 'Hide Blizzard bonus objectives',
 			['HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS'] = 'Hide Blizzard quest map pins',
 			['WORLD_QUEST'] = 'World Quests',
+			['HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES'] = 'Hide Blizzard dungeon entrances',
 			},
 		supportedControlMaps = { WorldMapFrame, OmegaMapFrame, },	-- the frame to check for visibility
 		supportedMaps = { WorldMapDetailFrame, OmegaMapDetailFrame, },	-- the frame that is the parent of the pins
@@ -4856,108 +4860,116 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 	elseif "ruRU" == locale then
 		S["ABANDONED"] = "Проваленный"
 		S["ACCEPTED"] = "Принят"
-		S["ACHIEVEMENT_COLORS"] = "Выделять цветом завершение достижения" -- Needs review
-		S["ALL_FACTION_REPUTATIONS"] = "Показать репутации всех фракций" -- Needs review
-		S["APPEND_LEVEL"] = "Показывать требуемый уровень" -- Needs review
-		S["BASE_QUESTS"] = "База заданий" -- Needs review
-		BINDING_NAME_WHOLLY_TOGGLEMAPPINS = "Переключить отображение меток на карте" -- Needs review
-		BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = "Переключить отображение завершенных" -- Needs review
-		BINDING_NAME_WHOLLY_TOGGLESHOWDAILIES = "Переключить отображение ежедневных" -- Needs review
-		BINDING_NAME_WHOLLY_TOGGLESHOWNEEDSPREREQUISITES = "Переключить отображение требующих предварительных" -- Needs review
-		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "Переключить отображение повторяющихся" -- Needs review
-		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Переключить отображение недоступных" -- Needs review
-		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "Отображение еженедельных заданий" -- Needs review
-		S["BLIZZARD_TOOLTIP"] = "Показывать подсказки в журнале заданий" -- Needs review
-		S["BREADCRUMB"] = "Путеводные задания:" -- Needs review
-		S["BUGGED"] = "***ОШИБОЧНОЕ***" -- Needs review
-		S["BUGGED_UNOBTAINABLE"] = "Считать ошибочные задания невозможными для получения" -- Needs review
-		S["BUILDING"] = "Постройки" -- Needs review
-		S["CHRISTMAS_WEEK"] = "Рождественская неделя" -- Needs review
+		S["ACHIEVEMENT_COLORS"] = "Выделять завершение достижения определенным цветом"
+		S["ADD_ADVENTURE_GUIDE"] = "Отображать задания Путеводителя в каждой зоне"
+		S["ALL_FACTION_REPUTATIONS"] = "Показать репутацию со всем фракциями"
+		S["APPEND_LEVEL"] = "Указывать требуемый уровень "
+		S["BASE_QUESTS"] = "Базовые задания"
+		BINDING_NAME_WHOLLY_TOGGLEMAPPINS = "Переключить метки на карте"
+		BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = "Переключить отображение завершенных заданий "
+		BINDING_NAME_WHOLLY_TOGGLESHOWDAILIES = "Переключить отображение ежедневных заданий "
+		BINDING_NAME_WHOLLY_TOGGLESHOWLOREMASTER = "Переключить отображение квестов Loremaster"
+		BINDING_NAME_WHOLLY_TOGGLESHOWNEEDSPREREQUISITES = "Переключить отображение требующих необходимые условия"
+		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "Переключить отображение повторяющихся заданий"
+		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Переключить отображение недоступных заданий"
+		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "Переключит отображение еженедельных заданий"
+		BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Переключить отображение Локальных Заданий"
+		S["BLIZZARD_TOOLTIP"] = "Появление подсказок в журнале заданий"
+		S["BREADCRUMB"] = "Направляющие задания из путеводителя:"
+		S["BUGGED"] = "***СЛОМАЛОСЬ***"
+		S["BUGGED_UNOBTAINABLE"] = "Ошибочные задания невозможны для получения"
+		S["BUILDING"] = "Здания"
+		S["CHRISTMAS_WEEK"] = "Неделя Зимнего Покрова"
 		S["CLASS_ANY"] = "Любой"
 		S["CLASS_NONE"] = "Нет"
-		S["COMPLETED"] = "Завершенные" -- Needs review
-		S["COMPLETION_DATES"] = "Даты завершения" -- Needs review
-		S["DROP_TO_START_FORMAT"] = "Падает %s, начинает [%s]" -- Needs review
--- 		S["EMPTY_ZONES"] = ""
-		S["ENABLE_COORDINATES"] = "Отображать координаты игрока" -- Needs review
-		S["ENTER_ZONE"] = "Принимаемое при входе в игровую зону" -- Needs review
-		S["ESCORT"] = "Сопровождение" -- Needs review
-		S["EVER_CAST"] = "Когда-либо использовалось" -- Needs review
+		S["COMPLETED"] = "Завершенные задания"
+		S["COMPLETION_DATES"] = "Даты для завершения "
+		S["DROP_TO_START_FORMAT"] = "Падает %s, начинается [%s]"
+		S["EMPTY_ZONES"] = "Отображать пустые локации"
+		S["ENABLE_COORDINATES"] = "Отображать местоположения игрока"
+		S["ENTER_ZONE"] = "Принимаемое при входе в игровую зону задание"
+		S["ESCORT"] = "Задание на сопровождение"
+		S["EVER_CAST"] = "Когда-либо произносилось"
 		S["EVER_COMPLETED"] = "Был выполнен"
-		S["EVER_EXPERIENCED"] = "Когда-либо получено" -- Needs review
+		S["EVER_EXPERIENCED"] = "Когда-либо наложилось"
 		S["FACTION_BOTH"] = "Обе"
-		S["FIRST_PREREQUISITE"] = "Первое в цепочке предварительных:" -- Needs review
-		S["GENDER"] = "Пол" -- Needs review
+		S["FIRST_PREREQUISITE"] = "Первое в цепочке предварительных:"
+		S["GENDER"] = "Пол"
 		S["GENDER_BOTH"] = "Оба"
 		S["GENDER_NONE"] = "Нет"
-		S["GRAIL_NOT_HAVE"] = "Этого задания нет в Grail" -- Needs review
-		S["HIGH_LEVEL"] = "Высокого уровня" -- Needs review
-		S["HOLIDAYS_ONLY"] = "Доступны только в праздничные дни:" -- Needs review
--- 		S["IGNORE_REPUTATION_SECTION"] = ""
-		S["IN_LOG"] = "Уже в журнале заданий" -- Needs review
-		S["IN_LOG_STATUS"] = "Отображать в журнале статус заданий" -- Needs review
-		S["INVALIDATE"] = "Недействительное задание из-за:" -- Needs review
-		S["IS_BREADCRUMB"] = "Путеводное задание для:" -- Needs review
+		S["GRAIL_NOT_HAVE"] = "Этого задания нет в Grail"
+		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Скрывать дополнительные задачи"
+		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Скрывать метки заданий на карте"
+		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Скрывать сокровища"
+		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "Скрывать точки полета"
+		S["HIGH_LEVEL"] = "Высокого уровня"
+		S["HOLIDAYS_ONLY"] = "Доступны только во время праздничных дней:"
+		S["IGNORE_REPUTATION_SECTION"] = "Игнорировать репутационные секции заданий"
+		S["IN_LOG"] = "В журнале заданий"
+		S["IN_LOG_STATUS"] = "Отображать статус заданий в журнале"
+		S["INVALIDATE"] = "Недействительное задание из-за:"
+		S["IS_BREADCRUMB"] = "Путеводное задание для:"
 		S["ITEM"] = "Предмет"
 		S["ITEM_LACK"] = "Предмет отсутствует"
-		S["KILL_TO_START_FORMAT"] = "Убить, чтобы начать [%s]" -- Needs review
-		S["LIVE_COUNTS"] = "Обновлять в реальном времени" -- Needs review
-		S["LOAD_DATA"] = "Загрузка данных" -- Needs review
-		S["LOREMASTER_AREA"] = "Хранитель мудрости" -- Needs review
-		S["LOW_LEVEL"] = "Низкого уровня" -- Needs review
-		S["MAP"] = "Карта" -- Needs review
+		S["KILL_TO_START_FORMAT"] = "Убить, чтобы начать [%s]"
+		S["LIVE_COUNTS"] = "Обновлять в реальном времени"
+		S["LOAD_DATA"] = "Загрузка данных"
+		S["LOREMASTER_AREA"] = "Хранитель мудрости"
+		S["LOW_LEVEL"] = "Низкого уровня"
+		S["MAP"] = "Карта"
+		S["MAP_BUTTON"] = "Отображать кнопку на карте мира"
+		S["MAP_DUNGEONS"] = "Показывать задания в подземельях на карте игровой зоны"
+		S["MAP_PINS"] = "Показывать на карте мира метки тех, кто дает задания"
+		S["MAP_UPDATES"] = "Обновлять карту мира при смене игровой зоны"
 		S["MAPAREA_NONE"] = "Нет"
-		S["MAP_BUTTON"] = "Отображать кнопку на карте мира" -- Needs review
-		S["MAP_DUNGEONS"] = "Показывать задания в подземельях на карте игровой зоны" -- Needs review
-		S["MAP_PINS"] = "Показывать на карте мира метки тех, кто дает задания" -- Needs review
-		S["MAP_UPDATES"] = "Обновлять карту мира при смене игровой зоны" -- Needs review
 		S["MAXIMUM_LEVEL_NONE"] = "Нет"
-		S["MULTIPLE_BREADCRUMB_FORMAT"] = "Доступно %d путеводных заданий" -- Needs review
-		S["MUST_KILL_PIN_FORMAT"] = "%s [Убить]" -- Needs review
-		S["NEAR"] = "Рядом" -- Needs review
-		S["NEEDS_PREREQUISITES"] = "С предварительными" -- Needs review
-		S["NEVER_ABANDONED"] = "Не отменялось" -- Needs review
-		S["OAC"] = "Задания, завершаемые при принятии:" -- Needs review
-		S["OCC"] = "Задания, завершаемые при выполнении условий:" -- Needs review
-		S["OTC"] = "Задания, завершаемые при возвращении:" -- Needs review
-		S["OTHER"] = "Другое" -- Needs review
-		S["OTHER_PREFERENCE"] = "Прочие" -- Needs review
-		S["PANEL_UPDATES"] = "Обновлять журнал заданий при смене игровой зоны" -- Needs review
-		S["PLOT"] = "Участок" -- Needs review
-		S["PREPEND_LEVEL"] = "Показывать уровень задания" -- Needs review
-		S["PREREQUISITES"] = "Предварительные задания:" -- Needs review
-		S["QUEST_COUNTS"] = "Показывать количество заданий" -- Needs review
-		S["QUEST_ID"] = "ID задания:" -- Needs review
+		S["MULTIPLE_BREADCRUMB_FORMAT"] = "Доступно %d путеводных заданий"
+		S["MUST_KILL_PIN_FORMAT"] = "%s [Убить]"
+		S["NEAR"] = "Рядом"
+		S["NEEDS_PREREQUISITES"] = "С предварительными"
+		S["NEVER_ABANDONED"] = "Не отменялось"
+		S["OAC"] = "Задания, завершаемые при принятии:"
+		S["OCC"] = "Задания, завершаемые при выполнении условий:"
+		S["OTC"] = "Задания, завершаемые при возвращении:"
+		S["OTHER"] = "Другое"
+		S["OTHER_PREFERENCE"] = "Прочие"
+		S["PANEL_UPDATES"] = "Обновлять журнал заданий при смене игровой зоны"
+		S["PLOT"] = "Участок"
+		S["PREPEND_LEVEL"] = "Показывать уровень задания"
+		S["PREREQUISITES"] = "Предварительные задания:"
+		S["QUEST_COUNTS"] = "Показывать количество заданий"
+		S["QUEST_ID"] = "ID задания:"
 		S["QUEST_TYPE_NORMAL"] = "Обычный"
 		S["RACE_ANY"] = "Любая"
 		S["RACE_NONE"] = "Нет"
-		S["RARE_MOBS"] = "Редкие существа" -- Needs review
-		S["REPEATABLE"] = "Повторяющиеся" -- Needs review
-		S["REPEATABLE_COMPLETED"] = "Показывать ранее выполненные повторяемые задания" -- Needs review
-		S["REPUTATION_REQUIRED"] = "Требуемая репутация" -- Needs review
-		S["REQUIRED_LEVEL"] = "Требуемый уровень" -- Needs review
-		S["REQUIRES_FORMAT"] = "Для работы Wholly требуется Grail версии %s или выше" -- Needs review
-		S["RESTORE_DIRECTIONAL_ARROWS"] = "Не восстанавливать стрелки, указывающие направление" -- Needs review
+		S["RARE_MOBS"] = "Редкие существа"
+		S["REPEATABLE"] = "Повторяющиеся"
+		S["REPEATABLE_COMPLETED"] = "Показывать ранее выполненные повторяемые задания"
+		S["REPUTATION_REQUIRED"] = "Требуемая репутация"
+		S["REQUIRED_LEVEL"] = "Требуемый уровень"
+		S["REQUIRES_FORMAT"] = "Для работы Wholly требуется Grail версии %s или выше"
+		S["RESTORE_DIRECTIONAL_ARROWS"] = "Не восстанавливать стрелки, указывающие направление"
 		S["SEARCH_ALL_QUESTS"] = "Все задания"
 		S["SEARCH_CLEAR"] = "Очистить"
 		S["SEARCH_NEW"] = "Новый"
-		S["SELF"] = "Себя" -- Needs review
-		S["SHOW_BREADCRUMB"] = "Показывать информацию о наличии путеводных заданий" -- Needs review
-		S["SHOW_LOREMASTER"] = "Показывать лишь задания, необходимые для получения \"Хранителя мудрости\"" -- Needs review
-		S["SINGLE_BREADCRUMB_FORMAT"] = "Доступно путеводное задание" -- Needs review
-		S["SP_MESSAGE"] = "Особый квест никогда не попадает в журнал заданий Blizzard" -- Needs review
-		S["TAGS"] = "Отмеченные" -- Needs review
-		S["TAGS_DELETE"] = "Удалить Тег" -- Needs review
-		S["TAGS_NEW"] = "Новый Тег" -- Needs review
-		S["TITLE_APPEARANCE"] = "Название задания" -- Needs review
-		S["TREASURE"] = "Сокровище" -- Needs review
-		S["TURNED_IN"] = "Условия выполнены" -- Needs review
-		S["UNOBTAINABLE"] = "Недоступные" -- Needs review
-		S["WHEN_KILL"] = "Принимаемые при убийстве:" -- Needs review
-		S["WIDE_PANEL"] = "Широкая панель заданий Wholly" -- Needs review
-		S["WIDE_SHOW"] = "Показывать" -- Needs review
-		S["WORLD_EVENTS"] = "Игровые события" -- Needs review
-		S["YEARLY"] = "Ежегодные" -- Needs review
+		S["SELF"] = "Себя"
+		S["SHOW_BREADCRUMB"] = "Показывать информацию о наличии путеводных заданий"
+		S["SHOW_LOREMASTER"] = "Показывать лишь задания, необходимые для получения \"Хранителя мудрости\""
+		S["SINGLE_BREADCRUMB_FORMAT"] = "Доступно путеводное задание"
+		S["SP_MESSAGE"] = "Особый квест никогда не попадает в журнал заданий Blizzard"
+		S["TAGS"] = "Отмеченные"
+		S["TAGS_DELETE"] = "Удалить отметку"
+		S["TAGS_NEW"] = "Новая отметка"
+		S["TITLE_APPEARANCE"] = "Название задания"
+		S["TREASURE"] = "Сокровище"
+		S["TURNED_IN"] = "Выполнено"
+		S["UNOBTAINABLE"] = "Недоступные"
+		S["WHEN_KILL"] = "Принимаемое при убийстве:"
+		S["WIDE_PANEL"] = "Широкая панель Wholly"
+		S["WIDE_SHOW"] = "Показать"
+		S["WORLD_EVENTS"] = "Игровые события"
+		S["WORLD_QUEST"] = "Мировые задания"
+		S["YEARLY"] = "Ежегодные задания"
 	elseif "zhCN" == locale then
 		S["ABANDONED"] = "放弃" -- Needs review
 		S["ACCEPTED"] = "已接受" -- Needs review
@@ -5263,6 +5275,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		{ S.HIDE_BLIZZARD_WORLD_MAP_TREASURES, 'hidesWorldMapTreasures', 'configurationScript16' },
 		{ S.HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES, 'hidesBlizzardWorldMapBonusObjectives', 'configurationScript17' },
 		{ S.HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS, 'hidesBlizzardWorldMapQuestPins', 'configurationScript16' },
+		{ S.HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES, 'hidesDungeonEntrances', 'configurationScript16' },
 		}
 	Wholly.configuration[S.WIDE_PANEL] = {
 		{ S.WIDE_PANEL },
@@ -5309,12 +5322,13 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
 hooksecurefunc("WorldMapFrame_Update", function()
 	local wpth = Wholly.poisToHide
-	if WhollyDatabase.hidesWorldMapFlightPoints or WhollyDatabase.hidesWorldMapTreasures then
+	if WhollyDatabase.hidesWorldMapFlightPoints or WhollyDatabase.hidesWorldMapTreasures or WhollyDatabase.hidesDungeonEntrances then
 		for i = 1, GetNumMapLandmarks() do
-			local _, name, _, textureIndex = GetMapLandmarkInfo(i)
+			local landmarkType, name, description, textureIndex, x, y = GetMapLandmarkInfo(i)
 			local shouldHide = false
 			if WhollyDatabase.hidesWorldMapTreasures and 197 == textureIndex then shouldHide = true end
-			if WhollyDatabase.hidesWorldMapFlightPoints and (textureIndex == 178 or textureIndex == 179 or textureIndex == 180) then shouldHide = true end
+			if WhollyDatabase.hidesDungeonEntrances and LE_MAP_LANDMARK_TYPE_DUNGEON_ENTRANCE == landmarkType then shouldHide = true end
+			if WhollyDatabase.hidesWorldMapFlightPoints and LE_MAP_LANDMARK_TYPE_TAXINODE == landmarkType then shouldHide = true end
 			if shouldHide then
 				local poi = _G["WorldMapFramePOI"..i]
 				if poi then
