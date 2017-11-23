@@ -345,6 +345,7 @@
 --			Updates technique to hide flight points on Blizzard map.
 --			Adds ability to hide dungeon entrances on Blizzard map.
 --			Updates Russian localization from iGreenGO and EragonJKee.
+--			Updates German localization from Adrinator.
 --
 --	Known Issues
 --
@@ -4104,10 +4105,12 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		BINDING_NAME_WHOLLY_TOGGLEMAPPINS = "Kartenpunkte umschalten."
 		BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = "Abgeschlossene Quests anzeigen ein/aus"
 		BINDING_NAME_WHOLLY_TOGGLESHOWDAILIES = "Tägliche Quests anzeigen ein/aus"
+		BINDING_NAME_WHOLLY_TOGGLESHOWLOREMASTER = "Ativieren zeigt Loremaster Quests"
 		BINDING_NAME_WHOLLY_TOGGLESHOWNEEDSPREREQUISITES = "Voraussetzungen anzeigen ein/aus"
 		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "Wiederholbare Quests anzeigen ein/aus"
 		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Anzeige \"Unerreichbares\" umschalten."
 		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "Wöchentliche Quests anzeigen ein/aus"
+		BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Zeige Weltquests"
 		S["BLIZZARD_TOOLTIP"] = "QuickInfos werden im Blizzard-Questlog angezeigt"
 		S["BREADCRUMB"] = "Brotkrumen-Quests:"
 		S["BUGGED"] = "*** FEHLERHAFT ***"
@@ -4132,9 +4135,10 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["GENDER_BOTH"] = "Beide"
 		S["GENDER_NONE"] = "Keins"
 		S["GRAIL_NOT_HAVE"] = "Grail kennt diese Quest nicht"
-		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Blende Blizzards Bonus Ziele aus"
-		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Blende Blizzards Questkarten Punkte aus"
-		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Blende Blizzards Weltkarten Schätze aus"
+		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Blizzards Bonus Ziele ausblenden"
+		S["HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES"] = "Verstecke Blizzards Instanzeingänge"
+		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Blizzards Questkarten Punkte ausblenden"
+		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Blizzards Weltkarten Schätze ausblenden"
 		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "verstecke Flugpunkt"
 		S["HIGH_LEVEL"] = "Hochstufig"
 		S["HOLIDAYS_ONLY"] = "Verfügbar nur an Feiertagen:"
