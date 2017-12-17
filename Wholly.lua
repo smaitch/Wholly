@@ -345,7 +345,7 @@
 --			Updates technique to hide flight points on Blizzard map.
 --			Adds ability to hide dungeon entrances on Blizzard map.
 --			Updates Russian localization from iGreenGO and EragonJKee.
---			Updates German localization from Adrinator.
+--			Updates German localization from Adrinator and Haipia.
 --
 --	Known Issues
 --
@@ -4105,12 +4105,12 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		BINDING_NAME_WHOLLY_TOGGLEMAPPINS = "Kartenpunkte umschalten."
 		BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = "Abgeschlossene Quests anzeigen ein/aus"
 		BINDING_NAME_WHOLLY_TOGGLESHOWDAILIES = "Tägliche Quests anzeigen ein/aus"
-		BINDING_NAME_WHOLLY_TOGGLESHOWLOREMASTER = "Ativieren zeigt Loremaster Quests"
+		BINDING_NAME_WHOLLY_TOGGLESHOWLOREMASTER = "Meister der Lehren-Quests anzeigen"
 		BINDING_NAME_WHOLLY_TOGGLESHOWNEEDSPREREQUISITES = "Voraussetzungen anzeigen ein/aus"
 		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "Wiederholbare Quests anzeigen ein/aus"
 		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Anzeige \"Unerreichbares\" umschalten."
 		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "Wöchentliche Quests anzeigen ein/aus"
-		BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Zeige Weltquests"
+		BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Weltquests anzeigen"
 		S["BLIZZARD_TOOLTIP"] = "QuickInfos werden im Blizzard-Questlog angezeigt"
 		S["BREADCRUMB"] = "Brotkrumen-Quests:"
 		S["BUGGED"] = "*** FEHLERHAFT ***"
@@ -4127,7 +4127,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["ENTER_ZONE"] = "Annahme, wenn Kartenbereich erreicht wird"
 		S["ESCORT"] = "Eskorte"
 		S["EVER_CAST"] = "Wurde schon mal vom Spieler irgendwann benutzt."
-		S["EVER_COMPLETED"] = "Wurde bereits einmal fertiggestellt"
+		S["EVER_COMPLETED"] = "Wurde bereits abgeschlossen"
 		S["EVER_EXPERIENCED"] = "Wurde schon mal auf den Spieler irgendwann benutzt."
 		S["FACTION_BOTH"] = "Beide"
 		S["FIRST_PREREQUISITE"] = "Erster in einer Questreihe"
@@ -4135,11 +4135,11 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["GENDER_BOTH"] = "Beide"
 		S["GENDER_NONE"] = "Keins"
 		S["GRAIL_NOT_HAVE"] = "Grail kennt diese Quest nicht"
-		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Blizzards Bonus Ziele ausblenden"
-		S["HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES"] = "Verstecke Blizzards Instanzeingänge"
-		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Blizzards Questkarten Punkte ausblenden"
-		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Blizzards Weltkarten Schätze ausblenden"
-		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "verstecke Flugpunkt"
+		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Blizzards Bonusziele ausblenden"
+		S["HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES"] = "Blizzards Instanzeingänge ausblenden"
+		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Blizzards Kartenpunkte für Quests ausblenden"
+		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Blizzards Schätze auf der Weltkarte ausblenden"
+		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "Flugpunkte verbergen"
 		S["HIGH_LEVEL"] = "Hochstufig"
 		S["HOLIDAYS_ONLY"] = "Verfügbar nur an Feiertagen:"
 		S["IGNORE_REPUTATION_SECTION"] = "Rufabschnitt bei Quests ignorieren"
@@ -4182,7 +4182,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["RACE_NONE"] = "Keine"
 		S["RARE_MOBS"] = "Seltene Gegner"
 		S["REPEATABLE"] = "Wiederholbar"
-		S["REPEATABLE_COMPLETED"] = "Zeige, ob wiederholbare Quests bereits fertiggestellt wurden"
+		S["REPEATABLE_COMPLETED"] = "Zeige, ob wiederholbare Quests bereits abgeschlossen wurden"
 		S["REPUTATION_REQUIRED"] = "Ruf erforderlich:"
 		S["REQUIRED_LEVEL"] = "Benötigte Stufe:"
 		S["REQUIRES_FORMAT"] = "Wholly benötigt Grail-Version %s oder neuer"
