@@ -346,6 +346,11 @@
 --			Adds ability to hide dungeon entrances on Blizzard map.
 --			Updates Russian localization from iGreenGO and EragonJKee.
 --			Updates German localization from Adrinator and Haipia.
+--		066	*** Requires Grail 93 or later ***
+--			Adds the ability to display prerequisites for Class Hall Missions.
+--			Adds support for Allied races.
+--			Updates Russian localization from mihaha_xienor.
+--			Updates Spanish localization from raquetty.
 --
 --	Known Issues
 --
@@ -406,7 +411,7 @@ local directoryName, _ = ...
 local versionFromToc = GetAddOnMetadata(directoryName, "Version")
 local _, _, versionValueFromToc = strfind(versionFromToc, "(%d+)")
 local Wholly_File_Version = tonumber(versionValueFromToc)
-local requiredGrailVersion = 85
+local requiredGrailVersion = 93
 
 --	Set up the bindings to use the localized name Blizzard supplies.  Note that the Bindings.xml file cannot
 --	just contain the TOGGLEQUESTLOG because then the entry for Wholly does not show up.  So, we use a version
@@ -2728,6 +2733,9 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				return format("|c%s"..AVAILABLE_QUEST.."|r", colorCode)
 			elseif questCode == '@' then
 				return format("|c%s%s %s %d|r", colorCode, Grail:NPCName(100000000 + subcode), self.s.LEVEL, numeric)
+			elseif questCode == '#' then
+				return format(GARRISON_MISSION_TIME, format("|c%s%s|r", colorCode, Grail:MissionName(numeric) or numeric))
+--				return format("Mission Needed: |c%s%s|r", colorCode, Grail:MissionName(numeric))	-- GARRISON_MISSION_TIME
 			else
 				questId = numeric
 				local typeString = ""
@@ -2834,6 +2842,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
 			questId = aliasQuestId or questId	-- remap to the alias now that the Blizzard interaction is done
 			local obtainersCode = Grail:CodeObtainers(questId)
+			local obtainersRaceCode = Grail:CodeObtainersRace(questId)
 			local holidayCode = Grail:CodeHoliday(questId)
 			local questLevel = Grail:QuestLevel(questId)
 			local _, _, requiredLevel, notToExceedLevel = Grail:MeetsRequirementLevel(questId)
@@ -2901,15 +2910,15 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
 			-- Note that race can show races of any faction, especially if the quest is marked just to exclude a specific race
 			local raceString
-			if 0 == bitband(obtainersCode, Grail.bitMaskRaceAll) then
+			if 0 == bitband(obtainersRaceCode, Grail.bitMaskRaceAll) then
 				raceString = self.s.RACE_NONE
-			elseif Grail.bitMaskRaceAll == bitband(obtainersCode, Grail.bitMaskRaceAll) then
+			elseif Grail.bitMaskRaceAll == bitband(obtainersRaceCode, Grail.bitMaskRaceAll) then
 				raceString = self.s.RACE_ANY
 			else
 				raceString = ""
 				for letterCode, raceTable in pairs(Grail.races) do
 					local bitValue = raceTable[4]
-					if 0 < bitband(obtainersCode, bitValue) then
+					if 0 < bitband(obtainersRaceCode, bitValue) then
 						local englishName = Grail.races[letterCode][1]
 						local localizedGenderRaceName = Grail:CreateRaceNameLocalizedGenderized(englishName)
 						raceString = raceString .. localizedGenderRaceName .. " "
@@ -3185,6 +3194,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				numeric = format("|c%s%s|r", WDB.color[classification], reputationLevelName)
 			elseif ('G' == code or 'z' == code) and Grail.GarrisonBuildingLevelString then
 				numeric = Grail:GarrisonBuildingLevelString(numeric)
+			elseif ('K' == code or 'k' == code) then
+				if numeric > 100000000 then numeric = numeric - 100000000 end
 			end
 			self:_AddLine(indentation..orString..pipeString..self:_PrettyQuestString({ innorItem, classification }), numeric)
 			if wSpecial then
@@ -4219,10 +4230,13 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		BINDING_NAME_WHOLLY_TOGGLEMAPPINS = "Mostrar/ocultar marcas en el mapa"
 		BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = "Mostrar/ocultar misiones completadas"
 		BINDING_NAME_WHOLLY_TOGGLESHOWDAILIES = "Mostrar/ocultar misiones diarias"
+--Translation missing
+		BINDING_NAME_WHOLLY_TOGGLESHOWLOREMASTER = "Toggle shows Loremaster quests"
 		BINDING_NAME_WHOLLY_TOGGLESHOWNEEDSPREREQUISITES = "Mostrar/ocultar misiones con prerequisitos obligatorios"
 		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "Mostrar/ocultar misiones repetibles"
 		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Mostrar/ocultar misiones no obtenibles"
 		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "Mostrar/ocultar misiones semanales"
+		BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Alternar visualización de Misiones de Mundos"
 		S["BLIZZARD_TOOLTIP"] = "Aparecen descripciones emergentes en el Diario de Misión de Blizzard"
 		S["BREADCRUMB"] = "Cadena de misiones:"
 		S["BUGGED"] = "*** ERROR ***"
@@ -4248,6 +4262,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["GENDER_NONE"] = "Ninguno"
 		S["GRAIL_NOT_HAVE"] = "Grail no tiene esta misión"
 		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Ocultar objetivos de bonificación de Blizzard"
+		S["HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES"] = "Ocultar las entradas de mazmorras de Blizzard"
 		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Ocultar marcadores de misión de Blizzard"
 		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Ocultar tesoros de Blizzard"
 		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "Ocultar puntos de vuelo"
@@ -4903,6 +4918,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["GENDER_NONE"] = "Нет"
 		S["GRAIL_NOT_HAVE"] = "Этого задания нет в Grail"
 		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Скрывать дополнительные задачи"
+		S["HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES"] = "Скрыть входы в подземелья Blizzard"
 		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Скрывать метки заданий на карте"
 		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Скрывать сокровища"
 		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "Скрывать точки полета"
