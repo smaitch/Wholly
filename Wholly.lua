@@ -351,6 +351,14 @@
 --			Adds support for Allied races.
 --			Updates Russian localization from mihaha_xienor.
 --			Updates Spanish localization from raquetty.
+--		067	Requires Grail 096 or later ***
+--			Corrects the problem where some dungeons are not listed.
+--			Updates French localization by deathart709 and MongooZz.
+--			Updates Russian localization by RChernenko.
+--			Updates Spanish localization by neinhalt_77.
+--			Made it so we can handle Blizzard removing GetCurrentMapDungeonLevel() and GetCurrentMapAreaID().
+--			Updates Italian localization by luigidirico96.
+--			Groups the continents together under a heading.
 --
 --	Known Issues
 --
@@ -371,12 +379,10 @@ local CreateFrame							= CreateFrame
 local GetAchievementInfo					= GetAchievementInfo
 local GetAddOnMetadata						= GetAddOnMetadata
 local GetBuildInfo							= GetBuildInfo
-local GetCurrentMapAreaID					= GetCurrentMapAreaID
 local GetCurrentMapDungeonLevel				= GetCurrentMapDungeonLevel
 local GetCursorPosition						= GetCursorPosition
 local GetCVarBool							= GetCVarBool
 local GetLocale								= GetLocale
-local GetPlayerMapPosition					= GetPlayerMapPosition
 local GetQuestID							= GetQuestID
 local GetRealZoneText						= GetRealZoneText
 local GetSpellInfo							= GetSpellInfo
@@ -452,7 +458,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		clearNPCTooltipData = function(self)
 									self.checkedNPCs = {}
 									self.npcs = {}
-									self:_RecordTooltipNPCs(GetCurrentMapAreaID())
+									self:_RecordTooltipNPCs(Grail.GetCurrentMapAreaID())
 								end,
 		color = {
 			['B'] = "FF996600",	-- brown	[unobtainable]
@@ -537,6 +543,15 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		configurationScript17 = function(self)
 									WorldMap_UpdateQuestBonusObjectives()
 								end,
+		configurationScript18 = function(self)
+									Wholly:_InitializeLevelOneData()
+									Wholly:ScrollFrameOne_Update()
+									Wholly:ScrollFrameTwo_Update()
+									Wholly:ScrollFrame_Update_WithCombatCheck()
+									Wholly.pinsNeedFiltering = true
+									Wholly:_UpdatePins()
+									Wholly:clearNPCTooltipData()
+								end,
 		coordinates = nil,
 		currentFrame = nil,
 		currentMaximumTooltipLines = 50,
@@ -592,7 +607,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					self.configurationScript9()
 				end
 
-				self:_RecordTooltipNPCs(GetCurrentMapAreaID())
+				self:_RecordTooltipNPCs(Grail.GetCurrentMapAreaID())
 			end,
 			['QUEST_PROGRESS'] = function(self, frame)
 				self:BreadcrumbUpdate(frame, true)
@@ -706,7 +721,10 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					frame:RegisterEvent("QUEST_GREETING")			-- to clear the breadcrumb frame
 					frame:RegisterEvent("QUEST_LOG_UPDATE")			-- just to be able update tooltips after reload UI
 					frame:RegisterEvent("QUEST_PROGRESS")
-					frame:RegisterEvent("WORLD_MAP_UPDATE")			-- this is for pins
+					--	BfA beta 26567 removes WORLD_MAP_UPDATE
+					if not Grail.battleForAzeroth then
+						frame:RegisterEvent("WORLD_MAP_UPDATE")		-- this is for pins
+					end
 					frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")	-- this is for the panel
 					self:UpdateBreadcrumb()							-- sets up registration of events for breadcrumbs based on user preferences
 					if not WDB.shouldNotRestoreDirectionalArrows then
@@ -781,6 +799,12 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 							end
 					end
 
+					if Grail.battleForAzeroth and TestWorldMapFrame then
+						tinsert(self.supportedControlMaps, TestWorldMapFrame)
+						tinsert(self.supportedMaps, TestWorldMapFrame)
+						tinsert(self.supportedPOIMaps, TestWorldMapFrame)
+					end
+
 					--	Allow specific quest detection to work even with previous versions of Grail
 					--	that do not have the expected API.
 					if nil == Grail.IsBonusObjective then
@@ -813,9 +837,9 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				-- It turns out that GetCurrentMapAreaID() and GetCurrentMapDungeonLevel() are not working properly unless the map system is accessed.
 				-- This would manifest itself when the UI is reloaded, and then the map location would be lost.  By forcing the map to the current zone
 				-- the problem goes away.
-				SetMapToCurrentZone()
-				self.zoneInfo.map.mapId = GetCurrentMapAreaID()
-				self.zoneInfo.map.dungeonLevel = GetCurrentMapDungeonLevel()
+				Grail.SetMapToCurrentZone()
+				self.zoneInfo.map.mapId = Grail.GetCurrentDisplayedMapAreaID()
+				self.zoneInfo.map.dungeonLevel = GetCurrentMapDungeonLevel and GetCurrentMapDungeonLevel() or 0
 				self.zoneInfo.zone.mapId = self.zoneInfo.map.mapId
 				self.zoneInfo.zone.dungeonLevel = self.zoneInfo.map.dungeonLevel
 				self:UpdateCoordinateSystem()
@@ -845,12 +869,12 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				--	based on a preference value.  Wholly is going to force the map to the new zone no matter
 				--	what, and then reset it to the previous zone if the user does not want Wholly to change
 				--	the open map.
-				SetMapToCurrentZone()
-				self.zoneInfo.zone.mapId = GetCurrentMapAreaID()
-				self.zoneInfo.zone.dungeonLevel = GetCurrentMapDungeonLevel()
+				Grail.SetMapToCurrentZone()
+				self.zoneInfo.zone.mapId = Grail.GetCurrentDisplayedMapAreaID()
+				self.zoneInfo.zone.dungeonLevel = GetCurrentMapDungeonLevel and GetCurrentMapDungeonLevel() or 0
 
 				if not WDB.updatesWorldMapOnZoneChange and mapWeSupportIsVisible then
-					SetMapByID(self.zoneInfo.map.mapId)
+					Grail.SetMapByID(self.zoneInfo.map.mapId)
 					if 0 ~= self.zoneInfo.map.dungeonLevel then
 						SetDungeonMapLevel(self.zoneInfo.map.dungeonLevel)
 					end
@@ -1259,8 +1283,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		end,
 
 		_WorldMapUpdateHandler = function(type, questId)
-			Wholly.zoneInfo.map.mapId = GetCurrentMapAreaID()
-			Wholly.zoneInfo.map.dungeonLevel = GetCurrentMapDungeonLevel()
+			Wholly.zoneInfo.map.mapId = Grail.GetCurrentDisplayedMapAreaID()
+			Wholly.zoneInfo.map.dungeonLevel = GetCurrentMapDungeonLevel and GetCurrentMapDungeonLevel() or 0
 			Wholly:_UpdatePins()
 		end,
 
@@ -1773,27 +1797,17 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			self:ScrollFrame_Update_WithCombatCheck()
 
 			if not ignoreForcingSelection then
-				local soughtIndex = Grail.continentIndexMapping[Grail.mapToContinentMapping[currentMapId]]
-				if nil == soughtIndex then		-- assume it is a dungeon
-					for mapId, continentTable in pairs(Grail.continents) do
-						if tContains(continentTable.dungeons, currentMapId) then
-							soughtIndex = 10 + Grail.continentIndexMapping[mapId]
-						end
---					for i = 1, #(Grail.continents) do
---						if tContains(Grail.continents[i].dungeons, currentMapId) then
---							soughtIndex = 10 + i
---						end
-					end
-				end
-				if nil == soughtIndex then		-- assume it is "Other"
-					if tContains(Grail.otherMapping, currentMapId) then
-						soughtIndex = 71
-					end
-				end
+				local soughtIndex = self.mapToContinentMapping[currentMapId]
 				if nil ~= soughtIndex then
 					for i, v in pairs(self.levelOneData) do
 						if v.index == soughtIndex then
 							self:_SetLevelOneCurrent(v)
+						elseif nil ~= v.children then
+							for j, w in pairs(v.children) do
+								if w.index == soughtIndex then
+									self:_SetLevelOneCurrent(w)
+								end
+							end
 						end
 					end
 				else
@@ -1919,6 +1933,36 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			return colorStart .. holidayName .. colorEnd, holidayName
 		end,
 
+--	Continents						maps to their mapId or mapId + 3000 * level (e.g., Eastern Kingdoms 2 vs. 1)
+--		12	Kalimdor
+--		13	Eastern Kingdoms
+--		101	Outland
+--		113	Northrend
+--		948	The Maelstrom
+--		424	Pandaria
+--		572	Draenor
+--		619	Broken Isles
+--		905	Argus
+--		875	Zandalar
+--		876	Kul Tiras
+--	World Events					-1	was 21
+--	Class							-2	was 22
+--	Professions						-3	was 23
+--	Reputation						-4	was 24
+--	>Achievements
+--		continents...				13,000 + mapId	was 30 + Grail.continentIndexMapping[mapId]
+--		holidays...					15,000 + holiday index	was 40 + holiday index
+--		professions...				16,000 + profession index	was 50 + profession index
+--		pet battle					17,000	was 74
+--		other						17,001	was 60
+--	>Reputation Changes				-100 - expansion level (currently 0 through 7)	was 61 through 67 (68)
+--		expansions...
+--	Followers						-5	was 71
+--	Other							-6	was 72
+--	Search							-7	was 73
+--	Tags							-8	was 75
+
+
 		--	This routine will populate the data structure self.levelOneData with all of the items
 		--	that are supposed to appear in the top-level dropdown or scroller.  Note that some of
 		--	the items' appearances are controlled by preferences.
@@ -1931,92 +1975,122 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			local WDB = WhollyDatabase
 			local entries = {}
 			local t1
-			
+			self.mapToContinentMapping = {}
+
 			--	Basic continents
+			t1 = { displayName = CONTINENT, header = 1, children = {} }
 			for mapId, continentTable in pairs(Grail.continents) do
-				local numberEntries = math.floor((#(continentTable.zones) + self.dropdownLimit - 1) / self.dropdownLimit)
+--				local numberEntries = math.floor((#(continentTable.zones) + #(continentTable.dungeons) + self.dropdownLimit - 1) / self.dropdownLimit)
+				local numberEntries = math.floor((#(self:_AreasOfInterestInContinent(continentTable)) + self.dropdownLimit - 1) / self.dropdownLimit)
 				for counter = 1, numberEntries do
 					local addition = (numberEntries > 1) and (" "..counter) or ""
-					tinsert(entries, { displayName = continentTable.name .. addition, index = Grail.continentIndexMapping[mapId] + 1000 * (counter - 1) })
+					tinsert(t1.children, { displayName = continentTable.name .. addition, index = mapId + 3000 * (counter - 1) })
 				end
---			for i = 1, #(Grail.continents) do
---				tinsert(entries, { displayName = Grail.continents[i].name, index = i })
-			end
-			tablesort(entries, function(a, b) return a.displayName < b.displayName end)
-			
-			if not Grail.existsWoD then
-			--	Dungeons
-			t1 = { displayName = BUG_CATEGORY3, header = 1, children = {} }
-			for mapId, continentTable in pairs(Grail.continents) do
-				local i = Grail.continentIndexMapping[mapId]
-				tinsert(t1.children, { displayName = continentTable.name, index = 10 + i, continent = i })
---			for i = 1, #(Grail.continents) do
---				tinsert(t1.children, { displayName = Grail.continents[i].name, index = 10 + i, continent = i })
 			end
 			tablesort(t1.children, function(a, b) return a.displayName < b.displayName end)
 			tinsert(entries, t1)
-			end
 
-			tinsert(entries, { displayName = Wholly.s.WORLD_EVENTS, index = 21 })
-			tinsert(entries, { displayName = CLASS, index = 22 })
-			tinsert(entries, { displayName = TRADE_SKILLS, index = 23 })		-- Professions
+			tinsert(entries, { displayName = Wholly.s.WORLD_EVENTS, index = -1 })
+			tinsert(entries, { displayName = CLASS, index = -2 })
+			tinsert(entries, { displayName = TRADE_SKILLS, index = -3 })		-- Professions
 			if not WDB.ignoreReputationQuests then
-				tinsert(entries, { displayName = REPUTATION, index = 24 })
+				tinsert(entries, { displayName = REPUTATION, index = -4 })
 			end
 
 			--	Achievements
 			if WDB.loadAchievementData then
 				t1 = { displayName = ACHIEVEMENTS, header = 2, children = {} }
 				for mapId, continentTable in pairs(Grail.continents) do
-					tinsert(t1.children, { displayName = continentTable.name, index = 30 + Grail.continentIndexMapping[mapId] })
---				for i = 1, #(Grail.continents) do
---					tinsert(t1.children, { displayName = Grail.continents[i].name, index = 30 + i })
+					tinsert(t1.children, { displayName = continentTable.name, index = 13000 + mapId })
 				end
 				tablesort(t1.children, function(a, b) return a.displayName < b.displayName end)
 				local i = 0
 				if nil ~= Grail.worldEventAchievements and nil ~= Grail.worldEventAchievements[Grail.playerFaction] then
 					for holidayKey, _ in pairs(Grail.worldEventAchievements[Grail.playerFaction]) do
 						i = i + 1
-						tinsert(t1.children, { displayName = Grail.holidayMapping[holidayKey], index = 40 + i, holidayName = Grail.holidayMapping[holidayKey]})
+						tinsert(t1.children, { displayName = Grail.holidayMapping[holidayKey], index = 15000 + i, holidayName = Grail.holidayMapping[holidayKey]})
 					end
 				end
 				i = 0
 				if nil ~= Grail.professionAchievements and nil ~= Grail.professionAchievements[Grail.playerFaction] then
 					for professionKey, _ in pairs(Grail.professionAchievements[Grail.playerFaction]) do
 						i = i + 1
-						tinsert(t1.children, { displayName = Grail.professionMapping[professionKey], index = 50 + i, professionName = Grail.professionMapping[professionKey] })
+						tinsert(t1.children, { displayName = Grail.professionMapping[professionKey], index = 16000 + i, professionName = Grail.professionMapping[professionKey] })
 					end
 				end
-				tinsert(t1.children, { displayName = BATTLE_PET_SOURCE_5, index = 74 })
-				tinsert(t1.children, { displayName = Wholly.s.OTHER, index = 60 })
+				tinsert(t1.children, { displayName = BATTLE_PET_SOURCE_5, index = 17000 })
+				tinsert(t1.children, { displayName = Wholly.s.OTHER, index = 17001 })
 				tinsert(entries, t1)
 			end
 
 			--	Reputation Changes
 			if WDB.loadReputationData then
 				t1 = { displayName = COMBAT_TEXT_SHOW_REPUTATION_TEXT, header = 3, children = {} }
-				tinsert(t1.children, { displayName = EXPANSION_NAME0, index = 61 })
-				tinsert(t1.children, { displayName = EXPANSION_NAME1, index = 62 })
-				tinsert(t1.children, { displayName = EXPANSION_NAME2, index = 63 })
-				tinsert(t1.children, { displayName = EXPANSION_NAME3, index = 64 })
+				tinsert(t1.children, { displayName = EXPANSION_NAME0, index = -100 })
+				tinsert(t1.children, { displayName = EXPANSION_NAME1, index = -101 })
+				tinsert(t1.children, { displayName = EXPANSION_NAME2, index = -102 })
+				tinsert(t1.children, { displayName = EXPANSION_NAME3, index = -103 })
 				if Grail.existsPandaria then
-					tinsert(t1.children, { displayName = EXPANSION_NAME4, index = 65 })
+					tinsert(t1.children, { displayName = EXPANSION_NAME4, index = -104 })
 				end
 				if Grail.existsWoD then
-					tinsert(t1.children, { displayName = EXPANSION_NAME5, index = 66 })
+					tinsert(t1.children, { displayName = EXPANSION_NAME5, index = -105 })
 				end
 				if Grail.existsLegion then
-					tinsert(t1.children, { displayName = EXPANSION_NAME6, index = 67 })
+					tinsert(t1.children, { displayName = EXPANSION_NAME6, index = -106 })
+				end
+				if Grail.battleForAzeroth then
+					tinsert(t1.children, { displayName = EXPANSION_NAME7, index = -107 })
 				end
 				tinsert(entries, t1)
 			end
 
-			tinsert(entries, { displayName = Wholly.s.FOLLOWERS, index = 71})
-			tinsert(entries, { displayName = Wholly.s.OTHER, index = 72 })
-			tinsert(entries, { displayName = SEARCH, index = 73 })
-			tinsert(entries, { displayName = Wholly.s.TAGS, index = 75 })	-- note that 74 is the pet battles above
+			tinsert(entries, { displayName = Wholly.s.FOLLOWERS, index = -5})
+			tinsert(entries, { displayName = Wholly.s.OTHER, index = -6 })
+			tinsert(entries, { displayName = SEARCH, index = -7 })
+			tinsert(entries, { displayName = Wholly.s.TAGS, index = -8 })
 
 			self.levelOneData = entries			
+		end,
+
+		_ShouldAddMapId = function(self, mapId)
+			local retval = false
+			if WhollyDatabase.displaysEmptyZones or
+				(0 < (Grail.indexedQuests[mapId] and #(Grail.indexedQuests[mapId]) or 0)) or
+				(0 < (Grail.indexedQuestsExtra[mapId] and #(Grail.indexedQuestsExtra[mapId]) or 0)) then
+				retval = true
+			end
+			return retval
+		end,
+
+		_AreasOfInterestInContinent = function(self, continent)
+			local t = {}
+			local zones = continent.zones
+			local dungeonsToAdd = Grail:_TableCopy(continent.dungeons)
+			for i = 1, #zones do
+				local t1 = {}
+				t1.sortName = zones[i].name
+				t1.displayName = t1.sortName
+				t1.mapID = zones[i].mapID
+				Grail:_TableRemove(dungeonsToAdd, t1.mapID)
+				if self:_ShouldAddMapId(t1.mapID) then
+					tinsert(t, t1)
+				end
+			end
+			for i = 1, #dungeonsToAdd do
+				local t1 = {}
+				t1.sortName = dungeonsToAdd[i].name
+				t1.displayName = t1.sortName
+				t1.mapID = dungeonsToAdd[i].mapID
+				if self:_ShouldAddMapId(t1.mapID) then
+					tinsert(t, t1)
+				end
+			end
+			tablesort(t, function(a, b) return a.sortName < b.sortName end)
+			for i = 1, #t do
+				self.mapToContinentMapping[t[i].mapID] = continent.mapID + 3000 * (math.floor((i + self.dropdownLimit - 1) / self.dropdownLimit) - 1)
+			end
+			return t
 		end,
 
 		--	This routine will populate the data structure self.levelTwoData with all of the items
@@ -2027,45 +2101,29 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			local t = {}
 			local which = self.levelOneCurrent and self.levelOneCurrent.index or nil
 			if nil == which then self.levelTwoData = t return end
-			if 10 > which or 1000 < which then				-- Basic continent
-				local Z = Grail.continents[Grail.continentMapIds[which % 1000]].zones
---				local Z = Grail.continents[which].zones
-				for i = 1, #Z do
-					local t1 = {}
-					t1.sortName = Z[i].name
-					t1.mapID = Z[i].mapID
---local augmentation = ''
---if nil ~= Grail.indexedQuests[t1.mapID] then augmentation = augmentation .. ' (' .. #(Grail.indexedQuests[t1.mapID]) .. ')' else augmentation = augmentation .. ' (NIL)' end
---if nil ~= Grail.indexedQuestsExtra[t1.mapID] then augmentation = augmentation .. ' (' .. #(Grail.indexedQuestsExtra[t1.mapID]) .. ')' else augmentation = augmentation .. ' (NIL)' end
-					t1.displayName = Z[i].name
---					.. ' ['.. Z[i].mapID .. ']' .. augmentation
-					if displaysEmptyZones or (0 < (Grail.indexedQuests[t1.mapID] and #(Grail.indexedQuests[t1.mapID]) or 0)) or (0 < (Grail.indexedQuestsExtra[t1.mapID] and #(Grail.indexedQuestsExtra[t1.mapID]) or 0)) then
-						tinsert(t, t1)
-					end
-				end
-				tablesort(t, function(a, b) return a.sortName < b.sortName end)
+			if which >= 0 and which < 13000 then				-- Basic continent
+				t = self:_AreasOfInterestInContinent(Grail.continents[which % 3000])
 				--	Now we determine which part of this table we are going to keep based on whether we are offset
-				if #Z > self.dropdownLimit then
-					local offset = math.floor(which / 1000)
+				if #t > self.dropdownLimit then
+					local offset = math.floor(which / 3000)
 					local start = 1 + offset * self.dropdownLimit
-					local stop = mathmin(start - 1 + self.dropdownLimit, #Z)
+					local stop = mathmin(start - 1 + self.dropdownLimit, #t)
 					local newT = {}
  					for current = start, stop do
 						tinsert(newT, t[current])
 					end
 					t = newT
 				end
-			elseif 20 > which then			-- Dungeons
-				local mapAreas = Grail.continents[Grail.continentMapIds[self.levelOneCurrent.continent]].dungeons
---				local mapAreas = Grail.continents[self.levelOneCurrent.continent].dungeons
-				for i = 1, #mapAreas do
-					local t1 = {}
-					t1.sortName = Grail:MapAreaName(mapAreas[i]) or "UNKNOWN"
-					t1.displayName = t1.sortName
-					t1.mapID = mapAreas[i]
-					tinsert(t, t1)
-				end
-			elseif 21 == which then			-- World Events
+--			elseif 20 > which then			-- Dungeons
+--				local mapAreas = Grail.continents[Grail.continentMapIds[self.levelOneCurrent.continent]].dungeons
+--				for i = 1, #mapAreas do
+--					local t1 = {}
+--					t1.sortName = Grail:MapAreaName(mapAreas[i]) or "UNKNOWN"
+--					t1.displayName = t1.sortName
+--					t1.mapID = mapAreas[i]
+--					tinsert(t, t1)
+--				end
+			elseif -1 == which then			-- World Events
 				for code, name in pairs(Grail.holidayMapping) do
 					local t1 = {}
 					t1.sortName = name
@@ -2073,7 +2131,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					t1.mapID = Grail.holidayToMapAreaMapping['H'..code]
 					tinsert(t, t1)
 				end
-			elseif 22 == which then		-- Class
+			elseif -2 == which then		-- Class
 				for code, englishName in pairs(Grail.classMapping) do
 					local localizedGenderClassName = Grail:CreateClassNameLocalizedGenderized(englishName)
 					local classColor = RAID_CLASS_COLORS[englishName]
@@ -2090,7 +2148,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 						tinsert(t, t1)
 					end
 				end
-			elseif 23 == which then		-- Professions
+			elseif -3 == which then		-- Professions
 				for code, professionName in pairs(Grail.professionMapping) do
 					local mapId = Grail.professionToMapAreaMapping['P'..code]
 					if nil ~= Grail:MapAreaName(mapId) then
@@ -2101,7 +2159,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 						tinsert(t, t1)
 					end
 				end
-			elseif 24 == which then		-- Reputations
+			elseif -4 == which then		-- Reputations
 				for reputationIndex, reputationName in pairs(Grail.reputationMapping) do
 					local factionId = tonumber(reputationIndex, 16)
 					local mapId = Grail.mapAreaBaseReputation + factionId
@@ -2113,8 +2171,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 						tinsert(t, t1)
 					end
 				end
-			elseif 40 > which then		-- Continent Achievements
-				local mapAreas = Grail.achievements[Grail.playerFaction] and Grail.achievements[Grail.playerFaction][which - 30] or {}
+			elseif which >= 13000 and which < 15000 then		-- Continent Achievements
+				local mapAreas = Grail.achievements[Grail.playerFaction] and Grail.achievements[Grail.playerFaction][which - 13000] or {}
 				for i = 1, #mapAreas do
 					local t1 = {}
 					t1.sortName = Grail:MapAreaName(mapAreas[i]) or "UNKONWN"
@@ -2122,7 +2180,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					t1.mapID = mapAreas[i]
 					tinsert(t, t1)
 				end
-			elseif 50 > which then		-- Holiday Achievements
+			elseif which >= 15000 and which < 16000 then		-- Holiday Achievements
 				local mapAreas = Grail.worldEventAchievements[Grail.playerFaction] and Grail.worldEventAchievements[Grail.playerFaction][Grail.reverseHolidayMapping[self.levelOneCurrent.holidayName]] or {}
 				for i = 1, #mapAreas do
 					local t1 = {}
@@ -2131,7 +2189,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					t1.mapID = mapAreas[i]
 					tinsert(t, t1)
 				end
-			elseif 60 > which then		-- Profession Achievements
+			elseif which >= 16000 and which < 17000 then		-- Profession Achievements
 				local mapAreas = Grail.professionAchievements[Grail.playerFaction] and Grail.professionAchievements[Grail.playerFaction][Grail.reverseProfessionMapping[self.levelOneCurrent.professionName]] or {}
 				for i = 1, #mapAreas do
 					local t1 = {}
@@ -2140,7 +2198,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					t1.mapID = mapAreas[i]
 					tinsert(t, t1)
 				end
-			elseif 60 == which then		-- Other Achievements
+			elseif 17001 == which then		-- Other Achievements
 				-- 5 Dungeon Achievement
 				local t1 = {}
 				local mapID = Grail.mapAreaBaseAchievement + 4956
@@ -2154,8 +2212,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				t1.displayName, t1.sortName = self:_AchievementName(mapID)
 				t1.mapID = mapID
 				tinsert(t, t1)
-			elseif 70 > which then		-- Reputation Changes
-				local mapAreas = Grail.reputationExpansionMapping[which - 60]
+			elseif which <= -100 then		-- Reputation Changes
+				local mapAreas = Grail.reputationExpansionMapping[which * -1 - 99]
 				for i = 1, #mapAreas do
 					local t1 = {}
 					local mapID = Grail.mapAreaBaseReputationChange + mapAreas[i]
@@ -2167,7 +2225,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 						tinsert(t, t1)
 					end
 				end
-			elseif 71 == which then		-- Followers
+			elseif -5 == which then		-- Followers
 				local followerInfo, qualityLevel
 				for questId, followerId in pairs(Grail.followerMapping) do
 					if Grail:MeetsRequirementFaction(questId) then
@@ -2177,7 +2235,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 						tinsert(t, { sortName = followerName, displayName = ITEM_QUALITY_COLORS[qualityLevel].hex..followerName.."|r", mapID = 0, f = function() Grail:SetMapAreaQuests(0, followerName, { questId }) Wholly.zoneInfo.panel.mapId = 0 Wholly._ForcePanelMapArea(Wholly, true) CloseDropDownMenus() end })
 					end
 				end
-			elseif 72 == which then		-- Other
+			elseif -6 == which then		-- Other
 				for i = 1, #(Grail.otherMapping) do
 					local t1 = {}
 					local mapID = Grail.otherMapping[i]
@@ -2192,7 +2250,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				mapAreaID = Grail.mapAreaBaseOther
 				mapName = Wholly.s.OTHER
 				tinsert(t, { sortName = mapName, displayName = mapName, mapID = mapAreaID })
-			elseif 73 == which then		-- Search
+			elseif -7 == which then		-- Search
 				-- We use sortName in a special way because we do not want these items sorted alphabetically
 				local lastUsed = 1
 				local WDB = WhollyDatabase
@@ -2208,7 +2266,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					self.justAddedSearch = nil
 				end
 				tinsert(t, { sortName = lastUsed + 1, displayName = Wholly.s.SEARCH_ALL_QUESTS, f = function() Wholly.SearchForAllQuests(Wholly) Wholly.zoneInfo.panel.mapId = 0 Wholly._ForcePanelMapArea(Wholly, true) CloseDropDownMenus() end })
-			elseif 74 == which then		-- Pet Battle achievements
+			elseif 17000 == which then		-- Pet Battle achievements
 				local mapAreas = Grail.petBattleAchievements[Grail.playerFaction] or {}
 				for i = 1, #mapAreas do
 					local t1 = {}
@@ -2217,7 +2275,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					t1.mapID = mapAreas[i]
 					tinsert(t, t1)
 				end
-			elseif 75 == which then		-- Tags
+			elseif -8 == which then		-- Tags
 				local WDB = WhollyDatabase
 				tinsert(t, { sortName = " ", displayName = Wholly.s.TAGS_NEW, f = function() Wholly._SearchFrameShow(Wholly, true) Wholly.zoneInfo.panel.mapId = nil Wholly._SetLevelTwoCurrent(Wholly, nil) Wholly._ForcePanelMapArea(Wholly,true) CloseDropDownMenus() end })
 				if WDB.tags then
@@ -2232,7 +2290,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			-- We want to make sure we retain the proper selection
 			if nil ~= self.levelTwoCurrent then
 				for i, v in pairs(t) do
-					if v.displayName == self.levelTwoCurrent.displayName and v.mapID == self.levelTwoCurrent.mapID then
+--					if v.displayName == self.levelTwoCurrent.displayName and v.mapID == self.levelTwoCurrent.mapID then
+					if v.mapID == self.levelTwoCurrent.mapID then
 						v.selected = true
 					end
 				end
@@ -2335,6 +2394,12 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		_OnEnterBlizzardQuestButton = function(blizzardQuestButton)
 			if WhollyDatabase.displaysBlizzardQuestTooltips then
 				local questId = blizzardQuestButton.questID
+				-- Prior to BfA beta 26567 this check and reassigning of questId was not needed.
+				-- Now in 26610 it is not needed anymore.
+--				if Grail.battleForAzeroth then
+--					local questTitle, level, questTag, suggestedGroup, isHeader, isCollapsed, isComplete, isDaily, theQuestId, startEvent = Grail:GetQuestLogTitle(blizzardQuestButton.questLogIndex)
+--					questId = theQuestId
+--				end
 				Wholly.onlyAddingTooltipToGameTooltip = true
 				Wholly:_PopulateTooltipForQuest(blizzardQuestButton, questId)
 				Wholly.onlyAddingTooltipToGameTooltip = false
@@ -2512,10 +2577,12 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				-- Now since the Blizzard UI has probably created a quest frame before I get
 				-- the chance to hook the function I need to go through all the quest frames
 				-- and hook them too.
+if not Grail.battleForAzeroth then
 				local titles = QuestMapFrame.QuestsFrame.Contents.Titles
 				for i = 1, #(titles) do
 					titles[i]:HookScript("OnEnter", Wholly._OnEnterBlizzardQuestButton)
 				end
+end
 			end
 
 			-- Our frame positions are wrong for MoP, so we change them here.
@@ -2564,7 +2631,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		_OnUpdate = function(self, frame, elapsed)
 			self.lastUpdate = self.lastUpdate + elapsed
 			if self.lastUpdate < self.updateThreshold then return end
-			local x, y = GetPlayerMapPosition('player')
+			local x, y = Grail.GetPlayerMapPosition('player')
 			if self.previousX ~= x or self.previousY ~= y then
 				if nil ~= self.coordinates then
 					self.coordinates.text = strformat("%.2f, %.2f", x * 100, y * 100)
@@ -4088,8 +4155,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
 		--	This is called because we are hooking secure functions to call it
 		_UserChangedMap = function(blizzardButton)
-			Wholly.zoneInfo.map.mapId = GetCurrentMapAreaID()
-			Wholly.zoneInfo.map.dungeonLevel = GetCurrentMapDungeonLevel()
+			Wholly.zoneInfo.map.mapId = Grail.GetCurrentDisplayedMapAreaID()
+			Wholly.zoneInfo.map.dungeonLevel = GetCurrentMapDungeonLevel and GetCurrentMapDungeonLevel() or 0
 			Wholly:_UpdatePins()
 		end,
 
@@ -4223,58 +4290,57 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["ABANDONED"] = "Abandonada"
 		S["ACCEPTED"] = "Aceptada"
 		S["ACHIEVEMENT_COLORS"] = "Mostrar colores de finalización de logros"
-		S["ADD_ADVENTURE_GUIDE"] = "Mostar misiones de Guía de Aventura en todas las zonas"
+		S["ADD_ADVENTURE_GUIDE"] = "Desplegar Guía de Aventuras y misiones en todas las zonas"
 		S["ALL_FACTION_REPUTATIONS"] = "Mostrar reputaciones de todas las facciones"
 		S["APPEND_LEVEL"] = "Añadir nivel requerido"
-		S["BASE_QUESTS"] = "Misiones básicas"
+		S["BASE_QUESTS"] = "Misiones Base"
 		BINDING_NAME_WHOLLY_TOGGLEMAPPINS = "Mostrar/ocultar marcas en el mapa"
 		BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = "Mostrar/ocultar misiones completadas"
 		BINDING_NAME_WHOLLY_TOGGLESHOWDAILIES = "Mostrar/ocultar misiones diarias"
---Translation missing
-		BINDING_NAME_WHOLLY_TOGGLESHOWLOREMASTER = "Toggle shows Loremaster quests"
+		BINDING_NAME_WHOLLY_TOGGLESHOWLOREMASTER = "Mostrar/ocultar misiones del Maestro Cultural"
 		BINDING_NAME_WHOLLY_TOGGLESHOWNEEDSPREREQUISITES = "Mostrar/ocultar misiones con prerequisitos obligatorios"
 		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "Mostrar/ocultar misiones repetibles"
 		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Mostrar/ocultar misiones no obtenibles"
 		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "Mostrar/ocultar misiones semanales"
-		BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Alternar visualización de Misiones de Mundos"
+		BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Mostrar/ocultar de misiones del mundo"
 		S["BLIZZARD_TOOLTIP"] = "Aparecen descripciones emergentes en el Diario de Misión de Blizzard"
 		S["BREADCRUMB"] = "Cadena de misiones:"
 		S["BUGGED"] = "*** ERROR ***"
-		S["BUGGED_UNOBTAINABLE"] = "Misiones con errores consideradas imposibles"
-		S["BUILDING"] = "Edificio"
+		S["BUGGED_UNOBTAINABLE"] = "*ERROR* en misión es considerada no obtenible "
+		S["BUILDING"] = "Estructura requerida"
 		S["CHRISTMAS_WEEK"] = "Semana navideña"
 		S["CLASS_ANY"] = "Cualquiera"
 		S["CLASS_NONE"] = "Ninguna"
-		S["COMPLETED"] = "Completada"
+		S["COMPLETED"] = "Completado"
 		S["COMPLETION_DATES"] = "Fechas de conclusión"
 		S["DROP_TO_START_FORMAT"] = "Deja caer %s que inicia [%s]"
 		S["EMPTY_ZONES"] = "Mostrar zonas vacías"
 		S["ENABLE_COORDINATES"] = "Habilitar coordenadas del jugador"
-		S["ENTER_ZONE"] = "Aceptada al entrar en mapa de la zona"
+		S["ENTER_ZONE"] = "Aceptar al entrar en el area del mapa"
 		S["ESCORT"] = "Escoltar"
-		S["EVER_CAST"] = "Lanzado alguna vez"
+		S["EVER_CAST"] = "ya lanzo este Hechizo or no ah lanzado el hechizo X"
 		S["EVER_COMPLETED"] = "Ha sido completado"
-		S["EVER_EXPERIENCED"] = "Experimentado alguna vez"
-		S["FACTION_BOTH"] = "Ambas"
+		S["EVER_EXPERIENCED"] = "Ya se ha recibido"
+		S["FACTION_BOTH"] = "Ambas faciones"
 		S["FIRST_PREREQUISITE"] = "Primera en la cadena de prerequisitos:"
 		S["GENDER"] = "Sexo"
 		S["GENDER_BOTH"] = "Ambos"
 		S["GENDER_NONE"] = "Ninguno"
 		S["GRAIL_NOT_HAVE"] = "Grail no tiene esta misión"
-		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Ocultar objetivos de bonificación de Blizzard"
-		S["HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES"] = "Ocultar las entradas de mazmorras de Blizzard"
+		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Ocultar Bonos de blizzard de los objetivos"
+		S["HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES"] = "Ocultar las entradas de las mazmorras"
 		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Ocultar marcadores de misión de Blizzard"
 		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Ocultar tesoros de Blizzard"
 		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "Ocultar puntos de vuelo"
-		S["HIGH_LEVEL"] = "Alto nivel"
+		S["HIGH_LEVEL"] = "misiones de nivel alto "
 		S["HOLIDAYS_ONLY"] = "Solo disponible durante eventos festivos:"
 		S["IGNORE_REPUTATION_SECTION"] = "Ignorar sección de reputación de las misiones"
 		S["IN_LOG"] = "En el registro"
 		S["IN_LOG_STATUS"] = "Mostrar estado de misión en registro"
 		S["INVALIDATE"] = "Invalidado por misiones:"
 		S["IS_BREADCRUMB"] = "Es misión de tránsito para:"
-		S["ITEM"] = "Objeto"
-		S["ITEM_LACK"] = "Falta el objeto"
+		S["ITEM"] = "articulo"
+		S["ITEM_LACK"] = "Faltan mas de este articulo"
 		S["KILL_TO_START_FORMAT"] = "Matar para iniciar [%s]"
 		S["LIVE_COUNTS"] = "Actualizaciones de recuentos de misiones en vivo"
 		S["LOAD_DATA"] = "Cargar datos"
@@ -4456,10 +4522,13 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		BINDING_NAME_WHOLLY_TOGGLEMAPPINS = "Afficher/cacher les marqueurs sur la carte"
 		BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = "Afficher/cacher les quêtes complétées"
 		BINDING_NAME_WHOLLY_TOGGLESHOWDAILIES = "Afficher/cacher les journalières"
+		BINDING_NAME_WHOLLY_TOGGLESHOWLOREMASTER = "Basculer l'affichage des quêtes de Loremaster"
 		BINDING_NAME_WHOLLY_TOGGLESHOWNEEDSPREREQUISITES = "Afficher/cacher les quêtes nécessitants des prérequis"
 		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "Afficher/cacher les répétables"
 		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Afficher/cacher les quêtes impossibles à obtenir"
 		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "Afficher/cacher les quêtes hebdomadaires"
+--Translation missing
+		BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Toggle shows World Quests"
 		S["BLIZZARD_TOOLTIP"] = "Apparition des info-bulles sur le Journal de quêtes"
 		S["BREADCRUMB"] = "Quêtes précédentes (suite de quêtes) :"
 		S["BUGGED"] = "*** BOGUÉE ***"
@@ -4473,7 +4542,6 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["DROP_TO_START_FORMAT"] = "Ramasser %s (butin) pour commencer [%s]"
 		S["EMPTY_ZONES"] = "Afficher les zones vides"
 		S["ENABLE_COORDINATES"] = "Activer les coordonnées du joueur"
--- Active les coordonnées x, y du joueur dans un flux LDB (Bazooka, Titan Panel, FuBar, etc)
 		S["ENTER_ZONE"] = "Accepté(e) lors de l'entrée dans la zone"
 		S["ESCORT"] = "Escorte"
 		S["EVER_CAST"] = "N'a jamais lancé "
@@ -4486,7 +4554,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["GENDER_NONE"] = "Aucun"
 		S["GRAIL_NOT_HAVE"] = "Grail n'a pas cette quête dans sa base de données"
 		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Masquer les objectifs bonus de Blizzard"
-		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Masquer les marqueur de quêtes de Blizzard"
+		S["HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES"] = "Masquer les entrées d'instance de Blizzard"
+		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Masquer les marqueurs de quêtes de Blizzard"
 		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Masquer les trésors de Blizzard"
 		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "Masquer les points de vol"
 		S["HIGH_LEVEL"] = "Haut niveau"
@@ -4558,86 +4627,143 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["WORLD_QUEST"] = "Expéditions"
 		S["YEARLY"] = "Annuelle"
     elseif "itIT" == locale then
-		S["ABANDONED"] = "Abbandonata" -- Needs review
-		S["ACCEPTED"] = "Accettata" -- Needs review
-		S["ACHIEVEMENT_COLORS"] = "Visualizza il colore delle realizzazioni completate" -- Needs review
-		S["APPEND_LEVEL"] = "Posponi livello richiesto" -- Needs review
-		S["BASE_QUESTS"] = "Quest di base" -- Needs review
-		S["BREADCRUMB"] = "Traccia Missioni" -- Needs review
-		S["BUGGED"] = "Bug" -- Needs review
-		S["BUGGED_UNOBTAINABLE"] = "Missioni buggate considerate non ottenibili" -- Needs review
-		S["CHRISTMAS_WEEK"] = "Settimana di Natale" -- Needs review
-		S["CLASS_ANY"] = "Qualsiasi" -- Needs review
-		S["CLASS_NONE"] = "Nessuna" -- Needs review
-		S["COMPLETED"] = "Completata" -- Needs review
-		S["ENABLE_COORDINATES"] = "Attiva le coordinate del giocatore" -- Needs review
-		S["ENTER_ZONE"] = "Accetta quando entri nell'area" -- Needs review
-		S["ESCORT"] = "Scorta" -- Needs review
-		S["EVER_COMPLETED"] = "Stata completata" -- Needs review
-		S["FACTION_BOTH"] = "Entrambe" -- Needs review
-		S["FIRST_PREREQUISITE"] = "In primo luogo nella catena dei prerequisiti:" -- Needs review
-		S["GENDER"] = "Genere" -- Needs review
-		S["GENDER_BOTH"] = "Entrambi" -- Needs review
-		S["GENDER_NONE"] = "Nessun" -- Needs review
-		S["GRAIL_NOT_HAVE"] = "Grail non dispone di questa ricerca" -- Needs review
-		S["HIGH_LEVEL"] = "Di livello alto" -- Needs review
-		S["HOLIDAYS_ONLY"] = "Disponibile solo durante le vacanze" -- Needs review
-		S["IN_LOG"] = "Connettiti" -- Needs review
-		S["IN_LOG_STATUS"] = "Mostra lo stato delle quest" -- Needs review
-		S["INVALIDATE"] = "Missioni invalidate" -- Needs review
-		S["ITEM"] = "Oggetto" -- Needs review
-		S["ITEM_LACK"] = "Oggetto mancante" -- Needs review
-		S["KILL_TO_START_FORMAT"] = "Uccidere per avviare [%s]" -- Needs review
-		S["LIVE_COUNTS"] = "Aggiornamento conteggio missioni direttamente" -- Needs review
-		S["LOAD_DATA"] = "Caricare i dati" -- Needs review
-		S["LOREMASTER_AREA"] = "Loremaster Area" -- Needs review
-		S["LOW_LEVEL"] = "Di livello basso" -- Needs review
-		S["MAP"] = "Mappa" -- Needs review
-		S["MAPAREA_NONE"] = "Nessuna" -- Needs review
-		S["MAP_BUTTON"] = "Mostra pulsante mappa del mondo" -- Needs review
-		S["MAP_DUNGEONS"] = "Mostra le quest nei dungeon sulla mappa esterna" -- Needs review
-		S["MAP_PINS"] = "Mostra sulla mappa le quest da prendere" -- Needs review
-		S["MAP_UPDATES"] = "Aggiorna la mappa quando cambio zona" -- Needs review
-		S["MAXIMUM_LEVEL_NONE"] = "Nessun" -- Needs review
-		S["MUST_KILL_PIN_FORMAT"] = "%s [Uccidere]" -- Needs review
-		S["NEAR"] = "Vicino a" -- Needs review
-		S["NEEDS_PREREQUISITES"] = "Prerequisiti richiesti" -- Needs review
-		S["NEVER_ABANDONED"] = "Mai abbandonata" -- Needs review
-		S["OCC"] = "Requisiti richiesti per completare la missione" -- Needs review
-		S["OTHER"] = "altro" -- Needs review
-		S["OTHER_PREFERENCE"] = "Altre" -- Needs review
-		S["PANEL_UPDATES"] = "Aggiorna il pannello log quest quando cambia zona" -- Needs review
-		S["PREPEND_LEVEL"] = "Anteponi Livello missioni" -- Needs review
-		S["PREREQUISITES"] = "Prerequisiti missione" -- Needs review
-		S["QUEST_COUNTS"] = "Mostra conteggio missioni" -- Needs review
-		S["QUEST_ID"] = "ID Missione" -- Needs review
-		S["QUEST_TYPE_NORMAL"] = "Normali" -- Needs review
-		S["RACE_ANY"] = "Qualsiasi" -- Needs review
-		S["RACE_NONE"] = "Nessuna" -- Needs review
-		S["REPEATABLE"] = "Ripetibile" -- Needs review
-		S["REPEATABLE_COMPLETED"] = "Visualizza se le missioni ripetibili precedentemente completate" -- Needs review
-		S["REPUTATION_REQUIRED"] = "Reputazione richiesta" -- Needs review
-		S["REQUIRED_LEVEL"] = "Livello Richiesto" -- Needs review
-		S["REQUIRES_FORMAT"] = "Richiede interamente versione Grail %s o versione successiva" -- Needs review
-		S["SEARCH_ALL_QUESTS"] = "Tutte le quest" -- Needs review
-		S["SEARCH_CLEAR"] = "Cancella" -- Needs review
-		S["SEARCH_NEW"] = "Nuova" -- Needs review
-		S["SELF"] = "Se stesso" -- Needs review
-		S["SHOW_BREADCRUMB"] = "Mostra informazioni sul percorso della missione sul Quest Frame" -- Needs review
-		S["SHOW_LOREMASTER"] = "Mostra solo le missioni Loremaster" -- Needs review
-		S["SINGLE_BREADCRUMB_FORMAT"] = "Cerca missioni disponibili" -- Needs review
-		S["SP_MESSAGE"] = "Missione speciale mai entrata nel diario della Blizzard" -- Needs review
-		S["TAGS"] = "Tag" -- Needs review
-		S["TAGS_DELETE"] = "Rimuovi Tag" -- Needs review
-		S["TAGS_NEW"] = "Aggiungi Tag" -- Needs review
-		S["TITLE_APPEARANCE"] = "Mostra titolo quest" -- Needs review
-		S["TURNED_IN"] = "Consegnata" -- Needs review
-		S["UNOBTAINABLE"] = "Non ottenibile" -- Needs review
-		S["WHEN_KILL"] = "Accetta quando uccidi" -- Needs review
-		S["WIDE_PANEL"] = "Ingrandisci il pannello Wholly quest" -- Needs review
-		S["WIDE_SHOW"] = "Mostra" -- Needs review
-		S["WORLD_EVENTS"] = "Eventi mondiali" -- Needs review
-		S["YEARLY"] = "Annuale" -- Needs review
+		S["ABANDONED"] = "Abbandonata"
+		S["ACCEPTED"] = "Accettata"
+		S["ACHIEVEMENT_COLORS"] = "Visualizza il colore delle realizzazioni completate"
+--[[Translation missing --]]
+		S["ADD_ADVENTURE_GUIDE"] = "Display Adventure Guide quests in every zone"
+		S["ALL_FACTION_REPUTATIONS"] = "Mostra la reputazione di tutte le fazioni"
+		S["APPEND_LEVEL"] = "Posponi livello richiesto"
+		S["BASE_QUESTS"] = "Quest di base"
+--[[Translation missing --]]
+		BINDING_NAME_WHOLLY_TOGGLEMAPPINS = "Toggle map pins"
+		BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = "Attiva/disattiva visualizzazione quest completate"
+		BINDING_NAME_WHOLLY_TOGGLESHOWDAILIES = "Attiva/disattiva quest giornaliere"
+--[[Translation missing --]]
+		BINDING_NAME_WHOLLY_TOGGLESHOWLOREMASTER = "Toggle shows Loremaster quests"
+		BINDING_NAME_WHOLLY_TOGGLESHOWNEEDSPREREQUISITES = "Attiva/disattiva visualizzazione prerequisiti"
+--[[Translation missing --]]
+		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "Toggle shows repeatables"
+--[[Translation missing --]]
+		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Toggle shows unobtainables"
+		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "Attiva/disattiva visualizzazione quest settimanali"
+--[[Translation missing --]]
+		BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Toggle shows World Quests"
+--[[Translation missing --]]
+		S["BLIZZARD_TOOLTIP"] = "Tooltips appear on Blizzard Quest Log"
+		S["BREADCRUMB"] = "Traccia Missioni"
+		S["BUGGED"] = "Bug"
+		S["BUGGED_UNOBTAINABLE"] = "Missioni buggate considerate non ottenibili"
+--[[Translation missing --]]
+		S["BUILDING"] = "Building"
+		S["CHRISTMAS_WEEK"] = "Settimana di Natale"
+		S["CLASS_ANY"] = "Qualsiasi"
+		S["CLASS_NONE"] = "Nessuna"
+		S["COMPLETED"] = "Completata"
+--[[Translation missing --]]
+		S["COMPLETION_DATES"] = "Completion Dates"
+--[[Translation missing --]]
+		S["DROP_TO_START_FORMAT"] = "Drops %s to start [%s]"
+		S["EMPTY_ZONES"] = "Mostra le zone vuote"
+		S["ENABLE_COORDINATES"] = "Attiva le coordinate del giocatore"
+		S["ENTER_ZONE"] = "Accetta quando entri nell'area"
+		S["ESCORT"] = "Scorta"
+--[[Translation missing --]]
+		S["EVER_CAST"] = "Has ever cast"
+		S["EVER_COMPLETED"] = "Stata completata"
+--[[Translation missing --]]
+		S["EVER_EXPERIENCED"] = "Has ever experienced"
+		S["FACTION_BOTH"] = "Entrambe"
+		S["FIRST_PREREQUISITE"] = "In primo luogo nella catena dei prerequisiti:"
+		S["GENDER"] = "Genere"
+		S["GENDER_BOTH"] = "Entrambi"
+		S["GENDER_NONE"] = "Nessun"
+		S["GRAIL_NOT_HAVE"] = "Grail non dispone di questa ricerca"
+--[[Translation missing --]]
+		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Hide Blizzard bonus objectives"
+--[[Translation missing --]]
+		S["HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES"] = "Hide Blizzard dungeon entrances"
+--[[Translation missing --]]
+		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Hide Blizzard quest map pins"
+--[[Translation missing --]]
+		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Hide Blizzard treasures"
+--[[Translation missing --]]
+		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "Hide flight points"
+		S["HIGH_LEVEL"] = "Di livello alto"
+		S["HOLIDAYS_ONLY"] = "Disponibile solo durante le vacanze"
+		S["IGNORE_REPUTATION_SECTION"] = "Ignora la sezione reputazione delle quest"
+		S["IN_LOG"] = "Connettiti"
+		S["IN_LOG_STATUS"] = "Mostra lo stato delle quest"
+		S["INVALIDATE"] = "Missioni invalidate"
+--[[Translation missing --]]
+		S["IS_BREADCRUMB"] = "Is breadcrumb quest for:"
+		S["ITEM"] = "Oggetto"
+		S["ITEM_LACK"] = "Oggetto mancante"
+		S["KILL_TO_START_FORMAT"] = "Uccidere per avviare [%s]"
+		S["LIVE_COUNTS"] = "Aggiornamento conteggio missioni direttamente"
+		S["LOAD_DATA"] = "Caricare i dati"
+		S["LOREMASTER_AREA"] = "Loremaster Area"
+		S["LOW_LEVEL"] = "Di livello basso"
+		S["MAP"] = "Mappa"
+		S["MAP_BUTTON"] = "Mostra pulsante mappa del mondo"
+		S["MAP_DUNGEONS"] = "Mostra le quest nei dungeon sulla mappa esterna"
+		S["MAP_PINS"] = "Mostra sulla mappa le quest da prendere"
+		S["MAP_UPDATES"] = "Aggiorna la mappa quando cambio zona"
+		S["MAPAREA_NONE"] = "Nessuna"
+		S["MAXIMUM_LEVEL_NONE"] = "Nessun"
+--[[Translation missing --]]
+		S["MULTIPLE_BREADCRUMB_FORMAT"] = "%d Breadcrumb quests available"
+		S["MUST_KILL_PIN_FORMAT"] = "%s [Uccidere]"
+		S["NEAR"] = "Vicino a"
+		S["NEEDS_PREREQUISITES"] = "Prerequisiti richiesti"
+		S["NEVER_ABANDONED"] = "Mai abbandonata"
+--[[Translation missing --]]
+		S["OAC"] = "On acceptance complete quests:"
+		S["OCC"] = "Requisiti richiesti per completare la missione"
+--[[Translation missing --]]
+		S["OTC"] = "On turn in complete quests:"
+		S["OTHER"] = "altro"
+		S["OTHER_PREFERENCE"] = "Altre"
+		S["PANEL_UPDATES"] = "Aggiorna il pannello log quest quando cambia zona"
+--[[Translation missing --]]
+		S["PLOT"] = "Plot"
+		S["PREPEND_LEVEL"] = "Anteponi Livello missioni"
+		S["PREREQUISITES"] = "Prerequisiti missione"
+		S["QUEST_COUNTS"] = "Mostra conteggio missioni"
+		S["QUEST_ID"] = "ID Missione"
+		S["QUEST_TYPE_NORMAL"] = "Normali"
+		S["RACE_ANY"] = "Qualsiasi"
+		S["RACE_NONE"] = "Nessuna"
+		S["RARE_MOBS"] = "Mob rari"
+		S["REPEATABLE"] = "Ripetibile"
+		S["REPEATABLE_COMPLETED"] = "Visualizza se le missioni ripetibili precedentemente completate"
+		S["REPUTATION_REQUIRED"] = "Reputazione richiesta"
+		S["REQUIRED_LEVEL"] = "Livello Richiesto"
+		S["REQUIRES_FORMAT"] = "Richiede interamente versione Grail %s o versione successiva"
+--[[Translation missing --]]
+		S["RESTORE_DIRECTIONAL_ARROWS"] = "Should not restore directional arrows"
+		S["SEARCH_ALL_QUESTS"] = "Tutte le quest"
+		S["SEARCH_CLEAR"] = "Cancella"
+		S["SEARCH_NEW"] = "Nuova"
+		S["SELF"] = "Se stesso"
+		S["SHOW_BREADCRUMB"] = "Mostra informazioni sul percorso della missione sul Quest Frame"
+		S["SHOW_LOREMASTER"] = "Mostra solo le missioni Loremaster"
+		S["SINGLE_BREADCRUMB_FORMAT"] = "Cerca missioni disponibili"
+		S["SP_MESSAGE"] = "Missione speciale mai entrata nel diario della Blizzard"
+		S["TAGS"] = "Tag"
+		S["TAGS_DELETE"] = "Rimuovi Tag"
+		S["TAGS_NEW"] = "Aggiungi Tag"
+		S["TITLE_APPEARANCE"] = "Mostra titolo quest"
+		S["TREASURE"] = "Tesoro"
+		S["TURNED_IN"] = "Consegnata"
+		S["UNOBTAINABLE"] = "Non ottenibile"
+		S["WHEN_KILL"] = "Accetta quando uccidi"
+		S["WIDE_PANEL"] = "Ingrandisci il pannello Wholly quest"
+		S["WIDE_SHOW"] = "Mostra"
+		S["WORLD_EVENTS"] = "Eventi mondiali"
+--[[Translation missing --]]
+		S["WORLD_QUEST"] = "World Quests"
+		S["YEARLY"] = "Annuale"
 	elseif "koKR" == locale then
 		S["ABANDONED"] = "포기"
 		S["ACCEPTED"] = "수락함"
@@ -4935,12 +5061,12 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		S["LIVE_COUNTS"] = "Обновлять в реальном времени"
 		S["LOAD_DATA"] = "Загрузка данных"
 		S["LOREMASTER_AREA"] = "Хранитель мудрости"
-		S["LOW_LEVEL"] = "Низкого уровня"
+		S["LOW_LEVEL"] = "Низкий уровень"
 		S["MAP"] = "Карта"
-		S["MAP_BUTTON"] = "Отображать кнопку на карте мира"
+		S["MAP_BUTTON"] = "Отображать кнопку на карте мира "
 		S["MAP_DUNGEONS"] = "Показывать задания в подземельях на карте игровой зоны"
-		S["MAP_PINS"] = "Показывать на карте мира метки тех, кто дает задания"
-		S["MAP_UPDATES"] = "Обновлять карту мира при смене игровой зоны"
+		S["MAP_PINS"] = "Показать на карте отметки существ давших задание"
+		S["MAP_UPDATES"] = "Обновлять карту мира при смене игровой зоны "
 		S["MAPAREA_NONE"] = "Нет"
 		S["MAXIMUM_LEVEL_NONE"] = "Нет"
 		S["MULTIPLE_BREADCRUMB_FORMAT"] = "Доступно %d путеводных заданий"
@@ -5320,7 +5446,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		{ S.BUGGED_UNOBTAINABLE, 'buggedQuestsConsideredUnobtainable', 'configurationScript4' },
 		{ S.BLIZZARD_TOOLTIP, 'displaysBlizzardQuestTooltips', 'configurationScript13' },
 		{ S.ALL_FACTION_REPUTATIONS, 'showsAllFactionReputations', 'configurationScript1' },
-		{ S.EMPTY_ZONES, 'displaysEmptyZones', 'configurationScript1' },
+		{ S.EMPTY_ZONES, 'displaysEmptyZones', 'configurationScript18' },
 		{ S.IGNORE_REPUTATION_SECTION, 'ignoreReputationQuests', 'configurationScript1' },
 		{ S.RESTORE_DIRECTIONAL_ARROWS, 'shouldNotRestoreDirectionalArrows', 'configurationScript1' },
 		{ S.ADD_ADVENTURE_GUIDE, 'shouldAddAdventureGuideQuests', 'configurationScript4' },
@@ -5340,6 +5466,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		end
 	end
 
+-- Starting in BfA beta 26567 there is no more WorldMapFrame_Update so we cannot support this at the moment...
+if not Grail.battleForAzeroth then
 hooksecurefunc("WorldMapFrame_Update", function()
 	local wpth = Wholly.poisToHide
 	if WhollyDatabase.hidesWorldMapFlightPoints or WhollyDatabase.hidesWorldMapTreasures or WhollyDatabase.hidesDungeonEntrances then
@@ -5370,10 +5498,13 @@ hooksecurefunc("WorldMapFrame_Update", function()
 	end
 	Wholly:_HidePOIs()
 end)
+end
 
+-- Starting in BfA beta 26567 there is no more WorldMap_UpdateQuestBonusObjectives so we cannot support this at the moment...
+if not Grail.battleForAzeroth then
 hooksecurefunc("WorldMap_UpdateQuestBonusObjectives", function()
 	if WhollyDatabase.hidesBlizzardWorldMapBonusObjectives then
-		local mapAreaID = GetCurrentMapAreaID()
+		local mapAreaID = Grail.GetCurrentDisplayedMapAreaID()
 		local taskInfo = C_TaskQuest.GetQuestsForPlayerByMapID(mapAreaID)
 		local numTaskPOIs = 0;
 		if(taskInfo ~= nil) then
@@ -5393,5 +5524,6 @@ hooksecurefunc("WorldMap_UpdateQuestBonusObjectives", function()
 		end
 	end
 end)
+end
 
 end
