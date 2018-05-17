@@ -359,6 +359,7 @@
 --			Made it so we can handle Blizzard removing GetCurrentMapDungeonLevel() and GetCurrentMapAreaID().
 --			Updates Italian localization by luigidirico96.
 --			Groups the continents together under a heading.
+--			Changes to use for WORLD_QUEST Blizzard's TRACKER_HEADER_WORLD_QUESTS.
 --
 --	Known Issues
 --
@@ -1004,7 +1005,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			['ITEM_LACK'] = "Item lack",
 			['ABANDONED'] = "Abandoned",
 			['NEVER_ABANDONED'] = "Never Abandoned",
-			['ACCEPTED'] = "Accepted",
+			['ACCEPTED'] = "Accepted",	-- ? CALENDAR_STATUS_ACCEPTED ?
 			['LEGENDARY'] = "Legendary",
 			['ACCOUNT'] = "Account",
 			['EVER_CAST'] = "Has ever cast",
@@ -1012,12 +1013,12 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			['TAGS'] = "Tags",
 			['TAGS_NEW'] = "New Tag",
 			['TAGS_DELETE'] = "Delete Tag",
-			['MAP'] = "Map",
+			['MAP'] = "Map",	-- ? BRAWL_TOOLTIP_MAP ?
 			['PLOT'] = "Plot",
 			['BUILDING'] = "Building",
 
 			['BASE_QUESTS'] = "Base Quests",
-			['COMPLETED'] = "Completed",
+			['COMPLETED'] = "Completed",	-- ? QUEST_COMPLETE ? -- it is "Quest completed"
 			['NEEDS_PREREQUISITES'] = "Needs prerequisites",
 			['UNOBTAINABLE'] = "Unobtainable",
 			['LOW_LEVEL'] = "Low-level",
@@ -1040,7 +1041,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			['BUGGED_UNOBTAINABLE'] = "Bugged quests considered unobtainable",
 			['BLIZZARD_TOOLTIP'] = "Tooltips appear on Blizzard Quest Log",
 			['WIDE_PANEL'] = "Wide Wholly Quest Panel",
-			['WIDE_SHOW'] = "Show",
+			['WIDE_SHOW'] = "Show",	-- ? SHOW ?
 			['QUEST_COUNTS'] = "Show quest counts",
 			['LIVE_COUNTS'] = "Live quest count updates",
 			['LOAD_DATA'] = "Load Data",
@@ -1056,7 +1057,6 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			['HIDE_BLIZZARD_WORLD_MAP_TREASURES'] = 'Hide Blizzard treasures',
 			['HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES'] = 'Hide Blizzard bonus objectives',
 			['HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS'] = 'Hide Blizzard quest map pins',
-			['WORLD_QUEST'] = 'World Quests',
 			['HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES'] = 'Hide Blizzard dungeon entrances',
 			},
 		supportedControlMaps = { WorldMapFrame, OmegaMapFrame, },	-- the frame to check for visibility
@@ -4284,7 +4284,6 @@ end
 		S["WIDE_PANEL"] = "Breites Wholly-Questfenster"
 		S["WIDE_SHOW"] = "Zeige"
 		S["WORLD_EVENTS"] = "Weltereignisse"
-		S["WORLD_QUEST"] = "Weltquest"
 		S["YEARLY"] = "Jährlich"
 	elseif "esES" == locale then
 		S["ABANDONED"] = "Abandonada"
@@ -4398,7 +4397,6 @@ end
 		S["WIDE_PANEL"] = "Anchura del panel de Misión de Wholly"
 		S["WIDE_SHOW"] = "Mostrar"
 		S["WORLD_EVENTS"] = "Eventos del mundo"
-		S["WORLD_QUEST"] = "Misiones del mundo"
 		S["YEARLY"] = "Anualmente"
 	elseif "esMX" == locale then
 		S["ABANDONED"] = "Abandonado"
@@ -4509,7 +4507,6 @@ end
 		S["WIDE_PANEL"] = "Ampliar Wholly Registro de misiones"
 		S["WIDE_SHOW"] = "Mostrar"
 		S["WORLD_EVENTS"] = "Eventos del mundo"
-		S["WORLD_QUEST"] = "Misiones de Mundo"
 		S["YEARLY"] = "Anualmente"
 	elseif "frFR" == locale then
 		S["ABANDONED"] = "Abandonnée"
@@ -4624,7 +4621,6 @@ end
 		S["WIDE_PANEL"] = "Journal de quêtes Wholly large"
 		S["WIDE_SHOW"] = "Afficher"
 		S["WORLD_EVENTS"] = "Événements mondiaux"
-		S["WORLD_QUEST"] = "Expéditions"
 		S["YEARLY"] = "Annuelle"
     elseif "itIT" == locale then
 		S["ABANDONED"] = "Abbandonata"
@@ -4761,8 +4757,6 @@ end
 		S["WIDE_PANEL"] = "Ingrandisci il pannello Wholly quest"
 		S["WIDE_SHOW"] = "Mostra"
 		S["WORLD_EVENTS"] = "Eventi mondiali"
---[[Translation missing --]]
-		S["WORLD_QUEST"] = "World Quests"
 		S["YEARLY"] = "Annuale"
 	elseif "koKR" == locale then
 		S["ABANDONED"] = "포기"
@@ -4889,7 +4883,6 @@ end
 		S["WIDE_PANEL"] = "넓은 Wholly 퀘스트 목록"
 		S["WIDE_SHOW"] = "표시"
 		S["WORLD_EVENTS"] = "월드 이벤트"
-		S["WORLD_QUEST"] = "전역 퀘스트"
 		S["YEARLY"] = "연간"
 	elseif "ptBR" == locale then
 		S["ABANDONED"] = "Abandonada"
@@ -5000,7 +4993,6 @@ end
 		S["WIDE_PANEL"] = "Painel largo de Missões do Whooly"
 		S["WIDE_SHOW"] = "Exibir"
 		S["WORLD_EVENTS"] = "Eventos Mundiais"
-		S["WORLD_QUEST"] = "Missões Mundiais"
 		S["YEARLY"] = "Anualmente"
 	elseif "ruRU" == locale then
 		S["ABANDONED"] = "Проваленный"
@@ -5114,7 +5106,6 @@ end
 		S["WIDE_PANEL"] = "Широкая панель Wholly"
 		S["WIDE_SHOW"] = "Показать"
 		S["WORLD_EVENTS"] = "Игровые события"
-		S["WORLD_QUEST"] = "Мировые задания"
 		S["YEARLY"] = "Ежегодные задания"
 	elseif "zhCN" == locale then
 		S["ABANDONED"] = "放弃" -- Needs review
@@ -5378,6 +5369,7 @@ end
 	S['REWARD_CHOICES'] = REWARD_CHOICES								-- "You will be able to choose one of these rewards:"
 	S['PET_BATTLES'] = BATTLE_PET_SOURCE_5								-- "Pet Battle"
 	S['PLAYER'] = PLAYER												-- "Player"
+	S['WORLD_QUEST'] = TRACKER_HEADER_WORLD_QUESTS						-- "World Quests"
 
 	local C = Wholly.color
 	Wholly.configuration = {}
