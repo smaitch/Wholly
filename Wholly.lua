@@ -351,7 +351,7 @@
 --			Adds support for Allied races.
 --			Updates Russian localization from mihaha_xienor.
 --			Updates Spanish localization from raquetty.
---		067	Requires Grail 096 or later ***
+--		067	*** Requires Grail 096 or later ***
 --			Corrects the problem where some dungeons are not listed.
 --			Updates French localization by deathart709 and MongooZz.
 --			Updates Russian localization by RChernenko.
@@ -395,7 +395,6 @@ local IsControlKeyDown						= IsControlKeyDown
 local IsShiftKeyDown						= IsShiftKeyDown
 local LoadAddOn								= LoadAddOn
 local PlaySound								= PlaySound
-local SetMapByID							= SetMapByID
 local ToggleDropDownMenu					= ToggleDropDownMenu
 local UIDropDownMenu_AddButton				= UIDropDownMenu_AddButton
 local UIDropDownMenu_CreateInfo				= UIDropDownMenu_CreateInfo
@@ -418,7 +417,7 @@ local directoryName, _ = ...
 local versionFromToc = GetAddOnMetadata(directoryName, "Version")
 local _, _, versionValueFromToc = strfind(versionFromToc, "(%d+)")
 local Wholly_File_Version = tonumber(versionValueFromToc)
-local requiredGrailVersion = 93
+local requiredGrailVersion = 96
 
 --	Set up the bindings to use the localized name Blizzard supplies.  Note that the Bindings.xml file cannot
 --	just contain the TOGGLEQUESTLOG because then the entry for Wholly does not show up.  So, we use a version
@@ -702,6 +701,91 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 						self.currentMaximumTooltipLines = self.defaultMaximumTooltipLines
 					end
 
+local mapPinsTemplateName = "WhollyPinsTemplate"
+
+self.mapPinsPool.parent = WorldMapFrame:GetCanvas()
+self.mapPinsPool.creationFunc = function(framepool)
+    local frame = CreateFrame(framepool.frameType, nil, framepool.parent)
+    frame:SetSize(16, 16)
+    return Mixin(frame, self.mapPinsProviderPin)
+end
+self.mapPinsPool.resetterFunc = function(pinPool, pin)
+    FramePool_HideAndClearAnchors(pinPool, pin)
+    pin:OnReleased()
+    pin.pinTemplate = nil
+    pin.owningMap = nil
+end
+WorldMapFrame.pinPools[mapPinsTemplateName] = self.mapPinsPool
+
+function self.mapPinsProvider:RemoveAllData()
+    self:GetMap():RemoveAllPinsByTemplate(mapPinsTemplateName)
+end
+function self.mapPinsProvider:RemovePinByIcon(icon)
+    for pin in self:GetMap():EnumeratePinsByTemplate(mapPinsTemplateName) do
+        if pin.icon == icon then
+            self:GetMap():RemovePin(pin)
+        end
+    end
+end
+function self.mapPinsProvider:RemovePinsByRef(ref)
+    for pin in self:GetMap():EnumeratePinsByTemplate(mapPinsTemplateName) do
+        if pin.icon and worldmapPinRegistry[ref][pin.icon] then
+            self:GetMap():RemovePin(pin)
+        end
+    end
+end
+function self.mapPinsProvider:RefreshAllData(fromOnShow)
+    self:RemoveAllData()
+    Wholly:_HideAllPins()
+    if WhollyDatabase.displaysMapPins then
+        local uiMapID = self:GetMap():GetMapID()
+        if not uiMapID then return end
+        Wholly.cachedPinQuests = Wholly:_ClassifyQuestsInMap(uiMapID) or {}
+        Wholly:_FilterPinQuests()
+        local questsInMap = Wholly.filteredPinQuests
+        local codeMapping = { ['G'] = 1, ['W'] = 2, ['D'] = 3, ['R'] = 4, ['K'] = 5, ['H'] = 6, ['Y'] = 7, ['P'] = 8, ['L'] = 9, ['O'] = 10, ['U'] = 11, }
+        for i = 1, #questsInMap do
+            local id = questsInMap[i][1]
+            local code = questsInMap[i][2]
+            if 'D' == code and Grail:IsRepeatable(id) then code = 'R' end
+            local codeValue = codeMapping[code]
+            local locations = Grail:QuestLocationsAccept(id, false, false, true, uiMapID, true, 0)
+            if nil ~= locations then
+                for _, npc in pairs(locations) do
+                    local xcoord, ycoord, npcName, npcId = npc.x, npc.y, npc.name, npc.id
+                    if nil ~= xcoord then
+                        local pin, isNew = Wholly:_GetPin(npcId, self:GetMap())
+                        local pinValue = codeMapping[pin.texType]
+                        if codeValue < pinValue then
+                            pin:SetType(code)
+                        end
+                        if isNew then
+                            pin:ClearAllPoints()
+                            pin.questId = id
+                            pin:SetPosition(xcoord/100, ycoord/100)
+                            pin:Show()
+                        end
+                    end
+                end
+            end
+        end
+    else
+        Wholly.mapCountLine = ""        -- do not display a tooltip for pins we are not showing
+    end
+end
+function self.mapPinsProviderPin:OnLoad()
+    self:UseFrameLevelType("PIN_FRAME_LEVEL_AREA_POI")
+    self:SetScalingLimits(1, 1.0, 1.2)
+end
+function self.mapPinsProviderPin:OnAcquired()
+end
+function self.mapPinsProviderPin:OnReleased()
+    if self.questId and self.npcId then
+        Wholly:_HidePin(self.questId .. ":" .. self.npcId, self)
+    end
+end
+WorldMapFrame:AddDataProvider(self.mapPinsProvider)
+
 					self:_DisplayMapFrame(WDB.displaysMapFrame)
 					Grail:RegisterObserver("Status", self._CallbackHandler)
 					Grail:RegisterObserverQuestAbandon(self._CallbackHandler)
@@ -929,6 +1013,11 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		levelTwoCurrent = nil,
 		levelTwoData = nil,
 		mapFrame = nil,			-- the world map frame that contains the checkbox to toggle pins
+        mapPins = {},
+        mapPinsPool = CreateFramePool("FRAME"),
+        mapPinsProvider = CreateFromMixins(MapCanvasDataProviderMixin),
+        mapPinsProviderPin = CreateFromMixins(MapCanvasPinMixin),
+        mapPinsRegistry = {},
 		mapPinCount = 0,
 		maximumSearchHistory = 10,
 		npcs = {},
@@ -1062,6 +1151,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		supportedControlMaps = { WorldMapFrame, OmegaMapFrame, },	-- the frame to check for visibility
 		supportedMaps = { WorldMapDetailFrame, OmegaMapDetailFrame, },	-- the frame that is the parent of the pins
 		supportedPOIMaps = { WorldMapPOIFrame, OmegaMapPOIFrame, },	-- the frame to use to set pin level, index from supportedMaps used to determine which to use
+		supportedPOIMaps = { WorldMapFrame, OmegaMapPOIFrame, },	-- the frame to use to set pin level, index from supportedMaps used to determine which to use
 		tooltip = nil,
 		updateDelay = 0.5,
 		updateThreshold = 0.1,
@@ -1588,11 +1678,6 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			if shouldDisplay then self.mapFrame:Show() else self.mapFrame:Hide() end
 		end,
 
-		_Distance = function(self, parentFrame, x1, y1, x2, y2)
-			local distRatio = parentFrame:GetHeight() / parentFrame:GetWidth();
-			return sqrt( (x1 - x2)^2 + ((y1 - y2)/distRatio)^2 );
-		end,
-
 		_Dropdown_AddButton = function(self, level, hasArrow, item)
 			local info = UIDropDownMenu_CreateInfo()
 			info.hasArrow = hasArrow
@@ -1834,15 +1919,17 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
 		_GetPin = function(self, npcId, parentFrame)
 			self:_PinFrameSetup(parentFrame)
-			if nil ~= self.pins[parentFrame]["npcs"][npcId] then return self.pins[parentFrame]["npcs"][npcId] end
+			if nil ~= self.pins[parentFrame]["npcs"][npcId] then return self.pins[parentFrame]["npcs"][npcId], false end
 
-			self.mapPinCount = self.mapPinCount + 1
-			local pin = CreateFrame("Frame", "com_mithrandir_WhollyMapPin"..self.mapPinCount, parentFrame);
-			pin.originalParentFrame = parentFrame
+--			self.mapPinCount = self.mapPinCount + 1
+--			local pin = CreateFrame("Frame", "com_mithrandir_WhollyMapPin"..self.mapPinCount, parentFrame);
+local pin = parentFrame:AcquirePin("WhollyPinsTemplate")
+            pin.originalParentFrame = parentFrame
 			pin.npcId = npcId
-			pin:SetWidth(16);
-			pin:SetHeight(16);
-			pin:EnableMouse(true);
+--			pin:SetWidth(16);
+--          pin:SetHeight(16);
+--			pin:EnableMouse(true);
+pin:SetMouseMotionEnabled(true)
 			pin:SetScript("OnEnter", function(pin) self:ShowTooltip(pin) end)
 			pin:SetScript("OnLeave", function() self:_HideTooltip() end)
 			pin.SetType = function(self, texType)
@@ -1898,7 +1985,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 
 			pin.texType = 'U'
 			self.pins[parentFrame]["npcs"][npcId] = pin
-			return pin;
+			return pin, true;
 		end,
 
 		_HideAllPins = function(self)
@@ -2030,18 +2117,10 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				tinsert(t1.children, { displayName = EXPANSION_NAME1, index = -101 })
 				tinsert(t1.children, { displayName = EXPANSION_NAME2, index = -102 })
 				tinsert(t1.children, { displayName = EXPANSION_NAME3, index = -103 })
-				if Grail.existsPandaria then
-					tinsert(t1.children, { displayName = EXPANSION_NAME4, index = -104 })
-				end
-				if Grail.existsWoD then
-					tinsert(t1.children, { displayName = EXPANSION_NAME5, index = -105 })
-				end
-				if Grail.existsLegion then
-					tinsert(t1.children, { displayName = EXPANSION_NAME6, index = -106 })
-				end
-				if Grail.battleForAzeroth then
-					tinsert(t1.children, { displayName = EXPANSION_NAME7, index = -107 })
-				end
+				tinsert(t1.children, { displayName = EXPANSION_NAME4, index = -104 })
+				tinsert(t1.children, { displayName = EXPANSION_NAME5, index = -105 })
+				tinsert(t1.children, { displayName = EXPANSION_NAME6, index = -106 })
+				tinsert(t1.children, { displayName = EXPANSION_NAME7, index = -107 })
 				tinsert(entries, t1)
 			end
 
@@ -2489,11 +2568,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			local f = CreateFrame("Button", nil, WorldMapFrame.BorderFrame, "UIPanelButtonTemplate")
 			f:SetSize(100, 25)
 			if nil == Gatherer_WorldMapDisplay then
-				if not Grail.existsWoD then
-					f:SetPoint("TOPLEFT", WorldMapPositioningGuide, "TOPLEFT", 4, -4)
-				else
-					f:SetPoint("TOPLEFT", WorldMapFrameTutorialButton, "TOPRIGHT", 0, -30)
-				end
+				f:SetPoint("TOPLEFT", WorldMapFrameTutorialButton, "TOPRIGHT", 0, -30)
 			else
 				f:SetPoint("TOPLEFT", Gatherer_WorldMapDisplay, "TOPRIGHT", 4, 0)
 			end
@@ -2502,18 +2577,10 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			f:SetText("Wholly")
 			f:SetScript("OnShow", function(self)
 									if nil == Gatherer_WorldMapDisplay then
-										if not Grail.existsWoD then
-											if not(GetCVarBool("miniWorldMap")) then
-												f:SetPoint("TOPLEFT", WorldMapPositioningGuide, "TOPLEFT", 4, -4)
-											else
-												self:SetPoint("TOPLEFT", WorldMapTitleButton, "TOPLEFT", 8, -3)
-											end
+                                        if TomTomWorldFrame and TomTomWorldFrame.Player then
+											f:SetPoint("TOPLEFT", TomTomWorldFrame.Player, "TOPRIGHT", 10, 6)
 										else
-											if TomTomWorldFrame and TomTomWorldFrame.Player then
-												f:SetPoint("TOPLEFT", TomTomWorldFrame.Player, "TOPRIGHT", 10, 6)
-											else
-												f:SetPoint("TOPLEFT", WorldMapFrameTutorialButton, "TOPRIGHT", 0, -30)
-											end
+											f:SetPoint("TOPLEFT", WorldMapFrameTutorialButton, "TOPRIGHT", 0, -30)
 										end
 									else
 										self:SetPoint("TOPLEFT", Gatherer_WorldMapDisplay, "TOPRIGHT", 4, 0)
@@ -2555,42 +2622,21 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			end
 
 			-- Make it so the Blizzard quest log can display our tooltips
-			if not GRAIL.existsWoD then
-				local buttons = QuestLogScrollFrame.buttons
-				local buttonCount = #buttons
-				for i = 1, buttonCount do
-					buttons[i]:HookScript("OnEnter", function(button)
-						if WhollyDatabase.displaysBlizzardQuestTooltips then
-							self:_PresentTooltipForBlizzardQuest(button)
-						end
-					end)
-					buttons[i]:HookScript("OnLeave", function(button)
-						if WhollyDatabase.displaysBlizzardQuestTooltips then
-							for i = 1, self.currentTt do
-								self.tt[i]:Hide()
-							end
-						end
-					end)
-				end
-			else
-				hooksecurefunc("QuestMapLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
-				-- Now since the Blizzard UI has probably created a quest frame before I get
-				-- the chance to hook the function I need to go through all the quest frames
-				-- and hook them too.
+            hooksecurefunc("QuestMapLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
+			-- Now since the Blizzard UI has probably created a quest frame before I get
+			-- the chance to hook the function I need to go through all the quest frames
+			-- and hook them too.
 if not Grail.battleForAzeroth then
-				local titles = QuestMapFrame.QuestsFrame.Contents.Titles
-				for i = 1, #(titles) do
-					titles[i]:HookScript("OnEnter", Wholly._OnEnterBlizzardQuestButton)
-				end
-end
+			local titles = QuestMapFrame.QuestsFrame.Contents.Titles
+			for i = 1, #(titles) do
+				titles[i]:HookScript("OnEnter", Wholly._OnEnterBlizzardQuestButton)
 			end
+end
 
 			-- Our frame positions are wrong for MoP, so we change them here.
-			if GRAIL.existsPandaria then
-				com_mithrandir_whollyQuestInfoFrame:SetPoint("TOPRIGHT", QuestFrame, "TOPRIGHT", -15, -35)
-				com_mithrandir_whollyQuestInfoBuggedFrame:SetPoint("TOPLEFT", QuestFrame, "TOPLEFT", 100, -35)
-				com_mithrandir_whollyBreadcrumbFrame:SetPoint("TOPLEFT", QuestFrame, "BOTTOMLEFT", 16, -10)
-			end
+			com_mithrandir_whollyQuestInfoFrame:SetPoint("TOPRIGHT", QuestFrame, "TOPRIGHT", -15, -35)
+			com_mithrandir_whollyQuestInfoBuggedFrame:SetPoint("TOPLEFT", QuestFrame, "TOPLEFT", 100, -35)
+			com_mithrandir_whollyBreadcrumbFrame:SetPoint("TOPLEFT", QuestFrame, "BOTTOMLEFT", 16, -10)
 
 			local nf = CreateFrame("Frame")
 			self.notificationFrame = nf
@@ -2606,9 +2652,6 @@ end
 
 			com_mithrandir_whollyFrameSwitchZoneButton:SetText(self.s.MAP)
 			com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
-			if not GRAIL.existsWoD then
-				com_mithrandir_whollyFrameWideReallySwitchZoneButton:Hide()
-			end
 
 		end,
 
@@ -3789,14 +3832,14 @@ end
 								pin:ClearAllPoints()
 								pin.questId = id
 								if frame ~= NxMap1 then
-									local baseFrameLevel = self.supportedPOIMaps[index]:GetFrameLevel()
-									local releaseDelta = (not Grail.existsWoD) and -1 or 1
-									local pinTypeDelta = (pin.texType == 'G' or pin.texType == 'W') and 1 or 0
-									pin:SetFrameStrata("DIALOG")	-- treasure map icons still rule when I am set to this level
-									pin:SetFrameStrata("TOOLTIP")
-									pin:SetFrameLevel(baseFrameLevel + releaseDelta + pinTypeDelta)
-									pin:SetPoint("CENTER", frame, "TOPLEFT", xcoord/100*frame:GetWidth(), -ycoord/100*frame:GetHeight())
-									pin:Show()
+--									local baseFrameLevel = self.supportedPOIMaps[index]:GetFrameLevel()
+--									local releaseDelta = (not Grail.existsWoD) and -1 or 1
+--									local pinTypeDelta = (pin.texType == 'G' or pin.texType == 'W') and 1 or 0
+--									pin:SetFrameStrata("DIALOG")	-- treasure map icons still rule when I am set to this level
+--									pin:SetFrameStrata("TOOLTIP")
+--									pin:SetFrameLevel(baseFrameLevel + releaseDelta + pinTypeDelta)
+--									pin:SetPoint("CENTER", frame, "TOPLEFT", xcoord/100*frame:GetWidth(), -ycoord/100*frame:GetHeight())
+--									pin:Show()
 								else
 									Nx.MapAddIcon(pin.questId, self.zoneInfo.pins.mapId, xcoord, ycoord, nil, pin)	-- requires modified Carbonite to work properly
 								end
@@ -3815,9 +3858,9 @@ end
 			self.tooltip:SetOwner(pin, "ANCHOR_RIGHT")
 			self.tooltip:ClearLines()
 
-			local parentFrame = pin:GetParent()
+            local parentFrame = pin.originalParentFrame
 			-- find all quests in range of hover
-			local mx, my = self:_GetMousePosition(parentFrame)
+            local mx, my = pin:GetPosition()
 			local npcList = {}
 			local npcNames = {}
 
@@ -3825,11 +3868,11 @@ end
 			local questId
 			for i = 1, #questsInMap do
 				questId = questsInMap[i][1]
-				local locations = Grail:QuestLocationsAccept(questId, false, false, true, self.zoneInfo.pins.mapId, true, self.zoneInfo.pins.dungeonLevel)
+                local locations = Grail:QuestLocationsAccept(questId, false, false, true, parentFrame:GetMapID(), true, 0)
 				if nil ~= locations then
 					for _, npc in pairs(locations) do
 						if nil ~= npc.x then
-							local dist = self:_Distance(parentFrame, mx, my, npc.x/100, npc.y/100)
+                            local dist = sqrt( (mx - npc.x/100)^2 + (my - npc.y/100)^2 )
 							if dist <= 0.02 or (NxMap1 == parentFrame and npc.id == pin.npcId) then
 								if not npcList[npc.id] then
 									npcList[npc.id] = {}
@@ -3871,7 +3914,7 @@ end
 				self.tooltip:SetLastFont(self.tooltip.small)
 			end
 	
-			self.tooltip:Show();
+            self.tooltip:Show();
 		end,
 
 		SlashCommand = function(self, frame, msg)
@@ -4107,16 +4150,21 @@ end
 					break
 				end
 			end
+--print("Supported map visible: "..(mapWeSupportIsVisible and "YES" or "NO"))
 			if mapWeSupportIsVisible then
 
 				local pinsShouldBeReclassified = (self.zoneInfo.pins.mapId ~= self.zoneInfo.map.mapId) or (self.zoneInfo.pins.dungeonLevel ~= self.zoneInfo.map.dungeonLevel)
 
+--print("Pins need reclassification: "..(pinsShouldBeReclassified and "YES" or "NO"))
+--print("Zoneinfo mapId: "..self.zoneInfo.map.mapId)
 				--	If we are not displaying pins or if anything has changed since we last displayed
 				--	pins, we need to hide (remove from the map) all the current pins.
 				if not WhollyDatabase.displaysMapPins or pinsShouldBeReclassified or self.pinsNeedFiltering then
 					self:_HideAllPins()
 				end
 
+--pinsShouldBeReclassified = true
+--self.zoneInfo.map.mapId = WorldMapFrame:GetMapID()
 				--	If we are displaying pins and something has changed since we last displayed
 				--	pins, we need to display all the current pins.
 				if WhollyDatabase.displaysMapPins and (pinsShouldBeReclassified or self.pinsNeedFiltering or self.pinsDisplayedLast ~= WhollyDatabase.displaysMapPins) then
@@ -4128,6 +4176,7 @@ end
 					self:_FilterPinQuests()
 					self.pinsNeedFiltering = false
 					local questsInMap = self.filteredPinQuests
+--print("Total quests in map: ".. #questsInMap)
 					for i = 1, #questsInMap do
 						self:ShowPin(questsInMap[i])
 					end
