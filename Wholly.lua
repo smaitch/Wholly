@@ -360,6 +360,8 @@
 --			Updates Italian localization by luigidirico96.
 --			Groups the continents together under a heading.
 --			Changes to use for WORLD_QUEST Blizzard's TRACKER_HEADER_WORLD_QUESTS.
+--			Disables ability to hide Blizzard map items because Blizzard API has changed.
+--			Updates Simplified Chinese localization by dh0000 and Aladdinn.
 --
 --	Known Issues
 --
@@ -536,10 +538,22 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 									end
 								end,
 		configurationScript16 = function(self)
-									WorldMapFrame_Update()
+--									WorldMapFrame_Update()
 								end,
 		configurationScript17 = function(self)
-									WorldMap_UpdateQuestBonusObjectives()
+--									WorldMap_UpdateQuestBonusObjectives()
+--	The following technique does not seem to work as expected.
+									if WhollyDatabase.hidesBlizzardWorldMapBonusObjectives then
+										Wholly.WorldQuestDataProviderMixin_RefreshAllData = WorldQuestDataProviderMixin.RefreshAllData
+										WorldQuestDataProviderMixin.RefreshAllData = function() end
+										WorldQuestDataProviderMixin:RemoveAllData()
+									else
+										if nil ~= Wholly.WorldQuestDataProviderMixin_RefreshAllData then
+											WorldQuestDataProviderMixin.RefreshAllData = Wholly.WorldQuestDataProviderMixin_RefreshAllData
+											WorldQuestDataProviderMixin:RefreshAllData()
+											Wholly.WorldQuestDataProviderMixin_RefreshAllData = nil
+										end
+									end
 								end,
 		configurationScript18 = function(self)
 									Wholly:_InitializeLevelOneData()
@@ -718,20 +732,6 @@ WorldMapFrame.pinPools[mapPinsTemplateName] = self.mapPinsPool
 function self.mapPinsProvider:RemoveAllData()
     self:GetMap():RemoveAllPinsByTemplate(mapPinsTemplateName)
 end
---function self.mapPinsProvider:RemovePinByIcon(icon)
---    for pin in self:GetMap():EnumeratePinsByTemplate(mapPinsTemplateName) do
---        if pin.icon == icon then
---           self:GetMap():RemovePin(pin)
---        end
---    end
---end
---function self.mapPinsProvider:RemovePinsByRef(ref)
---    for pin in self:GetMap():EnumeratePinsByTemplate(mapPinsTemplateName) do
---        if pin.icon and worldmapPinRegistry[ref][pin.icon] then
---            self:GetMap():RemovePin(pin)
---        end
---    end
---  end
 function self.mapPinsProvider:RefreshAllData(fromOnShow)
     self:RemoveAllData()
     Wholly:_HideAllPins()
@@ -3974,7 +3974,9 @@ end
 		end,
 
         _UpdatePins = function(self, forceUpdate)
-            self.mapPinsProvider:RefreshAllData()
+			if WorldMapFrame:IsVisible() then
+            	self.mapPinsProvider:RefreshAllData()
+			end
         end,
 
 		UpdateQuestCaches = function(self, forceUpdate, setPinMap, setPanelMap, useCurrentZone)
@@ -4352,7 +4354,7 @@ end
 		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "Afficher/cacher les répétables"
 		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Afficher/cacher les quêtes impossibles à obtenir"
 		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "Afficher/cacher les quêtes hebdomadaires"
---Translation missing
+--[[Translation missing --]]
 		BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Toggle shows World Quests"
 		S["BLIZZARD_TOOLTIP"] = "Apparition des info-bulles sur le Journal de quêtes"
 		S["BREADCRUMB"] = "Quêtes précédentes (suite de quêtes) :"
@@ -4838,7 +4840,7 @@ end
 		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "Переключить отображение повторяющихся заданий"
 		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Переключить отображение недоступных заданий"
 		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "Переключит отображение еженедельных заданий"
-		BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Переключить отображение Локальных Заданий"
+		BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Включить отображение Локальных Заданий"
 		S["BLIZZARD_TOOLTIP"] = "Появление подсказок в журнале заданий"
 		S["BREADCRUMB"] = "Направляющие задания из путеводителя:"
 		S["BUGGED"] = "***СЛОМАЛОСЬ***"
@@ -4936,104 +4938,125 @@ end
 		S["WORLD_EVENTS"] = "Игровые события"
 		S["YEARLY"] = "Ежегодные задания"
 	elseif "zhCN" == locale then
-		S["ABANDONED"] = "放弃" -- Needs review
-		S["ACCEPTED"] = "已接受" -- Needs review
-		S["ACHIEVEMENT_COLORS"] = "显示成就完成颜色" -- Needs review
-		S["APPEND_LEVEL"] = "显示需要等级" -- Needs review
-		S["BASE_QUESTS"] = "基础任务" -- Needs review
-		BINDING_NAME_WHOLLY_TOGGLEMAPPINS = "开启地图标记" -- Needs review
-		BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = "显示已完成任务" -- Needs review
-		BINDING_NAME_WHOLLY_TOGGLESHOWDAILIES = "显示每日任务" -- Needs review
-		BINDING_NAME_WHOLLY_TOGGLESHOWNEEDSPREREQUISITES = "显示需要前置的任务" -- Needs review
-		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "显示重复任务" -- Needs review
-		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "显示无法取得任务" -- Needs review
-		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "显示每周任务" -- Needs review
-		S["BLIZZARD_TOOLTIP"] = "在游戏任务日志中显示提示信息" -- Needs review
-		S["BREADCRUMB"] = "引导任务：" -- Needs review
-		S["BUGGED"] = "|cffff0000*** 有问题的 ***|r" -- Needs review
-		S["BUGGED_UNOBTAINABLE"] = "将有BUG的任务视为不可取得" -- Needs review
-		S["BUILDING"] = "建筑" -- Needs review
-		S["CHRISTMAS_WEEK"] = "圣诞周" -- Needs review
-		S["CLASS_ANY"] = "任何职业" -- Needs review
-		S["CLASS_NONE"] = "无" -- Needs review
-		S["COMPLETED"] = "已完成" -- Needs review
-		S["COMPLETION_DATES"] = "完成日期" -- Needs review
-		S["DROP_TO_START_FORMAT"] = "掉落 %s 以开始 [%s]" -- Needs review
-		S["ENABLE_COORDINATES"] = "启用显示玩家座标" -- Needs review
-		S["ENTER_ZONE"] = "进入区域时取得" -- Needs review
-		S["ESCORT"] = "护送" -- Needs review
-		S["EVER_CAST"] = "曾经施放" -- Needs review
-		S["EVER_COMPLETED"] = "代表一个任务从未完成过" -- Needs review
-		S["EVER_EXPERIENCED"] = "有过经验" -- Needs review
-		S["FACTION_BOTH"] = "联盟&部落" -- Needs review
-		S["FIRST_PREREQUISITE"] = "前置任务链中的第一个：" -- Needs review
-		S["GENDER"] = "性別" -- Needs review
-		S["GENDER_BOTH"] = "男女皆可" -- Needs review
-		S["GENDER_NONE"] = "无" -- Needs review
-		S["GRAIL_NOT_HAVE"] = "|cFFFF0000Grail资料库内无此任务|r" -- Needs review
-		S["HIGH_LEVEL"] = "高等级" -- Needs review
-		S["HOLIDAYS_ONLY"] = "仅在节日时可取得：" -- Needs review
-		S["IN_LOG"] = "已接" -- Needs review
-		S["IN_LOG_STATUS"] = "在纪录中显示任务状态" -- Needs review
-		S["INVALIDATE"] = "被以下任务停用：" -- Needs review
-		S["IS_BREADCRUMB"] = "是下列任务的引导任务：" -- Needs review
-		S["ITEM"] = "物品" -- Needs review
-		S["ITEM_LACK"] = "缺少物品" -- Needs review
-		S["KILL_TO_START_FORMAT"] = "击杀以开始 [%s]" -- Needs review
-		S["LIVE_COUNTS"] = "即时更新计数" -- Needs review
-		S["LOAD_DATA"] = "读取资料" -- Needs review
-		S["LOREMASTER_AREA"] = "博学大师区域" -- Needs review
-		S["LOW_LEVEL"] = "低等级" -- Needs review
-		S["MAP"] = "地图" -- Needs review
-		S["MAPAREA_NONE"] = "无" -- Needs review
-		S["MAP_BUTTON"] = "在世界地图上显示按钮" -- Needs review
-		S["MAP_DUNGEONS"] = "在外部地图显示副本任务" -- Needs review
-		S["MAP_PINS"] = "在地图上显示任务给予者" -- Needs review
-		S["MAP_UPDATES"] = "当区域变更时更新世界地图" -- Needs review
-		S["MAXIMUM_LEVEL_NONE"] = "无" -- Needs review
-		S["MULTIPLE_BREADCRUMB_FORMAT"] = "有 %d 个引导任务" -- Needs review
-		S["MUST_KILL_PIN_FORMAT"] = "%s [击杀]" -- Needs review
-		S["NEAR"] = "靠近" -- Needs review
-		S["NEEDS_PREREQUISITES"] = "需要前置" -- Needs review
-		S["NEVER_ABANDONED"] = "不可放弃" -- Needs review
-		S["OAC"] = "接受时完成任务" -- Needs review
-		S["OCC"] = "完成要求时完成任务" -- Needs review
-		S["OTC"] = "缴交时完成任务" -- Needs review
-		S["OTHER"] = "其他" -- Needs review
-		S["OTHER_PREFERENCE"] = "其他" -- Needs review
-		S["PANEL_UPDATES"] = "当变更区域时更新任务纪录视窗" -- Needs review
-		S["PLOT"] = "空地" -- Needs review
-		S["PREPEND_LEVEL"] = "显示任务等级" -- Needs review
-		S["PREREQUISITES"] = "前置任务：" -- Needs review
-		S["QUEST_COUNTS"] = "显示任务计数" -- Needs review
-		S["QUEST_ID"] = "任务 ID：" -- Needs review
-		S["QUEST_TYPE_NORMAL"] = "普通" -- Needs review
-		S["RACE_ANY"] = "任何种族" -- Needs review
-		S["RACE_NONE"] = "无" -- Needs review
-		S["REPEATABLE"] = "可重复" -- Needs review
-		S["REPEATABLE_COMPLETED"] = "显示已完成过的可重复任务" -- Needs review
-		S["REPUTATION_REQUIRED"] = "声望要求：" -- Needs review
-		S["REQUIRED_LEVEL"] = "等级要求" -- Needs review
-		S["REQUIRES_FORMAT"] = "Wholly 需要 %s 或更新的 Grail版本" -- Needs review
-		S["SEARCH_ALL_QUESTS"] = "所有任务" -- Needs review
-		S["SEARCH_CLEAR"] = "清除" -- Needs review
-		S["SEARCH_NEW"] = "新的" -- Needs review
-		S["SELF"] = "自己" -- Needs review
-		S["SHOW_BREADCRUMB"] = "在接受任务时如果跳过了引导任务，则显示警告" -- Needs review
-		S["SHOW_LOREMASTER"] = "仅显示博学大师成就相关任务" -- Needs review
-		S["SINGLE_BREADCRUMB_FORMAT"] = "可取得引导任务" -- Needs review
-		S["SP_MESSAGE"] = "不会进入内建任务纪录的特殊任务" -- Needs review
-		S["TAGS"] = "标记" -- Needs review
-		S["TAGS_DELETE"] = "删除标记" -- Needs review
-		S["TAGS_NEW"] = "添加标记" -- Needs review
-		S["TITLE_APPEARANCE"] = "任务标题显示" -- Needs review
-		S["TURNED_IN"] = "缴交" -- Needs review
-		S["UNOBTAINABLE"] = "无法取得" -- Needs review
-		S["WHEN_KILL"] = "击杀时取得：" -- Needs review
-		S["WIDE_PANEL"] = "更宽的 Wholly 任务视窗" -- Needs review
-		S["WIDE_SHOW"] = "显示" -- Needs review
-		S["WORLD_EVENTS"] = "世界事件" -- Needs review
-		S["YEARLY"] = "每年" -- Needs review
+		S["ABANDONED"] = "放弃"
+		S["ACCEPTED"] = "已接受"
+		S["ACHIEVEMENT_COLORS"] = "显示成就完成颜色"
+--[[Translation missing --]]
+		S["ADD_ADVENTURE_GUIDE"] = "Display Adventure Guide quests in every zone"
+		S["ALL_FACTION_REPUTATIONS"] = "显示全部阵营的声望进度"
+		S["APPEND_LEVEL"] = "显示需要等级"
+		S["BASE_QUESTS"] = "基础任务"
+		BINDING_NAME_WHOLLY_TOGGLEMAPPINS = "开启地图标记"
+		BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = "显示已完成任务"
+		BINDING_NAME_WHOLLY_TOGGLESHOWDAILIES = "显示每日任务"
+--[[Translation missing --]]
+		BINDING_NAME_WHOLLY_TOGGLESHOWLOREMASTER = "Toggle shows Loremaster quests"
+		BINDING_NAME_WHOLLY_TOGGLESHOWNEEDSPREREQUISITES = "显示需要前置的任务"
+		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "显示重复任务"
+		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "显示无法取得任务"
+		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "显示每周任务"
+--[[Translation missing --]]
+		BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Toggle shows World Quests"
+		S["BLIZZARD_TOOLTIP"] = "在游戏任务日志中显示提示信息"
+		S["BREADCRUMB"] = "引导任务："
+		S["BUGGED"] = "*** 有问题的 ***"
+		S["BUGGED_UNOBTAINABLE"] = "将有BUG的任务视为不可取得"
+		S["BUILDING"] = "建筑"
+		S["CHRISTMAS_WEEK"] = "圣诞周"
+		S["CLASS_ANY"] = "任何职业"
+		S["CLASS_NONE"] = "无"
+		S["COMPLETED"] = "已完成"
+		S["COMPLETION_DATES"] = "完成日期"
+		S["DROP_TO_START_FORMAT"] = "掉落 %s 以开始 [%s]"
+		S["EMPTY_ZONES"] = "显示空白区域"
+		S["ENABLE_COORDINATES"] = "启用显示玩家座标"
+		S["ENTER_ZONE"] = "进入区域时取得"
+		S["ESCORT"] = "护送"
+		S["EVER_CAST"] = "曾经施放"
+		S["EVER_COMPLETED"] = "代表一个任务从未完成过"
+		S["EVER_EXPERIENCED"] = "有过经验"
+		S["FACTION_BOTH"] = "联盟&部落"
+		S["FIRST_PREREQUISITE"] = "前置任务链中的第一个："
+		S["GENDER"] = "性別"
+		S["GENDER_BOTH"] = "男女皆可"
+		S["GENDER_NONE"] = "无"
+		S["GRAIL_NOT_HAVE"] = "|cFFFF0000Grail资料库内无此任务|r"
+--[[Translation missing --]]
+		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Hide Blizzard bonus objectives"
+--[[Translation missing --]]
+		S["HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES"] = "Hide Blizzard dungeon entrances"
+--[[Translation missing --]]
+		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Hide Blizzard quest map pins"
+--[[Translation missing --]]
+		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Hide Blizzard treasures"
+		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "隐藏飞行点"
+		S["HIGH_LEVEL"] = "高等级"
+		S["HOLIDAYS_ONLY"] = "仅在节日时可取得："
+		S["IGNORE_REPUTATION_SECTION"] = "忽视任务的声望部分"
+		S["IN_LOG"] = "已接"
+		S["IN_LOG_STATUS"] = "在纪录中显示任务状态"
+		S["INVALIDATE"] = "被以下任务停用："
+		S["IS_BREADCRUMB"] = "是下列任务的引导任务："
+		S["ITEM"] = "物品"
+		S["ITEM_LACK"] = "缺少物品"
+		S["KILL_TO_START_FORMAT"] = "击杀以开始 [%s]"
+		S["LIVE_COUNTS"] = "即时更新计数"
+		S["LOAD_DATA"] = "读取资料"
+		S["LOREMASTER_AREA"] = "博学大师区域"
+		S["LOW_LEVEL"] = "低等级"
+		S["MAP"] = "地图"
+		S["MAP_BUTTON"] = "在世界地图上显示按钮"
+		S["MAP_DUNGEONS"] = "在外部地图显示副本任务"
+		S["MAP_PINS"] = "在地图上显示任务给予者"
+		S["MAP_UPDATES"] = "当区域变更时更新世界地图"
+		S["MAPAREA_NONE"] = "无"
+		S["MAXIMUM_LEVEL_NONE"] = "无"
+		S["MULTIPLE_BREADCRUMB_FORMAT"] = "有 %d 个引导任务"
+		S["MUST_KILL_PIN_FORMAT"] = "%s [击杀]"
+		S["NEAR"] = "靠近"
+		S["NEEDS_PREREQUISITES"] = "需要前置"
+		S["NEVER_ABANDONED"] = "不可放弃"
+		S["OAC"] = "接受时完成任务"
+		S["OCC"] = "完成要求时完成任务"
+		S["OTC"] = "缴交时完成任务"
+		S["OTHER"] = "其他"
+		S["OTHER_PREFERENCE"] = "其他"
+		S["PANEL_UPDATES"] = "当变更区域时更新任务纪录视窗"
+		S["PLOT"] = "空地"
+		S["PREPEND_LEVEL"] = "显示任务等级"
+		S["PREREQUISITES"] = "前置任务："
+		S["QUEST_COUNTS"] = "显示任务计数"
+		S["QUEST_ID"] = "任务 ID："
+		S["QUEST_TYPE_NORMAL"] = "普通"
+		S["RACE_ANY"] = "任何种族"
+		S["RACE_NONE"] = "无"
+		S["RARE_MOBS"] = "稀有怪"
+		S["REPEATABLE"] = "可重复"
+		S["REPEATABLE_COMPLETED"] = "显示已完成过的可重复任务"
+		S["REPUTATION_REQUIRED"] = "声望要求："
+		S["REQUIRED_LEVEL"] = "等级要求"
+		S["REQUIRES_FORMAT"] = "Wholly 需要 %s 或更新的 Grail版本"
+		S["RESTORE_DIRECTIONAL_ARROWS"] = "不重置指向箭头"
+		S["SEARCH_ALL_QUESTS"] = "所有任务"
+		S["SEARCH_CLEAR"] = "清除"
+		S["SEARCH_NEW"] = "新的"
+		S["SELF"] = "自己"
+		S["SHOW_BREADCRUMB"] = "在接受任务时如果跳过了引导任务，则显示警告"
+		S["SHOW_LOREMASTER"] = "仅显示博学大师成就相关任务"
+		S["SINGLE_BREADCRUMB_FORMAT"] = "可取得引导任务"
+		S["SP_MESSAGE"] = "不会进入内建任务纪录的特殊任务"
+		S["TAGS"] = "标记"
+		S["TAGS_DELETE"] = "删除标记"
+		S["TAGS_NEW"] = "添加标记"
+		S["TITLE_APPEARANCE"] = "任务标题显示"
+		S["TREASURE"] = "宝藏"
+		S["TURNED_IN"] = "缴交"
+		S["UNOBTAINABLE"] = "无法取得"
+		S["WHEN_KILL"] = "击杀时取得："
+		S["WIDE_PANEL"] = "更宽的 Wholly 任务视窗"
+		S["WIDE_SHOW"] = "显示"
+		S["WORLD_EVENTS"] = "世界事件"
+		S["YEARLY"] = "每年"
 	elseif "zhTW" == locale then
 		S["ABANDONED"] = "已放棄"
 		S["ACCEPTED"] = "已接受"
@@ -5237,11 +5260,11 @@ end
 		{ S.MAP_BUTTON, 'displaysMapFrame', 'configurationScript3' },
 		{ S.MAP_DUNGEONS, 'displaysDungeonQuests', 'configurationScript4' },
 		{ S.MAP_UPDATES, 'updatesWorldMapOnZoneChange', 'configurationScript1' },
-		{ S.HIDE_WORLD_MAP_FLIGHT_POINTS, 'hidesWorldMapFlightPoints', 'configurationScript16' },
-		{ S.HIDE_BLIZZARD_WORLD_MAP_TREASURES, 'hidesWorldMapTreasures', 'configurationScript16' },
-		{ S.HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES, 'hidesBlizzardWorldMapBonusObjectives', 'configurationScript17' },
-		{ S.HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS, 'hidesBlizzardWorldMapQuestPins', 'configurationScript16' },
-		{ S.HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES, 'hidesDungeonEntrances', 'configurationScript16' },
+--		{ S.HIDE_WORLD_MAP_FLIGHT_POINTS, 'hidesWorldMapFlightPoints', 'configurationScript16' },
+--		{ S.HIDE_BLIZZARD_WORLD_MAP_TREASURES, 'hidesWorldMapTreasures', 'configurationScript16' },
+--		{ S.HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES, 'hidesBlizzardWorldMapBonusObjectives', 'configurationScript17' },
+--		{ S.HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS, 'hidesBlizzardWorldMapQuestPins', 'configurationScript16' },
+--		{ S.HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES, 'hidesDungeonEntrances', 'configurationScript16' },
 		}
 	Wholly.configuration[S.WIDE_PANEL] = {
 		{ S.WIDE_PANEL },
