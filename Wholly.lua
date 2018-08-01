@@ -875,10 +875,6 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				end
 			end,
 			['PLAYER_ENTERING_WORLD'] = function(self, frame)
-				-- It turns out that GetCurrentMapAreaID() and GetCurrentMapDungeonLevel() are not working properly unless the map system is accessed.
-				-- This would manifest itself when the UI is reloaded, and then the map location would be lost.  By forcing the map to the current zone
-				-- the problem goes away.
-				Grail.SetMapToCurrentZone(true)
 				self.zoneInfo.zone.mapId = Grail.GetCurrentMapAreaID()
 				self:UpdateCoordinateSystem()
 			end,
@@ -888,7 +884,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 
 				self.zoneInfo.zone.mapId = Grail.GetCurrentMapAreaID()
 				if WDB.updatesWorldMapOnZoneChange and WorldMapFrame:IsVisible() then
-					Grail.SetMapByID(self.zoneInfo.zone.mapId)
+					OpenWorldMap(self.zoneInfo.zone.mapId)
 				end
 				self:UpdateQuestCaches(false, false, WDB.updatesPanelWhenZoneChanges, true)
 
