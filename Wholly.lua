@@ -362,6 +362,8 @@
 --			Changes to use for WORLD_QUEST Blizzard's TRACKER_HEADER_WORLD_QUESTS.
 --			Disables ability to hide Blizzard map items because Blizzard API has changed.
 --			Updates Simplified Chinese localization by dh0000 and Aladdinn.
+--		068	Corrects the issue where the map was caused to change unexpectedly.
+--			Corrects the problem where TomTom arrows were not being added properly with the new TomTom.
 --
 --	Known Issues
 --
@@ -1092,7 +1094,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 
 		_AddDirectionalArrows = function(self, questTable, npcType, groupNumberToUse)
 			local TomTom = TomTom
-			if not TomTom or not TomTom.AddMFWaypoint then return end
+			if not TomTom or not TomTom.AddWaypoint then return end
 			if nil == questTable or nil == npcType then return end
 			local locations
 			local WDB = WhollyDatabase
@@ -1116,7 +1118,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 					for _, npc in pairs(locations) do
 						if nil ~= npc.x then
 							local npcName = self:_PrettyNPCString(npc.name, npc.kill, npc.realArea) or "***"
-							local uid = TomTom:AddMFWaypoint(npc.mapArea, npc.mapLevel, npc.x/100, npc.y/100,
+							local uid = TomTom:AddWaypoint(npc.mapArea, npc.x/100, npc.y/100,
 									{	persistent = false,
 										title = npcName .. " - " .. self:_QuestName(questId),
 									})
@@ -1381,7 +1383,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				if LightHeaded then self:ToggleLightHeaded() end
 				return
 			end
-			if not TomTom or not TomTom.AddMFWaypoint then return end	-- technically _AddDirectionalArrows does this check, but why do the extra work if not needed?
+			if not TomTom or not TomTom.AddWaypoint then return end	-- technically _AddDirectionalArrows does this check, but why do the extra work if not needed?
 			if IsControlKeyDown() then
 				local questsInMap = self.filteredPanelQuests
 				local numEntries = #questsInMap
