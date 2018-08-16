@@ -364,6 +364,7 @@
 --			Updates Simplified Chinese localization by dh0000 and Aladdinn.
 --		068	Corrects the issue where the map was caused to change unexpectedly.
 --			Corrects the problem where TomTom arrows were not being added properly with the new TomTom.
+--			Updates Latin American Spanish localization by danvar33.
 --
 --	Known Issues
 --
@@ -4237,10 +4238,13 @@ end
 		BINDING_NAME_WHOLLY_TOGGLEMAPPINS = "Mostrar/ocultar marcas en el mapa"
 		BINDING_NAME_WHOLLY_TOGGLESHOWCOMPLETED = "Mostrar/ocultar misiones completadas"
 		BINDING_NAME_WHOLLY_TOGGLESHOWDAILIES = "Mostrar/ocultar misiones diarias"
+		BINDING_NAME_WHOLLY_TOGGLESHOWLOREMASTER = "Alternar muestra master Lore de las misiones"
 		BINDING_NAME_WHOLLY_TOGGLESHOWNEEDSPREREQUISITES = "Mostrar/ocultar misiones con prerequisitos obligatorios"
 		BINDING_NAME_WHOLLY_TOGGLESHOWREPEATABLES = "Mostrar/ocultar misiones repetibles"
 		BINDING_NAME_WHOLLY_TOGGLESHOWUNOBTAINABLES = "Mostrar/ocultar misiones no obtenibles"
 		BINDING_NAME_WHOLLY_TOGGLESHOWWEEKLIES = "Mostrar/ocultar misiones semanales"
+--[[Translation missing --]]
+		BINDING_NAME_WHOLLY_TOGGLESHOWWORLDQUESTS = "Toggle shows World Quests"
 		S["BLIZZARD_TOOLTIP"] = "Mostrar la Herramienta de información en el registro de busquedas de Blizzard"
 		S["BREADCRUMB"] = "Misiones de senderos migas de pan:"
 		S["BUGGED"] = "*** ERROR ***"
@@ -4266,6 +4270,8 @@ end
 		S["GENDER_NONE"] = "Ninguno"
 		S["GRAIL_NOT_HAVE"] = "Grail no tiene esta misión"
 		S["HIDE_BLIZZARD_WORLD_MAP_BONUS_OBJECTIVES"] = "Ocultar objetivos de bonificación de Blizzard"
+--[[Translation missing --]]
+		S["HIDE_BLIZZARD_WORLD_MAP_DUNGEON_ENTRANCES"] = "Hide Blizzard dungeon entrances"
 		S["HIDE_BLIZZARD_WORLD_MAP_QUEST_PINS"] = "Ocultar marcadores de mapa de busqueda de Blizzard"
 		S["HIDE_BLIZZARD_WORLD_MAP_TREASURES"] = "Ocultar tesoros de Blizzard"
 		S["HIDE_WORLD_MAP_FLIGHT_POINTS"] = "Ocultar puntos de vuelo"
