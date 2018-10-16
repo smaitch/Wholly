@@ -366,6 +366,7 @@
 --			Corrects the problem where TomTom arrows were not being added properly with the new TomTom.
 --			Updates Latin American Spanish localization by danvar33.
 --		069	Updates Russian localization by dartraiden.
+--			Removes quest level for those quests that have no real level, and changes the display to show variable level maximums as appropriate.
 --
 --	Known Issues
 --
@@ -2773,8 +2774,8 @@ end
 					typeString = format(" ![%s]", self.s.TURNED_IN)
 				end
 				local statusCode = GRAIL:StatusCode(questId)
-				local questLevel = GRAIL:QuestLevel(questId)
-				local questLevelString = WDB.prependsQuestLevel and format("[%s] ", questLevel or "??") or ""
+				local questLevel = GRAIL:QuestLevelString(questId)
+				local questLevelString = WDB.prependsQuestLevel and questLevel ~= "" and format("[%s] ", questLevel or "??") or ""
 				local requiredLevelString = ""
 				if WDB.appendRequiredLevel then
 					local success, _, questLevelNeeded, _ = GRAIL:MeetsRequirementLevel(questId)
@@ -2852,7 +2853,7 @@ end
 			local obtainersCode = Grail:CodeObtainers(questId)
 			local obtainersRaceCode = Grail:CodeObtainersRace(questId)
 			local holidayCode = Grail:CodeHoliday(questId)
-			local questLevel = Grail:QuestLevel(questId)
+			local questLevel = Grail:QuestLevelString(questId)
 			local _, _, requiredLevel, notToExceedLevel = Grail:MeetsRequirementLevel(questId)
 			local questType = self:_QuestTypeString(questId)
 			local statusCode = Grail:StatusCode(questId)
@@ -2860,7 +2861,9 @@ end
 			local colorCode
 
 			self:_AddLine(" ")
-			self:_AddLine(LEVEL, questLevel)
+			if questLevel ~= "" then
+				self:_AddLine(LEVEL, questLevel)
+			end
 			self:_AddLine(self.s.REQUIRED_LEVEL, requiredLevel)
 			if bitband(statusCode, Grail.bitMaskLevelTooHigh) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorLevelTooHigh) > 0 then colorCode = orangeColor else colorCode = normalColor end
 			self:_AddLine("|c"..colorCode..self.s.MAX_LEVEL.."|r", (notToExceedLevel * Grail.bitMaskQuestMaxLevelOffset == Grail.bitMaskQuestMaxLevel) and self.s.MAXIMUM_LEVEL_NONE or notToExceedLevel)
