@@ -2957,7 +2957,7 @@ end
 				self:_AddLine(self.s.SP_MESSAGE)
 			end
 
-			if nil ~= Grail.quests[questId]['rep'] then
+			if nil ~= questId and nil ~= Grail.quests[questId] and nil ~= Grail.quests[questId]['rep'] then
 				self:_AddLine(" ")
 				if bitband(statusCode, Grail.bitMaskReputation) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorReputation) > 0 then colorCode = orangeColor else colorCode = normalColor end
 				self:_AddLine("|c"..colorCode..self.s.REPUTATION_REQUIRED.."|r")
