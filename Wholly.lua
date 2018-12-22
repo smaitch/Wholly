@@ -368,6 +368,9 @@
 --		069	Updates Russian localization by dartraiden.
 --			Removes quest level for those quests that have no real level, and changes the display to show variable level maximums as appropriate.
 --			Updates a bunch of localizations from users who provided input on: https://wow.curseforge.com/projects/wholly/localization
+--		070	Updates Interface in TOC to 80100.
+--			Allows map button to work with Titan Location.
+--			Adds a little defensive code to avoid a Lua error.
 --
 --	Known Issues
 --
@@ -2487,6 +2490,8 @@ pin:SetMouseMotionEnabled(true)
 									if nil == Gatherer_WorldMapDisplay then
                                         if TomTomWorldFrame and TomTomWorldFrame.Player then
 											f:SetPoint("TOPLEFT", TomTomWorldFrame.Player, "TOPRIGHT", 10, 6)
+										elseif TitanMapCursorLocation then
+											f:SetPoint("TOPLEFT", TitanMapCursorLocation, "TOPRIGHT", 10, 6)
 										else
 --											f:SetPoint("TOPLEFT", WorldMapFrameTutorialButton, "TOPRIGHT", 0, -30)
 f:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame.Tutorial, "TOPRIGHT", 0, -30)
