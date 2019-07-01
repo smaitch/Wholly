@@ -371,6 +371,8 @@
 --		070	Updates Interface in TOC to 80100.
 --			Allows map button to work with Titan Location.
 --			Adds a little defensive code to avoid a Lua error.
+--		071	Updates Interface in TOC to 80200.
+--			Adds a little defensive code to avoid a Lua error.
 --
 --	Known Issues
 --
@@ -3033,7 +3035,7 @@ end
 			self:_QuestInfoSection(self.s.OAC, Grail:QuestOnAcceptCompletes(questId))
 			self:_QuestInfoSection(self.s.OCC, Grail:QuestOnCompletionCompletes(questId))
 			self:_QuestInfoTurninSection(self.s.OTC, Grail:QuestOnTurninCompletes(questId))
-			if nil ~= Grail.quests[questId]['AZ'] then
+			if nil ~= Grail.quests[questId] and nil ~= Grail.quests[questId]['AZ'] then
 				self:_AddLine(" ")
 				if "table" == type(Grail.quests[questId]['AZ']) then
 					for _, mapAreaId in pairs(Grail.quests[questId]['AZ']) do
