@@ -373,6 +373,8 @@
 --			Adds a little defensive code to avoid a Lua error.
 --		071	Updates Interface in TOC to 80200.
 --			Adds a little defensive code to avoid a Lua error.
+--			Makes it so achievements are not loaded in Classic.
+--			Makes it so some of the UI elements are not used in Classic.
 --
 --	Known Issues
 --
@@ -519,14 +521,14 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 									Wholly:UpdateCoordinateSystem()
 								end,
 		configurationScript9 = function(self)
-									if WhollyDatabase.loadAchievementData then
+									if WhollyDatabase.loadAchievementData and Wholly.systemSupportsAchievements then
 										Grail:LoadAddOn("Grail-Achievements")
 									end
 									Wholly:_InitializeLevelOneData()
 								end,
 		configurationScript10 = function(self)
 									if WhollyDatabase.loadReputationData then
-										Grail:LoadAddOn("Grail-Reputations")
+										Grail:LoadReputations()
 									end
 									Wholly:_InitializeLevelOneData()
 								end,
@@ -626,7 +628,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				-- that the Achievements were not appearing properly, and this turned out to be caused by a
 				-- change that Blizzard seems to have done to make it so GetAchievementInfo() no longer has
 				-- a proper title in its return values at that point.
-				if WhollyDatabase.loadAchievementData then
+				if WhollyDatabase.loadAchievementData and Grail.capabilities.usesAchievements then
 					self.configurationScript9()
 				end
 
@@ -655,7 +657,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					end
 
 					-- load all the localized quest names
-					Grail:LoadAddOn("Grail-Quests-" .. Grail.playerLocale)
+					Grail:LoadLocalizedQuestNames()
 
 					-- Setup the colors, only setting those that do not already exist
 					WDB.color = WDB.color or {}
@@ -874,14 +876,6 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 
 					self:_InitializeLevelOneData()
 					if WDB.useWidePanel then self:ToggleCurrentFrame() end
-
-					-- Make it so we can populate the questId into the QuestLogPopupDetailFrame
-					self.QuestLogPopupDetailFrame_Show = QuestLogPopupDetailFrame_Show
-					QuestLogPopupDetailFrame_Show = function(questLogIndex)
-						local questId = select(8, GetQuestLogTitle(questLogIndex))
-						com_mithrandir_whollyPopupQuestInfoFrameText:SetText(questId)
-						Wholly.QuestLogPopupDetailFrame_Show(questLogIndex)
-					end
 
 				end
 			end,
@@ -1992,7 +1986,9 @@ pin:SetMouseMotionEnabled(true)
 			tablesort(t1.children, function(a, b) return a.displayName < b.displayName end)
 			tinsert(entries, t1)
 
-			tinsert(entries, { displayName = Wholly.s.WORLD_EVENTS, index = -1 })
+			if Grail.capabilities.usesWorldEvents then
+				tinsert(entries, { displayName = Wholly.s.WORLD_EVENTS, index = -1 })
+			end
 			tinsert(entries, { displayName = CLASS, index = -2 })
 			tinsert(entries, { displayName = TRADE_SKILLS, index = -3 })		-- Professions
 			if not WDB.ignoreReputationQuests then
@@ -2000,17 +1996,19 @@ pin:SetMouseMotionEnabled(true)
 			end
 
 			--	Achievements
-			if WDB.loadAchievementData then
+			if WDB.loadAchievementData and Grail.capabilities.usesAchievements then
 				t1 = { displayName = ACHIEVEMENTS, header = 2, children = {} }
 				for mapId, continentTable in pairs(Grail.continents) do
 					tinsert(t1.children, { displayName = continentTable.name, index = 13000 + mapId })
 				end
 				tablesort(t1.children, function(a, b) return a.displayName < b.displayName end)
 				local i = 0
-				if nil ~= Grail.worldEventAchievements and nil ~= Grail.worldEventAchievements[Grail.playerFaction] then
-					for holidayKey, _ in pairs(Grail.worldEventAchievements[Grail.playerFaction]) do
-						i = i + 1
-						tinsert(t1.children, { displayName = Grail.holidayMapping[holidayKey], index = 15000 + i, holidayName = Grail.holidayMapping[holidayKey]})
+				if Grail.capabilities.usesWorldEvents then
+					if nil ~= Grail.worldEventAchievements and nil ~= Grail.worldEventAchievements[Grail.playerFaction] then
+						for holidayKey, _ in pairs(Grail.worldEventAchievements[Grail.playerFaction]) do
+							i = i + 1
+							tinsert(t1.children, { displayName = Grail.holidayMapping[holidayKey], index = 15000 + i, holidayName = Grail.holidayMapping[holidayKey]})
+						end
 					end
 				end
 				i = 0
@@ -2029,17 +2027,21 @@ pin:SetMouseMotionEnabled(true)
 			if WDB.loadReputationData then
 				t1 = { displayName = COMBAT_TEXT_SHOW_REPUTATION_TEXT, header = 3, children = {} }
 				tinsert(t1.children, { displayName = EXPANSION_NAME0, index = -100 })
-				tinsert(t1.children, { displayName = EXPANSION_NAME1, index = -101 })
-				tinsert(t1.children, { displayName = EXPANSION_NAME2, index = -102 })
-				tinsert(t1.children, { displayName = EXPANSION_NAME3, index = -103 })
-				tinsert(t1.children, { displayName = EXPANSION_NAME4, index = -104 })
-				tinsert(t1.children, { displayName = EXPANSION_NAME5, index = -105 })
-				tinsert(t1.children, { displayName = EXPANSION_NAME6, index = -106 })
-				tinsert(t1.children, { displayName = EXPANSION_NAME7, index = -107 })
+				if not Grail.existsClassic then
+					tinsert(t1.children, { displayName = EXPANSION_NAME1, index = -101 })
+					tinsert(t1.children, { displayName = EXPANSION_NAME2, index = -102 })
+					tinsert(t1.children, { displayName = EXPANSION_NAME3, index = -103 })
+					tinsert(t1.children, { displayName = EXPANSION_NAME4, index = -104 })
+					tinsert(t1.children, { displayName = EXPANSION_NAME5, index = -105 })
+					tinsert(t1.children, { displayName = EXPANSION_NAME6, index = -106 })
+					tinsert(t1.children, { displayName = EXPANSION_NAME7, index = -107 })
+				end
 				tinsert(entries, t1)
 			end
 
-			tinsert(entries, { displayName = Wholly.s.FOLLOWERS, index = -5})
+			if Grail.capabilities.usesFollowers then
+				tinsert(entries, { displayName = Wholly.s.FOLLOWERS, index = -5})
+			end
 			tinsert(entries, { displayName = Wholly.s.OTHER, index = -6 })
 			tinsert(entries, { displayName = SEARCH, index = -7 })
 			tinsert(entries, { displayName = Wholly.s.TAGS, index = -8 })
@@ -2530,7 +2532,8 @@ f:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame.Tutorial, "TOPRIGHT", 0, -30)
 --			end
 
 			-- Make it so the Blizzard quest log can display our tooltips
-            hooksecurefunc("QuestMapLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
+			if not Grail.existsClassic then
+				hooksecurefunc("QuestMapLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
 			-- Now since the Blizzard UI has probably created a quest frame before I get
 			-- the chance to hook the function I need to go through all the quest frames
 			-- and hook them too.
@@ -2539,6 +2542,7 @@ if not Grail.battleForAzeroth then
 			for i = 1, #(titles) do
 				titles[i]:HookScript("OnEnter", Wholly._OnEnterBlizzardQuestButton)
 			end
+end
 end
 
 			-- Our frame positions are wrong for MoP, so we change them here.
@@ -2812,7 +2816,9 @@ end
 			end
 			if nil == questId then return end
 			if not self.onlyAddingTooltipToGameTooltip then
+if not Grail.existsClassic then
 				self.tt[1]:SetHyperlink(format("quest:%d", questId))
+end
 			end
 			if not Grail:DoesQuestExist(questId) then self:_AddLine(" ") self:_AddLine(self.s.GRAIL_NOT_HAVE) return end
 
@@ -3069,7 +3075,10 @@ end
 			-- Technically we should be able to fetch quest reward information for quests that are not in our quest log
 			self:_AddLine(" ")
 			self:_AddLine(self.s.QUEST_REWARDS .. ":")
-			local rewardXp = GetQuestLogRewardXP(questId)
+			local rewardXp = 0
+			if not Grail.existsClassic then
+				rewardXp = GetQuestLogRewardXP(questId)
+			end
 			if 0 ~= rewardXp then
 				self:_AddLine(strformat(self.s.GAIN_EXPERIENCE_FORMAT, rewardXp))
 			end
@@ -3077,7 +3086,11 @@ end
 			if 0 ~= rewardMoney then
 				self:_AddLine(GetCoinTextureString(rewardMoney))
 			end
-			for counter = 1, GetNumQuestLogRewardCurrencies(questId) do
+			local numberRewardCurrencies = 0
+			if not Grail.existsClassic then
+				numberRewardCurrencies = GetNumQuestLogRewardCurrencies(questId)
+			end
+			for counter = 1, numberRewardCurrencies do
 				local currencyName, currencyTexture, currencyCount = GetQuestLogRewardCurrencyInfo(counter, questId)
 				self:_AddLine(currencyName, currencyCount, currencyTexture)
 			end
@@ -3164,10 +3177,12 @@ end
 		end,
 
 		QuestInfoEnterPopup = function(self, frame)
+if not Grail.existsClassic then
 			self:_PopulateTooltipForQuest(frame, QuestLogPopupDetailFrame.questID)
 			for i = 1, self.currentTt do
 				self.tt[i]:Show()
 			end
+end
 		end,
 
 		_QuestInfoSection = function(self, heading, tableOrString, lastUsedIndex)
@@ -5324,63 +5339,63 @@ end
 	end
 
 -- Starting in BfA beta 26567 there is no more WorldMapFrame_Update so we cannot support this at the moment...
-if not Grail.battleForAzeroth then
-hooksecurefunc("WorldMapFrame_Update", function()
-	local wpth = Wholly.poisToHide
-	if WhollyDatabase.hidesWorldMapFlightPoints or WhollyDatabase.hidesWorldMapTreasures or WhollyDatabase.hidesDungeonEntrances then
-		for i = 1, GetNumMapLandmarks() do
-			local landmarkType, name, description, textureIndex, x, y = GetMapLandmarkInfo(i)
-			local shouldHide = false
-			if WhollyDatabase.hidesWorldMapTreasures and 197 == textureIndex then shouldHide = true end
-			if WhollyDatabase.hidesDungeonEntrances and LE_MAP_LANDMARK_TYPE_DUNGEON_ENTRANCE == landmarkType then shouldHide = true end
-			if WhollyDatabase.hidesWorldMapFlightPoints and LE_MAP_LANDMARK_TYPE_TAXINODE == landmarkType then shouldHide = true end
-			if shouldHide then
-				local poi = _G["WorldMapFramePOI"..i]
-				if poi then
-				-- The "if poi then" check is probably not needed, but better safe than sorry!
---					print("Hiding icon for",name)
---					poi:Hide()
-					wpth[#wpth + 1] = poi
-				end
-			end
-		end
-	end
-	if WhollyDatabase.hidesBlizzardWorldMapQuestPins then
-		for i = 1, C_Questline.GetNumAvailableQuestlines() do
-			local poi = _G["WorldMapStoryLine"..i]
-			if poi then
-				wpth[#wpth + 1] = poi
-			end
-		end
-	end
-	Wholly:_HidePOIs()
-end)
-end
+--if not Grail.battleForAzeroth then
+--hooksecurefunc("WorldMapFrame_Update", function()
+--	local wpth = Wholly.poisToHide
+--	if WhollyDatabase.hidesWorldMapFlightPoints or WhollyDatabase.hidesWorldMapTreasures or WhollyDatabase.hidesDungeonEntrances then
+--		for i = 1, GetNumMapLandmarks() do
+--			local landmarkType, name, description, textureIndex, x, y = GetMapLandmarkInfo(i)
+--			local shouldHide = false
+--			if WhollyDatabase.hidesWorldMapTreasures and 197 == textureIndex then shouldHide = true end
+--			if WhollyDatabase.hidesDungeonEntrances and LE_MAP_LANDMARK_TYPE_DUNGEON_ENTRANCE == landmarkType then shouldHide = true end
+--			if WhollyDatabase.hidesWorldMapFlightPoints and LE_MAP_LANDMARK_TYPE_TAXINODE == landmarkType then shouldHide = true end
+--			if shouldHide then
+--				local poi = _G["WorldMapFramePOI"..i]
+--				if poi then
+--				-- The "if poi then" check is probably not needed, but better safe than sorry!
+----					print("Hiding icon for",name)
+----					poi:Hide()
+--					wpth[#wpth + 1] = poi
+--				end
+--			end
+--		end
+--	end
+--	if WhollyDatabase.hidesBlizzardWorldMapQuestPins then
+--		for i = 1, C_Questline.GetNumAvailableQuestlines() do
+--			local poi = _G["WorldMapStoryLine"..i]
+--			if poi then
+--				wpth[#wpth + 1] = poi
+--			end
+--		end
+--	end
+--	Wholly:_HidePOIs()
+--end)
+--end
 
 -- Starting in BfA beta 26567 there is no more WorldMap_UpdateQuestBonusObjectives so we cannot support this at the moment...
-if not Grail.battleForAzeroth then
-hooksecurefunc("WorldMap_UpdateQuestBonusObjectives", function()
-	if WhollyDatabase.hidesBlizzardWorldMapBonusObjectives then
-		local mapAreaID = Grail.GetCurrentDisplayedMapAreaID()
-		local taskInfo = C_TaskQuest.GetQuestsForPlayerByMapID(mapAreaID)
-		local numTaskPOIs = 0;
-		if(taskInfo ~= nil) then
-			numTaskPOIs = #taskInfo;
-		end
-		local taskIconCount = 1;
-		if ( numTaskPOIs > 0 ) then
-			local wpth = Wholly.poisToHide
-			for _, info  in next, taskInfo do
-				local taskPOIName = "WorldMapFrameTaskPOI"..taskIconCount;
-				local taskPOI = _G[taskPOIName];
---				taskPOI:Hide();
-				wpth[#wpth + 1] = taskPOI
-				taskIconCount = taskIconCount + 1;
-			end
-			Wholly:_HidePOIs()
-		end
-	end
-end)
-end
+--if not Grail.battleForAzeroth then
+--hooksecurefunc("WorldMap_UpdateQuestBonusObjectives", function()
+--	if WhollyDatabase.hidesBlizzardWorldMapBonusObjectives then
+--		local mapAreaID = Grail.GetCurrentDisplayedMapAreaID()
+--		local taskInfo = C_TaskQuest.GetQuestsForPlayerByMapID(mapAreaID)
+--		local numTaskPOIs = 0;
+--		if(taskInfo ~= nil) then
+--			numTaskPOIs = #taskInfo;
+--		end
+--		local taskIconCount = 1;
+--		if ( numTaskPOIs > 0 ) then
+--			local wpth = Wholly.poisToHide
+--			for _, info  in next, taskInfo do
+--				local taskPOIName = "WorldMapFrameTaskPOI"..taskIconCount;
+--				local taskPOI = _G[taskPOIName];
+----				taskPOI:Hide();
+--				wpth[#wpth + 1] = taskPOI
+--				taskIconCount = taskIconCount + 1;
+--			end
+--			Wholly:_HidePOIs()
+--		end
+--	end
+--end)
+--end
 
 end
