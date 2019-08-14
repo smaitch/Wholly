@@ -431,7 +431,7 @@ local directoryName, _ = ...
 local versionFromToc = GetAddOnMetadata(directoryName, "Version")
 local _, _, versionValueFromToc = strfind(versionFromToc, "(%d+)")
 local Wholly_File_Version = tonumber(versionValueFromToc)
-local requiredGrailVersion = 96
+local requiredGrailVersion = 100
 
 --	Set up the bindings to use the localized name Blizzard supplies.  Note that the Bindings.xml file cannot
 --	just contain the TOGGLEQUESTLOG because then the entry for Wholly does not show up.  So, we use a version
@@ -2281,7 +2281,9 @@ pin:SetMouseMotionEnabled(true)
 					tinsert(t, { sortName = "  ", displayName = Wholly.s.TAGS_DELETE, f = function() Wholly._TagDelete(Wholly) Wholly.zoneInfo.panel.mapId = nil Wholly._SetLevelTwoCurrent(Wholly, nil) Wholly._ForcePanelMapArea(Wholly,true) end })
 				end
 			end
-			tablesort(t, function(a, b) return a.sortName < b.sortName end)
+			if nil ~= t and #t > 1 then
+				tablesort(t, function(a, b) return a.sortName < b.sortName end)
+			end
 
 			-- We want to make sure we retain the proper selection
 			if nil ~= self.levelTwoCurrent then
