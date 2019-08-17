@@ -375,6 +375,7 @@
 --			Adds a little defensive code to avoid a Lua error.
 --			Makes it so achievements are not loaded in Classic.
 --			Makes it so some of the UI elements are not used in Classic.
+--			Adds the ability to show a message in the chat indicating a breadcrumb is available.
 --
 --	Known Issues
 --
@@ -1047,6 +1048,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			['OTHER_PREFERENCE'] = "Other",
 			['PANEL_UPDATES'] = "Quest log panel updates when zones change",
 			['SHOW_BREADCRUMB'] = "Display breadcrumb quest information on Quest Frame",
+			['SHOW_BREADCRUMB_MESSAGE'] = "Display breadcrumb message in chat",
 			['SHOW_LOREMASTER'] = "Show only Loremaster quests",
 			['ENABLE_COORDINATES'] = "Enable player coordinates",
 			['ACHIEVEMENT_COLORS'] = "Show achievement completion colors",
@@ -2322,6 +2324,7 @@ pin:SetMouseMotionEnabled(true)
 			db.displaysMapFrame = true
 			db.displaysDungeonQuests = true
 			db.displaysBreadcrumbs = true
+			db.displaysBreadcrumbMessages = false
 			db.displaysHolidaysAlways = true
 			db.updatesWorldMapOnZoneChange = true
 			db.showsInLogQuestStatus = true
@@ -3707,18 +3710,42 @@ end
 			end
 		end,
 
-		ShowBreadcrumbInfo = function(self)
+		_GetBreadcrumbMessage = function(self)
+			local retval = nil
 			local questId = self:_BreadcrumbQuestId()
 			local breadcrumbs = Grail:AvailableBreadcrumbs(questId)
+			if nil ~= breadcrumbs then
+				if 1 == #breadcrumbs then
+					retval = self.s.SINGLE_BREADCRUMB_FORMAT
+				else
+					retval = format(self.s.MULTIPLE_BREADCRUMB_FORMAT, #breadcrumbs)
+				end
+			end
+			return retval
+		end,
+
+		ShowBreadcrumbInfo = function(self)
+			local questId = self:_BreadcrumbQuestId()
+--			local breadcrumbs = Grail:AvailableBreadcrumbs(questId)
 			com_mithrandir_whollyBreadcrumbFrame:Hide()
 			com_mithrandir_whollyQuestInfoFrameText:SetText(questId)
 			self:UpdateBuggedText(questId)
-			if nil ~= breadcrumbs then
-				if 1 == #breadcrumbs then com_mithrandir_whollyBreadcrumbFrameMessage:SetText(self.s.SINGLE_BREADCRUMB_FORMAT)
-				else com_mithrandir_whollyBreadcrumbFrameMessage:SetText(format(self.s.MULTIPLE_BREADCRUMB_FORMAT, #breadcrumbs))
+			local breadcrumbMessage = self:_GetBreadcrumbMessage()
+			if nil ~= breadcrumbMessage then
+				if WhollyDatabase.displaysBreadcrumbs then
+					com_mithrandir_whollyBreadcrumbFrameMessage:SetText(breadcrumbMessage)
+					com_mithrandir_whollyBreadcrumbFrame:Show()
 				end
-				com_mithrandir_whollyBreadcrumbFrame:Show()
+				if WhollyDatabase.displaysBreadcrumbMessages then
+					print(format("|cFFFFFF00Wholly|r |cFFFF00FF%s|r", breadcrumbMessage))
+				end
 			end
+--			if nil ~= breadcrumbs then
+--				if 1 == #breadcrumbs then com_mithrandir_whollyBreadcrumbFrameMessage:SetText(self.s.SINGLE_BREADCRUMB_FORMAT)
+--				else com_mithrandir_whollyBreadcrumbFrameMessage:SetText(format(self.s.MULTIPLE_BREADCRUMB_FORMAT, #breadcrumbs))
+--				end
+--				com_mithrandir_whollyBreadcrumbFrame:Show()
+--			end
 		end,
 
 		ShowTooltip = function(self, pin)
@@ -3972,7 +3999,7 @@ end
 		---
 		--	Sets up the event monitoring to handle those associated with displaying breadcrumb information.
 		UpdateBreadcrumb = function(self)
-			if WhollyDatabase.displaysBreadcrumbs then
+			if WhollyDatabase.displaysBreadcrumbs or WhollyDatabase.displaysBreadcrumbMessages then
 				self.notificationFrame:RegisterEvent("QUEST_DETAIL")
 				if QuestFrame:IsVisible() then
 					self:ShowBreadcrumbInfo()
@@ -4131,6 +4158,7 @@ end
 		S["SEARCH_NEW"] = "Neue Suche"
 		S["SELF"] = "Selbst"
 		S["SHOW_BREADCRUMB"] = "Detaillierte Questinformationen im Questfenster anzeigen"
+		S["SHOW_BREADCRUMB_MESSAGE"] = "Display breadcrumb message in chat"
 		S["SHOW_LOREMASTER"] = "Zeige nur Meister-der-Lehren-Quests"
 		S["SINGLE_BREADCRUMB_FORMAT"] = "Brotkrumen-Quest verfügbar"
 		S["SP_MESSAGE"] = "Spezial-Quests tauchen niemals in Blizzards Quest-Log auf"
@@ -4244,6 +4272,7 @@ end
 		S["SEARCH_NEW"] = "Nueva"
 		S["SELF"] = "Auto"
 		S["SHOW_BREADCRUMB"] = "Mostrar información de cadenas de misión en interfaz de misión"
+		S["SHOW_BREADCRUMB_MESSAGE"] = "Display breadcrumb message in chat"
 		S["SHOW_LOREMASTER"] = "Solo mostrar misiones de Maestro Cultural"
 		S["SINGLE_BREADCRUMB_FORMAT"] = "Cadenas de misiones disponibles"
 		S["SP_MESSAGE"] = "Misión especial, no entra en registro de misiones de Blizzard"
@@ -4359,6 +4388,7 @@ end
 		S["SEARCH_NEW"] = "Nueva búsqueda"
 		S["SELF"] = "Auto"
 		S["SHOW_BREADCRUMB"] = "Mostrar la información de la Mision El Sendero de Migas en la Cuadra de Búsqueda"
+		S["SHOW_BREADCRUMB_MESSAGE"] = "Display breadcrumb message in chat"
 		S["SHOW_LOREMASTER"] = "Solo mostrar misiones del Maestro Cultural"
 		S["SINGLE_BREADCRUMB_FORMAT"] = "Mision El Sendero de Migas de Pan Disponible"
 		S["SP_MESSAGE"] = "Misiones especiales nunca entran al registro de misiones de Blizzard"
@@ -4472,6 +4502,7 @@ end
 		S["SEARCH_NEW"] = "Nouvelle"
 		S["SELF"] = "Soi-même"
 		S["SHOW_BREADCRUMB"] = "Afficher les informations d'une suite de quêtes dans le journal de quêtes"
+		S["SHOW_BREADCRUMB_MESSAGE"] = "Display breadcrumb message in chat"
 		S["SHOW_LOREMASTER"] = "Afficher uniquement les quêtes comptant pour le haut fait de \"Maître des traditions\""
 		S["SINGLE_BREADCRUMB_FORMAT"] = "Quête préalable disponible"
 		S["SP_MESSAGE"] = "Certaines quêtes spéciales ne sont jamais affichées dans le journal de quêtes de Blizzard"
@@ -4608,6 +4639,7 @@ end
 		S["SEARCH_NEW"] = "Nuova"
 		S["SELF"] = "Se stesso"
 		S["SHOW_BREADCRUMB"] = "Mostra informazioni sul percorso della missione sul Quest Frame"
+		S["SHOW_BREADCRUMB_MESSAGE"] = "Display breadcrumb message in chat"
 		S["SHOW_LOREMASTER"] = "Mostra solo le missioni Loremaster"
 		S["SINGLE_BREADCRUMB_FORMAT"] = "Cerca missioni disponibili"
 		S["SP_MESSAGE"] = "Missione speciale mai entrata nel diario della Blizzard"
@@ -4732,6 +4764,7 @@ end
 		S["SEARCH_NEW"] = "신규"
 		S["SELF"] = "자신"
 		S["SHOW_BREADCRUMB"] = "퀘스트 창에 여러 퀘스트 정보 표시"
+		S["SHOW_BREADCRUMB_MESSAGE"] = "Display breadcrumb message in chat"
 		S["SHOW_LOREMASTER"] = "Loremaster 퀘스트만 표시"
 		S["SINGLE_BREADCRUMB_FORMAT"] = "추가 목표 퀘스트가 가능합니다."
 --Translation missing 
@@ -4847,6 +4880,7 @@ end
 		S["SEARCH_NEW"] = "Nova"
 		S["SELF"] = "Por si só"
 		S["SHOW_BREADCRUMB"] = "Mostrar informações de andamento na Janela de Missões"
+		S["SHOW_BREADCRUMB_MESSAGE"] = "Display breadcrumb message in chat"
 		S["SHOW_LOREMASTER"] = "Exibir somente missões do Mestre Historiador"
 		S["SINGLE_BREADCRUMB_FORMAT"] = "Sequência de missão disponível"
 		S["SP_MESSAGE"] = "Missões especiais nunca entram no registro de missões da Blizzard"
@@ -4960,6 +4994,7 @@ end
 		S["SEARCH_NEW"] = "Новый"
 		S["SELF"] = "Само"
 		S["SHOW_BREADCRUMB"] = "Показывать наличие направляющих заданий"
+		S["SHOW_BREADCRUMB_MESSAGE"] = "Display breadcrumb message in chat"
 		S["SHOW_LOREMASTER"] = "Показывать лишь задания, необходимые для получения \"Хранителя мудрости\""
 		S["SINGLE_BREADCRUMB_FORMAT"] = "Доступно направляющее задание"
 		S["SP_MESSAGE"] = "Особое задание никогда не попадает в журнал заданий Blizzard"
@@ -5073,6 +5108,7 @@ end
 		S["SEARCH_NEW"] = "新的"
 		S["SELF"] = "自己"
 		S["SHOW_BREADCRUMB"] = "在接受任务时如果跳过了引导任务，则显示警告"
+		S["SHOW_BREADCRUMB_MESSAGE"] = "Display breadcrumb message in chat"
 		S["SHOW_LOREMASTER"] = "仅显示博学大师成就相关任务"
 		S["SINGLE_BREADCRUMB_FORMAT"] = "可取得引导任务"
 		S["SP_MESSAGE"] = "不会进入内建任务纪录的特殊任务"
@@ -5186,6 +5222,7 @@ end
 		S["SEARCH_NEW"] = "新的"
 		S["SELF"] = "自己"
 		S["SHOW_BREADCRUMB"] = "在任務提示中顯示後續任務資訊"
+		S["SHOW_BREADCRUMB_MESSAGE"] = "Display breadcrumb message in chat"
 		S["SHOW_LOREMASTER"] = "僅顯示博學大師成就相關任務"
 		S["SINGLE_BREADCRUMB_FORMAT"] = "可取得後續任務"
 		S["SP_MESSAGE"] = "不在遊戲內建任務記錄的特殊任務"
@@ -5317,6 +5354,7 @@ end
 		{ S.OTHER_PREFERENCE },
 		{ S.PANEL_UPDATES, 'updatesPanelWhenZoneChanges', 'configurationScript1' },
 		{ S.SHOW_BREADCRUMB, 'displaysBreadcrumbs', 'configurationScript5' },
+		{ S.SHOW_BREADCRUMB_MESSAGE, 'displaysBreadcrumbMessages', 'configurationScript5' },
 		{ S.SHOW_LOREMASTER, 'showsLoremasterOnly', 'configurationScript4' },
 		{ S.ENABLE_COORDINATES, 'enablesPlayerCoordinates', 'configurationScript8', nil, 'pairedCoordinatesButton' },
 		{ S.ACHIEVEMENT_COLORS, 'showsAchievementCompletionColors', 'configurationScript1' },
