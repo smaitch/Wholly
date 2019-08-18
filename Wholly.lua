@@ -376,6 +376,7 @@
 --			Makes it so achievements are not loaded in Classic.
 --			Makes it so some of the UI elements are not used in Classic.
 --			Adds the ability to show a message in the chat indicating a breadcrumb is available.
+--			Corrects issue where map pins could be the wrong type.
 --
 --	Known Issues
 --
@@ -727,8 +728,6 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 						self.currentMaximumTooltipLines = self.defaultMaximumTooltipLines
 					end
 
-local mapPinsTemplateName = "WhollyPinsTemplate"
-
 self.mapPinsPool.parent = WorldMapFrame:GetCanvas()
 self.mapPinsPool.creationFunc = function(framepool)
     local frame = CreateFrame(framepool.frameType, nil, framepool.parent)
@@ -741,14 +740,13 @@ self.mapPinsPool.resetterFunc = function(pinPool, pin)
     pin.pinTemplate = nil
     pin.owningMap = nil
 end
-WorldMapFrame.pinPools[mapPinsTemplateName] = self.mapPinsPool
+WorldMapFrame.pinPools[Wholly.mapPinsTemplateName] = self.mapPinsPool
 
 function self.mapPinsProvider:RemoveAllData()
-    self:GetMap():RemoveAllPinsByTemplate(mapPinsTemplateName)
+    self:GetMap():RemoveAllPinsByTemplate(Wholly.mapPinsTemplateName)
 end
 function self.mapPinsProvider:RefreshAllData(fromOnShow)
     self:RemoveAllData()
-    Wholly:_HideAllPins()
     if WhollyDatabase.displaysMapPins then
         local uiMapID = self:GetMap():GetMapID()
         if not uiMapID then return end
@@ -766,17 +764,18 @@ function self.mapPinsProvider:RefreshAllData(fromOnShow)
                 for _, npc in pairs(locations) do
                     local xcoord, ycoord, npcName, npcId = npc.x, npc.y, npc.name, npc.id
                     if nil ~= xcoord then
-                        local pin, isNew = Wholly:_GetPin(npcId, self:GetMap())
-                        local pinValue = codeMapping[pin.texType]
-                        if codeValue < pinValue then
-                            pin:SetType(code)
-                        end
-                        if isNew then
-                            pin:ClearAllPoints()
-                            pin.questId = id
-                            pin:SetPosition(xcoord/100, ycoord/100)
-                            pin:Show()
-                        end
+						-- Either find an existing pin to see whether we need to change its texture type or create
+						-- a new pin.  We might need to change the texture depending on how many quests are going
+						-- to be displayed for the NPC.  We want the map to show one pin for the NPC and have its
+						-- texture be for the "best" quest type that NPC shows.
+						local possibleExistingPin = Wholly:RegisteredMapPin(xcoord, ycoord, npcId)
+						if nil ~= possibleExistingPin then
+							if codeValue < codeMapping[possibleExistingPin.texType] then
+								possibleExistingPin:SetType(code)
+							end
+						else
+							self:GetMap():AcquirePin(Wholly.mapPinsTemplateName, code, self:GetMap(), xcoord, ycoord, npcId)
+						end
                     end
                 end
             end
@@ -785,16 +784,28 @@ function self.mapPinsProvider:RefreshAllData(fromOnShow)
         Wholly.mapCountLine = ""        -- do not display a tooltip for pins we are not showing
     end
 end
+
 function self.mapPinsProviderPin:OnLoad()
     self:UseFrameLevelType("PIN_FRAME_LEVEL_AREA_POI")
-    self:SetScalingLimits(1, 1.0, 1.2)
+	self.texture = self:CreateTexture()
+	self:SetScalingLimits(1, 1.0, 1.2)
+	self:SetMouseMotionEnabled(true)
+	self:SetScript("OnEnter", function(self) Wholly:ShowTooltip(self) end)
+	self:SetScript("OnLeave", function() Wholly:_HideTooltip() end)
+	self.SetType = Wholly._PinSetType
 end
-function self.mapPinsProviderPin:OnAcquired()
+function self.mapPinsProviderPin:OnAcquired(code, map, x, y, npcId)
+	self:SetPosition(x/100, y/100)
+	self:SetType(code)
+	self.map = map
+	self.npcId = npcId
+	self.xcoord = x
+	self.ycoord = y
+	Wholly:RegisterMapPin(self, x, y, npcId)
+	self:Show()
 end
 function self.mapPinsProviderPin:OnReleased()
-    if self.questId and self.npcId then
-        Wholly:_HidePin(self.questId .. ":" .. self.npcId, self)
-    end
+	Wholly:UnregisterMapPin(self)
 end
 WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 
@@ -942,6 +953,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
         mapPinsProvider = CreateFromMixins(MapCanvasDataProviderMixin),
         mapPinsProviderPin = CreateFromMixins(MapCanvasPinMixin),
         mapPinsRegistry = {},
+		mapPinsTemplateName = "WhollyPinsTemplate",
 		mapPinCount = 0,
 		maximumSearchHistory = 10,
 		npcs = {},
@@ -1831,90 +1843,84 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			return mathmin(mathmax(cx, 0), 1), mathmin(mathmax(cy, 0), 1);
 		end,
 
-		_GetPin = function(self, npcId, parentFrame)
-			self:_PinFrameSetup(parentFrame)
-			if nil ~= self.pins[parentFrame]["npcs"][npcId] then return self.pins[parentFrame]["npcs"][npcId], false end
+		_PinSetType = function(pin, texType)
+			if pin.texType == texType then return end -- don't need to make changes
+			local colorString = WhollyDatabase.color[texType]
+			local r = tonumber(strsub(colorString, 3, 4), 16) / 255
+			local g = tonumber(strsub(colorString, 5, 6), 16) / 255
+			local b = tonumber(strsub(colorString, 7, 8), 16) / 255
 
---			self.mapPinCount = self.mapPinCount + 1
---			local pin = CreateFrame("Frame", "com_mithrandir_WhollyMapPin"..self.mapPinCount, parentFrame);
-local pin = parentFrame:AcquirePin("WhollyPinsTemplate")
-            pin.originalParentFrame = parentFrame
-			pin.npcId = npcId
---			pin:SetWidth(16);
---          pin:SetHeight(16);
---			pin:EnableMouse(true);
-pin:SetMouseMotionEnabled(true)
-			pin:SetScript("OnEnter", function(pin) self:ShowTooltip(pin) end)
-			pin:SetScript("OnLeave", function() self:_HideTooltip() end)
-			pin.SetType = function(self, texType)
-				if self.texType == texType then return end -- don't need to make changes
-				local colorString = WhollyDatabase.color[texType]
-				local r = tonumber(strsub(colorString, 3, 4), 16) / 255
-				local g = tonumber(strsub(colorString, 5, 6), 16) / 255
-				local b = tonumber(strsub(colorString, 7, 8), 16) / 255
-
-				self.texture = self:CreateTexture()
-				-- WoD beta does not allow custom textures so we go back to the old way
-				if not Grail.existsWoD or Grail.blizzardRelease >= 18663 then
-					if 'R' == texType then
-						self.texture:SetTexture("Interface\\Addons\\Wholly\\question")
-					else
-						self.texture:SetTexture("Interface\\Addons\\Wholly\\exclamation")
-					end
-					self.texture:SetVertexColor(r, g, b)
+			-- WoD beta does not allow custom textures so we go back to the old way
+			if not Grail.existsWoD or Grail.blizzardRelease >= 18663 then
+				if 'R' == texType then
+					pin.texture:SetTexture("Interface\\Addons\\Wholly\\question")
 				else
-					local width, height = 0.125, 0.125
-					self.texture:SetTexture("Interface\\MINIMAP\\ObjectIcons.blp")
-					self.texture:SetDesaturated(false)
-					self.texture:SetVertexColor(1, 1, 1)
-					if texType == "D" then
-						self.texture:SetTexCoord(3*width, 4*width, 1*height, 2*height);
-					elseif texType == "R" then
-						self.texture:SetTexCoord(4*width, 5*width, 1*height, 2*height);
-					elseif texType == "P" then
-						self.texture:SetTexCoord(1*width, 2*width, 1*height, 2*height);
-						self.texture:SetVertexColor(1.0, 0.0, 0.0);
-					elseif texType == "O" then
-						self.texture:SetTexCoord(1*width, 2*width, 1*height, 2*height);
-						self.texture:SetVertexColor(1.0, 192/255, 203/255);
-					elseif texType == "Y" then
-						self.texture:SetTexCoord(1*width, 2*width, 1*height, 2*height);
-						self.texture:SetVertexColor(12/15, 6/15, 0.0);
-					elseif texType == "H" then
-						self.texture:SetTexCoord(1*width, 2*width, 1*height, 2*height);
-						self.texture:SetVertexColor(0.0, 0.0, 1.0);
-					elseif texType == "W" then
-						self.texture:SetTexCoord(1*width, 2*width, 1*height, 2*height);
-						self.texture:SetVertexColor(0.75, 0.75, 0.75);
-					elseif texType == "L" then
-						self.texture:SetTexCoord(1*width, 2*width, 1*height, 2*height);
-						self.texture:SetDesaturated(1);
-					else
-						self.texture:SetTexCoord(1*width, 2*width, 1*height, 2*height);
-					end
+					pin.texture:SetTexture("Interface\\Addons\\Wholly\\exclamation")
 				end
-				self.texture:SetAllPoints()
-				self.texType = texType
+				pin.texture:SetVertexColor(r, g, b)
+			else
+				local width, height = 0.125, 0.125
+				pin.texture:SetTexture("Interface\\MINIMAP\\ObjectIcons.blp")
+				pin.texture:SetDesaturated(false)
+				pin.texture:SetVertexColor(1, 1, 1)
+				if texType == "D" then
+					pin.texture:SetTexCoord(3*width, 4*width, 1*height, 2*height);
+				elseif texType == "R" then
+					pin.texture:SetTexCoord(4*width, 5*width, 1*height, 2*height);
+				elseif texType == "P" then
+					pin.texture:SetTexCoord(1*width, 2*width, 1*height, 2*height);
+					pin.texture:SetVertexColor(1.0, 0.0, 0.0);
+				elseif texType == "O" then
+					pin.texture:SetTexCoord(1*width, 2*width, 1*height, 2*height);
+					pin.texture:SetVertexColor(1.0, 192/255, 203/255);
+				elseif texType == "Y" then
+					pin.texture:SetTexCoord(1*width, 2*width, 1*height, 2*height);
+					pin.texture:SetVertexColor(12/15, 6/15, 0.0);
+				elseif texType == "H" then
+					pin.texture:SetTexCoord(1*width, 2*width, 1*height, 2*height);
+					pin.texture:SetVertexColor(0.0, 0.0, 1.0);
+				elseif texType == "W" then
+					pin.texture:SetTexCoord(1*width, 2*width, 1*height, 2*height);
+					pin.texture:SetVertexColor(0.75, 0.75, 0.75);
+				elseif texType == "L" then
+					pin.texture:SetTexCoord(1*width, 2*width, 1*height, 2*height);
+					pin.texture:SetDesaturated(1);
+				else
+					pin.texture:SetTexCoord(1*width, 2*width, 1*height, 2*height);
+				end
 			end
-
-			pin.texType = 'U'
-			self.pins[parentFrame]["npcs"][npcId] = pin
-			return pin, true;
+			pin.texture:SetAllPoints()
+			pin.texType = texType
 		end,
 
-		_HideAllPins = function(self)
-			local frame = WorldMapFrame
-			self:_PinFrameSetup(frame)
-			for i, v in pairs(self.pins[frame]["ids"]) do
-				self:_HidePin(i, v)
+		_PinIndex = function(self, x, y, npcId)
+			return format("%d:%d:%d", npcId, x, y)
+		end,
+
+		RegisterMapPin = function(self, pin, x, y, npcId)
+			self.mapPins = self.mapPins or {}
+			if nil ~= pin and nil ~= npcId and nil ~= x and nil ~= y then
+				self.mapPins[self:_PinIndex(x, y, npcId)] = pin
 			end
 		end,
 
-		_HidePin = function(self, id, pin)
-			pin:Hide()
-			local pinTable = self.pins[pin.originalParentFrame]
-			pinTable["npcs"][pin.npcId] = nil
-			pinTable["ids"][id] = nil
+		RegisteredMapPin = function(self, x, y, npcId)
+			self.mapPins = self.mapPins or {}
+			local retval = nil
+			if nil ~= npcId and nil ~= x and nil ~= y then
+				retval = self.mapPins[self:_PinIndex(x, y, npcId)]
+			end
+			return retval
+		end,
+
+		UnregisterMapPin = function(self, pin)
+			self.mapPins = self.mapPins or {}
+			if pin then
+				pin:Hide()
+				if pin.npcId and pin.xcoord and pin.ycoord then
+					self.mapPins[self:_PinIndex(pin.xcoord, pin.ycoord, pin.npcId)] = nil
+				end
+			end
 		end,
 
 		_HideTooltip = function(self)
@@ -2610,12 +2616,6 @@ end
 		_OpenInterfaceOptions = function(self)
 			InterfaceOptionsFrame_OpenToCategory("Wholly")
 			InterfaceOptionsFrame_OpenToCategory("Wholly")
-		end,
-
-		_PinFrameSetup = function(self, frame)
-			if nil == self.pins[frame] then
-				self.pins[frame] = { ["npcs"] = {}, ["ids"] = {}, }
-			end
 		end,
 
 		_PresentTooltipForBlizzardQuest = function(self, blizzardQuestButton)
@@ -3764,12 +3764,14 @@ end
 			local questId
 			for i = 1, #questsInMap do
 				questId = questsInMap[i][1]
-                local locations = Grail:QuestLocationsAccept(questId, false, false, true, parentFrame:GetMapID(), true, 0)
+--                local locations = Grail:QuestLocationsAccept(questId, false, false, true, parentFrame:GetMapID(), true, 0)
+				local locations = Grail:QuestLocationsAccept(questId, false, false, true, pin.map, true, 0)
 				if nil ~= locations then
 					for _, npc in pairs(locations) do
 						if nil ~= npc.x then
                             local dist = sqrt( (mx - npc.x/100)^2 + (my - npc.y/100)^2 )
-							if dist <= 0.02 or (NxMap1 == parentFrame and npc.id == pin.npcId) then
+--							if dist <= 0.02 or (NxMap1 == parentFrame and npc.id == pin.npcId) then
+							if dist <= 0.02 then
 								if not npcList[npc.id] then
 									npcList[npc.id] = {}
 									local nameToUse = npc.name
