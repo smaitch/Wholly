@@ -522,7 +522,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 									Wholly:UpdateCoordinateSystem()
 								end,
 		configurationScript9 = function(self)
-									if WhollyDatabase.loadAchievementData and Wholly.systemSupportsAchievements then
+									if WhollyDatabase.loadAchievementData and Grail.capabilities.usesAchievements then
 										Grail:LoadAddOn("Grail-Achievements")
 									end
 									Wholly:_InitializeLevelOneData()
