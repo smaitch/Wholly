@@ -377,6 +377,7 @@
 --			Makes it so some of the UI elements are not used in Classic.
 --			Adds the ability to show a message in the chat indicating a breadcrumb is available.
 --			Corrects issue where map pins could be the wrong type.
+--		072	Fixes a problem where the open world map in Classic errors when changing zones.
 --
 --	Known Issues
 --
@@ -667,6 +668,19 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 						WDB.color[code] = WDB.color[code] or colorCode
 					end
 
+					-- Setup the preferences
+--					local com_mithrandir_whollyConfigFrame = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer)
+--					com_mithrandir_whollyConfigFrame:SetScript("OnShow", function(self) Wholly:ConfigFrame_OnShow(self) end)
+--					local com_mithrandir_whollyTitleAppearanceConfigFrame = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer)
+--					com_mithrandir_whollyTitleAppearanceConfigFrame:SetScript("OnShow", function(self) Wholly:ConfigFrame_OnShow(self) end)
+--					local com_mithrandir_whollyWorldMapConfigFrame = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer)
+--					com_mithrandir_whollyWorldMapConfigFrame:SetScript("OnShow", function(self) Wholly:ConfigFrame_OnShow(self) end)
+--					local com_mithrandir_whollyWidePanelConfigFrame = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer)
+--					com_mithrandir_whollyWidePanelConfigFrame:SetScript("OnShow", function(self) Wholly:ConfigFrame_OnShow(self) end)
+--					local com_mithrandir_whollyLoadDataConfigFrame = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer)
+--					com_mithrandir_whollyLoadDataConfigFrame:SetScript("OnShow", function(self) Wholly:ConfigFrame_OnShow(self) end)
+--					local com_mithrandir_whollyOtherConfigFrame = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer)
+--					com_mithrandir_whollyOtherConfigFrame:SetScript("OnShow", function(self) Wholly:ConfigFrame_OnShow(self) end)
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyConfigFrame, "Wholly")
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyTitleAppearanceConfigFrame, Wholly.s.TITLE_APPEARANCE, "Wholly")
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyWorldMapConfigFrame, Wholly.s.WORLD_MAP, "Wholly")
@@ -901,7 +915,8 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 
 				self.zoneInfo.zone.mapId = Grail.GetCurrentMapAreaID()
 				if WDB.updatesWorldMapOnZoneChange and WorldMapFrame:IsVisible() then
-					OpenWorldMap(self.zoneInfo.zone.mapId)
+					WorldMapFrame:SetMapID(self.zoneInfo.zone.mapId)
+--					OpenWorldMap(self.zoneInfo.zone.mapId)	-- does not work on Classic, Blizzard errors
 				end
 				self:UpdateQuestCaches(false, false, WDB.updatesPanelWhenZoneChanges, true)
 
@@ -2555,6 +2570,14 @@ if not Grail.battleForAzeroth then
 			end
 end
 end
+
+			-- Create the quest info frame
+--			local com_mithrandir_whollyQuestInfoFrame = CreateFrame("Frame", "com_mithrandir_whollyQuestInfoFrame", QuestFrame)
+--			com_mithrandir_whollyQuestInfoFrame:EnableMouse(true)
+--			com_mithrandir_whollyQuestInfoFrame:SetSize(60, 14)
+--			com_mithrandir_whollyQuestInfoFrame:SetPoint("TOPRIGHT", QuestFrame, "TOPRIGHT", -40, -55)
+--			com_mithrandir_whollyQuestInfoFrame:SetScript("OnEnter", function(self) Wholly:QuestInfoEnter(self) end)
+--			com_mithrandir_whollyQuestInfoFrame:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
 
 			-- Our frame positions are wrong for MoP, so we change them here.
 			com_mithrandir_whollyQuestInfoFrame:SetPoint("TOPRIGHT", QuestFrame, "TOPRIGHT", -15, -35)
