@@ -378,6 +378,7 @@
 --			Adds the ability to show a message in the chat indicating a breadcrumb is available.
 --			Corrects issue where map pins could be the wrong type.
 --		072	Fixes a problem where the open world map in Classic errors when changing zones.
+--			Fixes the problem where the Wholly map button was not appearing and working properly in Classic.
 --
 --	Known Issues
 --
@@ -2506,15 +2507,22 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 
 			self.tt = { [1] = GameTooltip }
 
-			local f = CreateFrame("Button", nil, WorldMapFrame.BorderFrame, "UIPanelButtonTemplate")
+			local parentFrame = Grail.existsClassic and WorldMapFrame or WorldMapFrame.BorderFrame
+			local f = CreateFrame("Button", nil, parentFrame, "UIPanelButtonTemplate")
 			f:SetSize(100, 25)
 			if nil == Gatherer_WorldMapDisplay then
-				f:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame.Tutorial, "TOPRIGHT", 0, -30)
+				if Grail.existsClassic then
+					f:SetPoint("TOPRIGHT", WorldMapContinentDropDown, "TOPLEFT", 10, 0)
+				else
+					f:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame.Tutorial, "TOPRIGHT", 0, -30)
+				end
 			else
 				f:SetPoint("TOPLEFT", Gatherer_WorldMapDisplay, "TOPRIGHT", 4, 0)
 			end
 			f:SetToplevel(true)
-			f:SetScale(0.7)
+			if not Grail.existsClassic then
+				f:SetScale(0.7)
+			end
 			f:SetText("Wholly")
 			f:SetScript("OnShow", function(self)
 									if nil == Gatherer_WorldMapDisplay then
@@ -2524,7 +2532,11 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 											f:SetPoint("TOPLEFT", TitanMapCursorLocation, "TOPRIGHT", 10, 6)
 										else
 --											f:SetPoint("TOPLEFT", WorldMapFrameTutorialButton, "TOPRIGHT", 0, -30)
+if Grail.existsClassic then
+f:SetPoint("TOPRIGHT", WorldMapContinentDropDown, "TOPLEFT", 10, 0)
+else
 f:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame.Tutorial, "TOPRIGHT", 0, -30)
+end
 										end
 									else
 										self:SetPoint("TOPLEFT", Gatherer_WorldMapDisplay, "TOPRIGHT", 4, 0)
