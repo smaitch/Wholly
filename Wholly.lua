@@ -379,6 +379,7 @@
 --			Corrects issue where map pins could be the wrong type.
 --		072	Fixes a problem where the open world map in Classic errors when changing zones.
 --			Fixes the problem where the Wholly map button was not appearing and working properly in Classic.
+--			Fixes the problem where exclusive classes in Classic were failing because of Retail classes.
 --
 --	Known Issues
 --
@@ -2957,7 +2958,9 @@ end
 						local englishName = Grail.classMapping[letterCode]
 						local localizedGenderClassName = Grail:CreateClassNameLocalizedGenderized(englishName)
 						local classColor = RAID_CLASS_COLORS[englishName]
-						classString = classString .. format("|cff%.2x%.2x%.2x%s|r ", classColor.r*255, classColor.g*255, classColor.b*255, localizedGenderClassName)
+						if nil ~= localizedGenderClassName and nil ~= classColor then
+							classString = classString .. format("|cff%.2x%.2x%.2x%s|r ", classColor.r*255, classColor.g*255, classColor.b*255, localizedGenderClassName)
+						end
 					end
 				end
 				trim(classString)
