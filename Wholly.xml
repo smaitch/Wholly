@@ -119,36 +119,6 @@
 		</Scripts>
 	</Button>
 
-	<Frame name="com_mithrandir_whollyQuestInfoFrame" parent="QuestFrame" enableMouse="true">
-		<Size>
-			<AbsDimension x="60" y="14" />
-		</Size>
-		<Scripts>
-			<OnEnter>
-				Wholly:QuestInfoEnter(self)
-			</OnEnter>
-			<OnLeave>
-				GameTooltip:Hide()
-			</OnLeave>
-		</Scripts>
-		<Anchors>
-			<Anchor point="TOPRIGHT" relativePoint="TOPRIGHT">
-				<Offset>
-					<AbsDimension x="-40" y="-55" />
-				</Offset>
-			</Anchor>
-		</Anchors>
-		<Layers>
-			<Layer level="BACKGROUND">
-				<FontString name="$parentText" inherits="GameFontNormal" justifyH="RIGHT" text="None">
-					<Size>
-						<AbsDimension x="60" y="20" />
-					</Size>
-				</FontString>
-			</Layer>
-		</Layers>
-	</Frame>
-
 	<Frame name="com_mithrandir_whollyQuestInfoBuggedFrame" parent="QuestFrame" enableMouse="true">
 		<Size>
 			<AbsDimension x="180" y="14" />

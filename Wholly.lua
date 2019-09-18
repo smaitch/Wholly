@@ -380,6 +380,7 @@
 --		072	Fixes a problem where the open world map in Classic errors when changing zones.
 --			Fixes the problem where the Wholly map button was not appearing and working properly in Classic.
 --			Fixes the problem where exclusive classes in Classic were failing because of Retail classes.
+--			Adds the ability to have the Wholly information appear in a tooltip when hovering over a quest in the Blizzard quest panel.
 --
 --	Known Issues
 --
@@ -2417,6 +2418,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 
 		_OnEnterBlizzardQuestButton = function(blizzardQuestButton)
 			if WhollyDatabase.displaysBlizzardQuestTooltips then
+				local frame = blizzardQuestButton
 				local questId = blizzardQuestButton.questID
 				-- Prior to BfA beta 26567 this check and reassigning of questId was not needed.
 				-- Now in 26610 it is not needed anymore.
@@ -2424,10 +2426,18 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 --					local questTitle, level, questTag, suggestedGroup, isHeader, isCollapsed, isComplete, isDaily, theQuestId, startEvent = Grail:GetQuestLogTitle(blizzardQuestButton.questLogIndex)
 --					questId = theQuestId
 --				end
-				Wholly.onlyAddingTooltipToGameTooltip = true
-				Wholly:_PopulateTooltipForQuest(blizzardQuestButton, questId)
-				Wholly.onlyAddingTooltipToGameTooltip = false
-				GameTooltip:Show()
+				if Grail.existsClassic then
+					local questLogIndex = blizzardQuestButton:GetID() + FauxScrollFrame_GetOffset(QuestLogListScrollFrame)
+					local questTitle, level, questTag, suggestedGroup, isHeader, isCollapsed, isComplete, isDaily, theQuestId, startEvent = Grail:GetQuestLogTitle(questLogIndex)
+					questId = theQuestId
+					frame = not isHeader and blizzardQuestButton or nil
+				end
+				if nil ~= frame then
+					Wholly.onlyAddingTooltipToGameTooltip = not Grail.existsClassic
+					Wholly:_PopulateTooltipForQuest(frame, questId)
+					Wholly.onlyAddingTooltipToGameTooltip = false
+					GameTooltip:Show()
+				end
 			end
 		end,
 
@@ -2453,6 +2463,125 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				self:SlashCommand(frame, msg)
 			end
 			SLASH_WHOLLY1 = "/wholly"
+
+			if nil == com_mithrandir_whollyFrame then
+				local frame = CreateFrame("Frame", "com_mithrandir_whollyFrame", UIParent)
+				frame:SetToplevel(true)
+				frame:EnableMouse(true)
+				frame:SetMovable(true)
+				frame:Hide()
+				frame:SetSize(384, 512)
+				frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
+
+				local topLeftTexture = frame:CreateTexture(nil, "BORDER")
+				topLeftTexture:SetSize(256, 256)
+				topLeftTexture:SetPoint("TOPLEFT")
+				topLeftTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-TopLeft")
+
+				local topRightTexture = frame:CreateTexture(nil, "BORDER")
+				topRightTexture:SetSize(128, 256)
+				topRightTexture:SetPoint("TOPRIGHT")
+				topRightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-TopRight")
+
+				local bottomLeftTexture = frame:CreateTexture(nil, "BORDER")
+				bottomLeftTexture:SetSize(256, 256)
+				bottomLeftTexture:SetPoint("BOTTOMLEFT")
+				bottomLeftTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BotLeft")
+
+				local bottomRightTexture = frame:CreateTexture(nil, "BORDER")
+				bottomRightTexture:SetSize(128, 256)
+				bottomRightTexture:SetPoint("BOTTOMRIGHT")
+				bottomRightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BotRight")
+
+				local bookTexture = frame:CreateTexture(nil, "BACKGROUND")
+				bookTexture:SetSize(64, 64)
+				bookTexture:SetPoint("TOPLEFT", 3, -4)
+				bookTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BookIcon")
+
+				local fontString = frame:CreateFontString("com_mithrandir_whollyFrameTitleText", "ARTWORK", "GameFontNormal")
+				fontString:SetSize(300, 14)
+				fontString:SetPoint("TOP", 0, -15)
+				fontString:SetText(QUEST_LOG)
+
+				local closeButton = CreateFrame("Button", "com_mithrandir_whollyFrameCloseButton", UIPanelCloseButton)
+				closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -30, -8)
+
+				local sortButton = CreateFrame("Button", "com_mithrandir_whollyFrameSortButton", UIPanelButtonTemplate)
+				sortButton:SetText(TRACKER_SORT_LABEL)
+				sortButton:SetSize(110, 21)
+				sortButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -43, 80)
+				sortButton:SetScript("OnClick", function(self) Wholly:Sort(self) end)
+				sortButton:SetScript("OnEnter", function(self) Wholly:SortButtonEnter(self) end)
+				sortButton:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+
+				local preferencesButton = CreateFrame("Button", "com_mithrandir_whollyFramePreferencesButton", UIPanelButtonTemplate)
+				preferencesButton:SetText(PREFERENCES)
+				preferencesButton:SetSize(110, 21)
+				preferencesButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -151, 80)
+				preferencesButton:SetScript("OnClick", function(self) Wholly:_OpenInterfaceOptions() end)
+
+				local mapButton = CreateFrame("Button", "com_mithrandir_whollyFrameSwitchZoneButton", UIPanelButtonTemplate)
+				mapButton:SetText(MAP)
+				mapButton:SetSize(110, 21)
+				mapButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -259, 80)
+				mapButton:SetScript("OnClick", function(self) Wholly:SetCurrentMapToPanel(self) end)
+				mapButton:SetScript("OnEnter", function(self) Wholly:ZoneButtonEnter(self) end)
+				mapButton:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+
+				local scrollFrame = CreateFrame("ScrollFrame", "com_mithrandir_whollyFrameScrollFrame", HybridScrollFrameTemplate)
+				scrollFrame:SetSize(305, 335)
+				scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 19, -75)
+				local slider = CreateFrame("Slider", "com_mithrandir_whollyFrameScrollFrameScrollBar", HybridScrollBarTemplate)
+				slider:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 0, -13)
+				slider:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 0, 14)
+				slider:SetScript("OnLoad", function(self)
+					local name = self:GetName()
+					_G[name.."BG"]:Hide()
+					_G[name.."Top"]:Hide()
+					_G[name.."Bottom"]:Hide()
+					_G[name.."Middle"]:Hide()
+					self.doNotHide = true
+				end)
+				scrollFrame.scrollBar = slider	-- hopefully this is parentKey="scrollBar"
+--				local subSubFrame = CreateFrame("Frame", "com_mithrandir_whollyFrameLogHighlightFrame")
+--				subSubFrame:Hide()
+--				subSubFrame:SetPoint("TOPLEFT")
+--				subSubFrame:SetPoint("BOTTOMRIGHT")
+--				local highlightTexture = subSubFrame:CreateTexture("com_mithrandir_whollyFrameLogHighlightFrameLogSkillHighlight", "ARTWORK")
+--				highlightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+----				highlightTexture:SetAlphaMode("ADD")
+--				subSubFrame:SetScript("OnLoad", function(self) self:SetParent(nil) end)
+	--			scrollFrame:SetScript("OnLoad", function(self) Wholly:ScrollFrame_OnLoad(self) end)
+
+	--			frame:SetScript("OnLoad", function(self) Wholly:OnLoad(self) tinsert(UISpecialFrames, self:GetName()) end)
+				frame:SetScript("OnShow", function(self) Wholly:OnShow(self) PlaySound(PlaySoundKitID and "igCharacterInfoOpen" or 839) end)
+				frame:SetScript("OnHide", function(self)
+					Wholly:OnHide(self)
+					PlaySound(PlaySoundKitID and "igCharacterInfoClose" or 840)
+					if self.isMoving then
+						self:StopMovingOrSizing()
+						self.isMoving = false
+					end
+				end)
+				frame:SetScript("OnMouseUp", function(self)
+					if self.isMoving then
+						self:StopMovingOrSizing()
+						self.isMoving = false
+					end
+				end)
+				frame:SetScript("OnMouseDown", function(self)
+					if (not self.isLocked or self.isLocked == 0) and button == "LeftButton" then
+						self:StartMoving()
+						self.isMoving = true
+					end
+				end)
+
+				Wholly:OnLoad(frame)
+				tinsert(UISpecialFrames, frame:GetName())
+				Wholly:ScrollFrame_OnLoad(scrollFrame)
+
+			end
+
 			com_mithrandir_whollyFrameTitleText:SetText("Wholly ".. com_mithrandir_whollyFrameTitleText:GetText())
 			com_mithrandir_whollyFrameWideTitleText:SetText("Wholly ".. com_mithrandir_whollyFrameWideTitleText:GetText())
 
@@ -2582,23 +2711,32 @@ if not Grail.battleForAzeroth then
 				titles[i]:HookScript("OnEnter", Wholly._OnEnterBlizzardQuestButton)
 			end
 end
+else
+	hooksecurefunc("QuestLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
 end
 
 			-- Create the quest info frame
---			local com_mithrandir_whollyQuestInfoFrame = CreateFrame("Frame", "com_mithrandir_whollyQuestInfoFrame", QuestFrame)
---			com_mithrandir_whollyQuestInfoFrame:EnableMouse(true)
---			com_mithrandir_whollyQuestInfoFrame:SetSize(60, 14)
---			com_mithrandir_whollyQuestInfoFrame:SetPoint("TOPRIGHT", QuestFrame, "TOPRIGHT", -40, -55)
---			com_mithrandir_whollyQuestInfoFrame:SetScript("OnEnter", function(self) Wholly:QuestInfoEnter(self) end)
---			com_mithrandir_whollyQuestInfoFrame:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+			if nil == com_mithrandir_whollyQuestInfoFrame then
+				local frame = CreateFrame("Frame", "com_mithrandir_whollyQuestInfoFrame", QuestFrame)
+				frame:EnableMouse(true)
+				frame:SetSize(60, 14)
+				local xOffset, yOffset = -15, -35
+				if Grail.existsClassic then
+					xOffset, yOffset = -55, -55
+				end
+				frame:SetPoint("TOPRIGHT", QuestFrame, "TOPRIGHT", xOffset, yOffset)
+				frame:SetScript("OnEnter", function(self) Wholly:QuestInfoEnter(self) end)
+				frame:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+				local fontString = frame:CreateFontString("com_mithrandir_whollyQuestInfoFrameText", "BACKGROUND", "GameFontNormal")
+				fontString:SetJustifyH("RIGHT")
+				fontString:SetSize(60, 20)
+				fontString:SetPoint("CENTER")	-- needed to add this even though it worked without this in XML
+				fontString:SetText("None")
+			end
 
 			-- Our frame positions are wrong for MoP, so we change them here.
-			com_mithrandir_whollyQuestInfoFrame:SetPoint("TOPRIGHT", QuestFrame, "TOPRIGHT", -15, -35)
 			com_mithrandir_whollyQuestInfoBuggedFrame:SetPoint("TOPLEFT", QuestFrame, "TOPLEFT", 100, -35)
 			com_mithrandir_whollyBreadcrumbFrame:SetPoint("TOPLEFT", QuestFrame, "BOTTOMLEFT", 16, -10)
-			if Grail.existsClassic then
-				com_mithrandir_whollyQuestInfoFrame:SetPoint("TOPRIGHT", QuestFrame, "TOPRIGHT", -55, -55)
-			end
 
 			local nf = CreateFrame("Frame")
 			self.notificationFrame = nf
