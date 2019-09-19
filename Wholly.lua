@@ -381,6 +381,7 @@
 --			Fixes the problem where the Wholly map button was not appearing and working properly in Classic.
 --			Fixes the problem where exclusive classes in Classic were failing because of Retail classes.
 --			Adds the ability to have the Wholly information appear in a tooltip when hovering over a quest in the Blizzard quest panel.
+--			Adds the ability to have the Wholly tooltip contain the quest title and description in Classic.
 --
 --	Known Issues
 --
@@ -2998,9 +2999,16 @@ end
 			end
 			if nil == questId then return end
 			if not self.onlyAddingTooltipToGameTooltip then
-if not Grail.existsClassic then
-				self.tt[1]:SetHyperlink(format("quest:%d", questId))
-end
+				if not Grail.existsClassic then
+					self.tt[1]:SetHyperlink(format("quest:%d", questId))
+				else
+					self:_AddLine(self:_QuestName(questId))
+					local description = Grail.quest.description[questId]
+					if nil ~= description then
+						self:_AddLine(" ")
+						self:_AddLine(description)
+					end
+				end
 			end
 			if not Grail:DoesQuestExist(questId) then self:_AddLine(" ") self:_AddLine(self.s.GRAIL_NOT_HAVE) return end
 
