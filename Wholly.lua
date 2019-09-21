@@ -381,7 +381,7 @@
 --			Fixes the problem where the Wholly map button was not appearing and working properly in Classic.
 --			Fixes the problem where exclusive classes in Classic were failing because of Retail classes.
 --			Adds the ability to have the Wholly information appear in a tooltip when hovering over a quest in the Blizzard quest panel.
---			Adds the ability to have the Wholly tooltip contain the quest title and description in Classic.
+--			Adds the ability to have the Wholly tooltip contain the quest title and description in Classic, with the description in white.
 --
 --	Known Issues
 --
@@ -1180,7 +1180,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 		end,
 
 		--	This adds a line to the "current" tooltip, creating a new one as needed.
-		_AddLine = function(self, value, value2, texture)
+		_AddLine = function(self, value, value2, texture, shouldWrap)
 			if not self.onlyAddingTooltipToGameTooltip then
 				local tt = self.tt[self.currentTt]
 				if tt:NumLines() >= self.currentMaximumTooltipLines then
@@ -1197,7 +1197,11 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				if nil ~= value2 then
 					tt:AddDoubleLine(value, value2)
 				else
-					tt:AddLine(value)
+					if shouldWrap then
+						tt:AddLine(value, 1, 1, 1, shouldWrap)
+					else
+						tt:AddLine(value)
+					end
 				end
 				if nil ~= texture then
 					tt:AddTexture(texture)
@@ -1206,7 +1210,11 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				if nil ~= value2 then
 					GameTooltip:AddDoubleLine(value, value2)
 				else
-					GameTooltip:AddLine(value)
+					if shouldWrap then
+						GameTooltip:AddLine(value, 1, 1, 1, shouldWrap)
+					else
+						GameTooltip:AddLine(value)
+					end
 				end
 				if nil ~= texture then
 					GameTooltip:AddTexture(texture)
@@ -3005,8 +3013,9 @@ end
 					self:_AddLine(self:_QuestName(questId))
 					local description = Grail.quest.description[questId]
 					if nil ~= description then
+						description = description:gsub("$B", "\n")
 						self:_AddLine(" ")
-						self:_AddLine(description)
+						self:_AddLine(description, nil, nil, true)
 					end
 				end
 			end
@@ -3109,7 +3118,7 @@ end
 						end
 					end
 				end
-				trim(classString)
+				classString = trim(classString)
 			end
 			if bitband(statusCode, Grail.bitMaskClass) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorClass) > 0 then colorCode = orangeColor else colorCode = normalColor end
 			self:_AddLine("|c"..colorCode..CLASS.."|r", classString)
