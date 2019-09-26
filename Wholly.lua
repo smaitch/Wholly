@@ -646,31 +646,195 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			end,
 			['ADDON_LOADED'] = function(self, frame, arg1)
 				if "Wholly" == arg1 then
+GRAIL = Grail
+if not GRAIL or GRAIL.versionNumber < requiredGrailVersion then
+local errorMessage = format(self.s.REQUIRES_FORMAT, requiredGrailVersion)
+print(errorMessage)
+UIErrorsFrame:AddMessage(errorMessage)
+return
+end
+self.checkedGrailVersion = true
+
+					self:_RegisterSlashCommand()
+
+if nil == com_mithrandir_whollyFrame then
+local frame = CreateFrame("Frame", "com_mithrandir_whollyFrame", UIParent)
+frame:SetToplevel(true)
+frame:EnableMouse(true)
+frame:SetMovable(true)
+frame:Hide()
+frame:SetSize(384, 512)
+frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
+
+local topLeftTexture = frame:CreateTexture(nil, "BORDER")
+topLeftTexture:SetSize(256, 256)
+topLeftTexture:SetPoint("TOPLEFT")
+topLeftTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-TopLeft")
+
+local topRightTexture = frame:CreateTexture(nil, "BORDER")
+topRightTexture:SetSize(128, 256)
+topRightTexture:SetPoint("TOPRIGHT")
+topRightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-TopRight")
+
+local bottomLeftTexture = frame:CreateTexture(nil, "BORDER")
+bottomLeftTexture:SetSize(256, 256)
+bottomLeftTexture:SetPoint("BOTTOMLEFT")
+bottomLeftTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BotLeft")
+
+local bottomRightTexture = frame:CreateTexture(nil, "BORDER")
+bottomRightTexture:SetSize(128, 256)
+bottomRightTexture:SetPoint("BOTTOMRIGHT")
+bottomRightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BotRight")
+
+local bookTexture = frame:CreateTexture(nil, "BACKGROUND")
+bookTexture:SetSize(64, 64)
+bookTexture:SetPoint("TOPLEFT", 3, -4)
+bookTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BookIcon")
+
+local fontString = frame:CreateFontString("com_mithrandir_whollyFrameTitleText", "ARTWORK", "GameFontNormal")
+fontString:SetSize(300, 14)
+fontString:SetPoint("TOP", 0, -15)
+fontString:SetText(QUEST_LOG)
+
+local closeButton = CreateFrame("Button", "com_mithrandir_whollyFrameCloseButton", UIPanelCloseButton)
+closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -30, -8)
+
+local sortButton = CreateFrame("Button", "com_mithrandir_whollyFrameSortButton", UIPanelButtonTemplate)
+sortButton:SetText(TRACKER_SORT_LABEL)
+sortButton:SetSize(110, 21)
+sortButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -43, 80)
+sortButton:SetScript("OnClick", function(self) Wholly:Sort(self) end)
+sortButton:SetScript("OnEnter", function(self) Wholly:SortButtonEnter(self) end)
+sortButton:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+
+local preferencesButton = CreateFrame("Button", "com_mithrandir_whollyFramePreferencesButton", UIPanelButtonTemplate)
+preferencesButton:SetText(PREFERENCES)
+preferencesButton:SetSize(110, 21)
+preferencesButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -151, 80)
+preferencesButton:SetScript("OnClick", function(self) Wholly:_OpenInterfaceOptions() end)
+
+local mapButton = CreateFrame("Button", "com_mithrandir_whollyFrameSwitchZoneButton", UIPanelButtonTemplate)
+mapButton:SetText(MAP)
+mapButton:SetSize(110, 21)
+mapButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -259, 80)
+mapButton:SetScript("OnClick", function(self) Wholly:SetCurrentMapToPanel(self) end)
+mapButton:SetScript("OnEnter", function(self) Wholly:ZoneButtonEnter(self) end)
+mapButton:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+
+local scrollFrame = CreateFrame("ScrollFrame", "com_mithrandir_whollyFrameScrollFrame", HybridScrollFrameTemplate)
+scrollFrame:SetSize(305, 335)
+scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 19, -75)
+local slider = CreateFrame("Slider", "com_mithrandir_whollyFrameScrollFrameScrollBar", HybridScrollBarTemplate)
+slider:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 0, -13)
+slider:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 0, 14)
+slider:SetScript("OnLoad", function(self)
+local name = self:GetName()
+_G[name.."BG"]:Hide()
+_G[name.."Top"]:Hide()
+_G[name.."Bottom"]:Hide()
+_G[name.."Middle"]:Hide()
+self.doNotHide = true
+end)
+scrollFrame.scrollBar = slider	-- hopefully this is parentKey="scrollBar"
+--				local subSubFrame = CreateFrame("Frame", "com_mithrandir_whollyFrameLogHighlightFrame")
+--				subSubFrame:Hide()
+--				subSubFrame:SetPoint("TOPLEFT")
+--				subSubFrame:SetPoint("BOTTOMRIGHT")
+--				local highlightTexture = subSubFrame:CreateTexture("com_mithrandir_whollyFrameLogHighlightFrameLogSkillHighlight", "ARTWORK")
+--				highlightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+----				highlightTexture:SetAlphaMode("ADD")
+--				subSubFrame:SetScript("OnLoad", function(self) self:SetParent(nil) end)
+--			scrollFrame:SetScript("OnLoad", function(self) Wholly:ScrollFrame_OnLoad(self) end)
+
+--			frame:SetScript("OnLoad", function(self) Wholly:OnLoad(self) tinsert(UISpecialFrames, self:GetName()) end)
+frame:SetScript("OnShow", function(self) Wholly:OnShow(self) PlaySound(PlaySoundKitID and "igCharacterInfoOpen" or 839) end)
+frame:SetScript("OnHide", function(self)
+Wholly:OnHide(self)
+PlaySound(PlaySoundKitID and "igCharacterInfoClose" or 840)
+if self.isMoving then
+self:StopMovingOrSizing()
+self.isMoving = false
+end
+end)
+frame:SetScript("OnMouseUp", function(self)
+if self.isMoving then
+self:StopMovingOrSizing()
+self.isMoving = false
+end
+end)
+frame:SetScript("OnMouseDown", function(self)
+if (not self.isLocked or self.isLocked == 0) and button == "LeftButton" then
+self:StartMoving()
+self.isMoving = true
+end
+end)
+
+Wholly:OnLoad(frame)
+tinsert(UISpecialFrames, frame:GetName())
+Wholly:ScrollFrame_OnLoad(scrollFrame)
+
+end
+
+com_mithrandir_whollyFrameTitleText:SetText("Wholly ".. com_mithrandir_whollyFrameTitleText:GetText())
+com_mithrandir_whollyFrameWideTitleText:SetText("Wholly ".. com_mithrandir_whollyFrameWideTitleText:GetText())
+
+self.toggleButton = CreateFrame("Button", "com_mithrandir_whollyFrameHiddenToggleButton", com_mithrandir_whollyFrame, "SecureHandlerClickTemplate")
+self.toggleButton:SetAttribute("_onclick", [=[
+local parent = self:GetParent()
+if parent:IsShown() then
+parent:Hide()
+else
+parent:Show()
+end
+]=])
+
+self.currentFrame = com_mithrandir_whollyFrame
+
+-- The frame is not allowing button presses to things just on the outside of its bounds so we move the hit rect
+frame:SetHitRectInsets(0, 32, 0, 84)
+
+					self:_SetupLibDataBroker()
+					self:_SetupTooltip()
+					self:_SetupWorldMapWhollyButton()	-- TODO: Should clean up this implementation
+
+
+-- if the UI panel disappears (maximized WorldMapFrame) we need to change parents
+UIParent:HookScript("OnHide", function()
+self.tooltip:SetParent(WorldMapFrame);
+self.tooltip:SetFrameStrata("TOOLTIP");
+end)
+UIParent:HookScript("OnShow", function()
+self.tooltip:SetParent(UIParent);
+self.tooltip:SetFrameStrata("TOOLTIP");
+end)
+
+GameTooltip:HookScript("OnTooltipSetUnit", Wholly._CheckNPCTooltip)
+
+					self:_SetupBlizzardQuestLogSupport()
+					self:_SetupQuestInfoFrame()
+
+-- Our frame positions are wrong for MoP, so we change them here.
+com_mithrandir_whollyQuestInfoBuggedFrame:SetPoint("TOPLEFT", QuestFrame, "TOPLEFT", 100, -35)
+com_mithrandir_whollyBreadcrumbFrame:SetPoint("TOPLEFT", QuestFrame, "BOTTOMLEFT", 16, -10)
+
+if "deDE" == GetLocale() then
+com_mithrandir_whollyFramePreferencesButton:SetText("Einstellungen")
+end
+if "ruRU" == GetLocale() then
+com_mithrandir_whollyFrameSortButton:SetText("Сортировать")
+end
+
+com_mithrandir_whollyFrameSwitchZoneButton:SetText(self.s.MAP)
+com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
+
 					local WDB = WhollyDatabase
 					local Grail = Grail
 					local TomTom = TomTom
 
-					if nil == WDB.defaultsLoaded then
-						WDB = self:_LoadDefaults()
-					end
-					if nil == WDB.currentSortingMode then
-						WDB.currentSortingMode = 1
-					end
-					if nil == WDB.closedHeaders then
-						WDB.closedHeaders = {}
-					end
-					if nil == WDB.ignoredQuests then
-						WDB.ignoredQuests = {}
-					end
+					self:_SetupDefaults()
 
 					-- load all the localized quest names
 					Grail:LoadLocalizedQuestNames()
-
-					-- Setup the colors, only setting those that do not already exist
-					WDB.color = WDB.color or {}
-					for code, colorCode in pairs(self.color) do
-						WDB.color[code] = WDB.color[code] or colorCode
-					end
 
 					-- Setup the preferences
 --					local com_mithrandir_whollyConfigFrame = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer)
@@ -691,60 +855,6 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyWidePanelConfigFrame, Wholly.s.WIDE_PANEL, "Wholly")
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyLoadDataConfigFrame, Wholly.s.LOAD_DATA, "Wholly")
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyOtherConfigFrame, Wholly.s.OTHER_PREFERENCE, "Wholly")
-
-					-- Now to be nicer to those that have used the addon before the current
-					-- incarnation, newly added defaults will have their normal setting set
-					-- as appropriate.
-					if nil == WDB.version then		-- first loaded prior to version 006, so default options added in 006
-						WDB.displaysHolidaysAlways = true		-- version 006
-						WDB.updatesWorldMapOnZoneChange = true	-- version 006
-						WDB.version = 6							-- just to make sure none of the other checks fails
-					end
-					if WDB.version < 7 then
-						WDB.showsInLogQuestStatus = true			-- version 007
-					end
-					if WDB.version < 16 then
-						WDB.showsAchievementCompletionColors = true	-- version 016
-					end
-					if WDB.version < 17 then
-						-- transform old values into new ones as appropriate
-						if WDB.showsDailyQuests then
-							WDB.showsRepeatableQuests = true
-						end
-						WDB.loadAchievementData = true
-						WDB.loadReputationData = true
-					end
-					if WDB.version < 27 then
-						WDB.showsHolidayQuests = true
-					end
-					if WDB.version < 34 then
-						WDB.loadDateData = true
-					end
-					if WDB.version < 38 then
-						WDB.displaysBlizzardQuestTooltips = true
-					end
-					if WDB.version < 39 then
-						WDB.showsWeeklyQuests = true
-					end
-					if WDB.version < 51 then
-						WDB.showsLegendaryQuests = true
-					end
-					if WDB.version < 53 then
-						WDB.showsPetBattleQuests = true
-					end
-					if WDB.version < 56 then
-						WDB.showsPVPQuests = true
-					end
-					if WDB.version < 60 then
-						WDB.showsWorldQuests = true
-					end
-					WDB.version = Wholly.versionNumber
-
-					if WDB.maximumTooltipLines then
-						self.currentMaximumTooltipLines = WDB.maximumTooltipLines
-					else
-						self.currentMaximumTooltipLines = self.defaultMaximumTooltipLines
-					end
 
 self.mapPinsPool.parent = WorldMapFrame:GetCanvas()
 self.mapPinsPool.creationFunc = function(framepool)
@@ -1940,6 +2050,13 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			return retval
 		end,
 
+		_RegisterSlashCommand = function(self)
+			SlashCmdList["WHOLLY"] = function(msg)
+				self:SlashCommand(frame, msg)
+			end
+			SLASH_WHOLLY1 = "/wholly"
+		end,
+
 		UnregisterMapPin = function(self, pin)
 			self.mapPins = self.mapPins or {}
 			if pin then
@@ -2460,308 +2577,6 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 		end,
 
 		OnLoad = function(self, frame)
-			GRAIL = Grail
-			if not GRAIL or GRAIL.versionNumber < requiredGrailVersion then
-				local errorMessage = format(self.s.REQUIRES_FORMAT, requiredGrailVersion)
-				print(errorMessage)
-				UIErrorsFrame:AddMessage(errorMessage)
-				return 
-			end
-			self.checkedGrailVersion = true
-			SlashCmdList["WHOLLY"] = function(msg)
-				self:SlashCommand(frame, msg)
-			end
-			SLASH_WHOLLY1 = "/wholly"
-
-			if nil == com_mithrandir_whollyFrame then
-				local frame = CreateFrame("Frame", "com_mithrandir_whollyFrame", UIParent)
-				frame:SetToplevel(true)
-				frame:EnableMouse(true)
-				frame:SetMovable(true)
-				frame:Hide()
-				frame:SetSize(384, 512)
-				frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
-
-				local topLeftTexture = frame:CreateTexture(nil, "BORDER")
-				topLeftTexture:SetSize(256, 256)
-				topLeftTexture:SetPoint("TOPLEFT")
-				topLeftTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-TopLeft")
-
-				local topRightTexture = frame:CreateTexture(nil, "BORDER")
-				topRightTexture:SetSize(128, 256)
-				topRightTexture:SetPoint("TOPRIGHT")
-				topRightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-TopRight")
-
-				local bottomLeftTexture = frame:CreateTexture(nil, "BORDER")
-				bottomLeftTexture:SetSize(256, 256)
-				bottomLeftTexture:SetPoint("BOTTOMLEFT")
-				bottomLeftTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BotLeft")
-
-				local bottomRightTexture = frame:CreateTexture(nil, "BORDER")
-				bottomRightTexture:SetSize(128, 256)
-				bottomRightTexture:SetPoint("BOTTOMRIGHT")
-				bottomRightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BotRight")
-
-				local bookTexture = frame:CreateTexture(nil, "BACKGROUND")
-				bookTexture:SetSize(64, 64)
-				bookTexture:SetPoint("TOPLEFT", 3, -4)
-				bookTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BookIcon")
-
-				local fontString = frame:CreateFontString("com_mithrandir_whollyFrameTitleText", "ARTWORK", "GameFontNormal")
-				fontString:SetSize(300, 14)
-				fontString:SetPoint("TOP", 0, -15)
-				fontString:SetText(QUEST_LOG)
-
-				local closeButton = CreateFrame("Button", "com_mithrandir_whollyFrameCloseButton", UIPanelCloseButton)
-				closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -30, -8)
-
-				local sortButton = CreateFrame("Button", "com_mithrandir_whollyFrameSortButton", UIPanelButtonTemplate)
-				sortButton:SetText(TRACKER_SORT_LABEL)
-				sortButton:SetSize(110, 21)
-				sortButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -43, 80)
-				sortButton:SetScript("OnClick", function(self) Wholly:Sort(self) end)
-				sortButton:SetScript("OnEnter", function(self) Wholly:SortButtonEnter(self) end)
-				sortButton:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
-
-				local preferencesButton = CreateFrame("Button", "com_mithrandir_whollyFramePreferencesButton", UIPanelButtonTemplate)
-				preferencesButton:SetText(PREFERENCES)
-				preferencesButton:SetSize(110, 21)
-				preferencesButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -151, 80)
-				preferencesButton:SetScript("OnClick", function(self) Wholly:_OpenInterfaceOptions() end)
-
-				local mapButton = CreateFrame("Button", "com_mithrandir_whollyFrameSwitchZoneButton", UIPanelButtonTemplate)
-				mapButton:SetText(MAP)
-				mapButton:SetSize(110, 21)
-				mapButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -259, 80)
-				mapButton:SetScript("OnClick", function(self) Wholly:SetCurrentMapToPanel(self) end)
-				mapButton:SetScript("OnEnter", function(self) Wholly:ZoneButtonEnter(self) end)
-				mapButton:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
-
-				local scrollFrame = CreateFrame("ScrollFrame", "com_mithrandir_whollyFrameScrollFrame", HybridScrollFrameTemplate)
-				scrollFrame:SetSize(305, 335)
-				scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 19, -75)
-				local slider = CreateFrame("Slider", "com_mithrandir_whollyFrameScrollFrameScrollBar", HybridScrollBarTemplate)
-				slider:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 0, -13)
-				slider:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 0, 14)
-				slider:SetScript("OnLoad", function(self)
-					local name = self:GetName()
-					_G[name.."BG"]:Hide()
-					_G[name.."Top"]:Hide()
-					_G[name.."Bottom"]:Hide()
-					_G[name.."Middle"]:Hide()
-					self.doNotHide = true
-				end)
-				scrollFrame.scrollBar = slider	-- hopefully this is parentKey="scrollBar"
---				local subSubFrame = CreateFrame("Frame", "com_mithrandir_whollyFrameLogHighlightFrame")
---				subSubFrame:Hide()
---				subSubFrame:SetPoint("TOPLEFT")
---				subSubFrame:SetPoint("BOTTOMRIGHT")
---				local highlightTexture = subSubFrame:CreateTexture("com_mithrandir_whollyFrameLogHighlightFrameLogSkillHighlight", "ARTWORK")
---				highlightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
-----				highlightTexture:SetAlphaMode("ADD")
---				subSubFrame:SetScript("OnLoad", function(self) self:SetParent(nil) end)
-	--			scrollFrame:SetScript("OnLoad", function(self) Wholly:ScrollFrame_OnLoad(self) end)
-
-	--			frame:SetScript("OnLoad", function(self) Wholly:OnLoad(self) tinsert(UISpecialFrames, self:GetName()) end)
-				frame:SetScript("OnShow", function(self) Wholly:OnShow(self) PlaySound(PlaySoundKitID and "igCharacterInfoOpen" or 839) end)
-				frame:SetScript("OnHide", function(self)
-					Wholly:OnHide(self)
-					PlaySound(PlaySoundKitID and "igCharacterInfoClose" or 840)
-					if self.isMoving then
-						self:StopMovingOrSizing()
-						self.isMoving = false
-					end
-				end)
-				frame:SetScript("OnMouseUp", function(self)
-					if self.isMoving then
-						self:StopMovingOrSizing()
-						self.isMoving = false
-					end
-				end)
-				frame:SetScript("OnMouseDown", function(self)
-					if (not self.isLocked or self.isLocked == 0) and button == "LeftButton" then
-						self:StartMoving()
-						self.isMoving = true
-					end
-				end)
-
-				Wholly:OnLoad(frame)
-				tinsert(UISpecialFrames, frame:GetName())
-				Wholly:ScrollFrame_OnLoad(scrollFrame)
-
-			end
-
-			com_mithrandir_whollyFrameTitleText:SetText("Wholly ".. com_mithrandir_whollyFrameTitleText:GetText())
-			com_mithrandir_whollyFrameWideTitleText:SetText("Wholly ".. com_mithrandir_whollyFrameWideTitleText:GetText())
-
-			self.toggleButton = CreateFrame("Button", "com_mithrandir_whollyFrameHiddenToggleButton", com_mithrandir_whollyFrame, "SecureHandlerClickTemplate")
-			self.toggleButton:SetAttribute("_onclick", [=[
-				local parent = self:GetParent()
-				if parent:IsShown() then
-					parent:Hide()
-				else
-					parent:Show()
-				end
-				]=])
-
-			self.currentFrame = com_mithrandir_whollyFrame
-
-			-- The frame is not allowing button presses to things just on the outside of its bounds so we move the hit rect
-			frame:SetHitRectInsets(0, 32, 0, 84)
-
-			local LibStub = _G["LibStub"]
-			if LibStub then
-				local LDB = LibStub("LibDataBroker-1.1", true)
-				if LDB then
-					local launcher = LDB:NewDataObject("Wholly", { type="launcher", icon="Interface\\Icons\\INV_Misc_Book_07",
-							OnClick = function(theFrame, button) if button == "RightButton" then Wholly:_OpenInterfaceOptions() else Wholly.currentFrame:Show() end end,
-							OnTooltipShow = function(tooltip)
-								Wholly:_ProcessInitialUpdate()
-								Wholly.ldbTooltipOwner = tooltip:GetOwner()
-								local dropdownValue = Wholly:_Dropdown_GetText()
-								local printValue = dropdownValue or ""
-								tooltip:AddLine("Wholly - " .. printValue )
-								tooltip:AddLine(Wholly.panelCountLine)
-								end, 
-							})
-					self.coordinates = LDB:NewDataObject("Wholly Coordinates", { type="data source", icon="Interface\\Icons\\INV_Misc_Map02", text="",
-							OnClick = function(theFrame, button) Wholly.pairedCoordinatesButton:Click() end,
-							OnTooltipShow = function(tooltip)
-								Wholly.ldbCoordinatesTooltipOwner = tooltip:GetOwner()
-								local mapAreaId = Wholly.zoneInfo.zone.mapId
-								local mapAreaName = GRAIL:MapAreaName(mapAreaId) or "UNKNOWN"
-								tooltip:AddLine(strformat("%d %s", mapAreaId, mapAreaName)) end,
-							})
-				end
-			end
-
-			self.tooltip = CreateFrame("GameTooltip", "com_mithrandir_WhollyTooltip", UIParent, "GameTooltipTemplate");
-			self.tooltip:SetFrameStrata("TOOLTIP");
-			self.tooltip.large = com_mithrandir_WhollyTooltipTextLeft1:GetFontObject();
-			self.tooltip.small = com_mithrandir_WhollyTooltipTextLeft2:GetFontObject();
-			self.tooltip.SetLastFont = function(self, fontObj, rightText)
-				local txt = rightText and "Right" or "Left"
-				_G[format("com_mithrandir_WhollyTooltipText%s%d", txt, self:NumLines())]:SetFont(fontObj:GetFont())
-			end
-
-			self.tt = { [1] = GameTooltip }
-
-			local parentFrame = Grail.existsClassic and WorldMapFrame or WorldMapFrame.BorderFrame
-			local f = CreateFrame("Button", nil, parentFrame, "UIPanelButtonTemplate")
-			f:SetSize(100, 25)
-			if nil == Gatherer_WorldMapDisplay then
-				if Grail.existsClassic then
-					f:SetPoint("TOPRIGHT", WorldMapContinentDropDown, "TOPLEFT", 10, 0)
-				else
-					f:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame.Tutorial, "TOPRIGHT", 0, -30)
-				end
-			else
-				f:SetPoint("TOPLEFT", Gatherer_WorldMapDisplay, "TOPRIGHT", 4, 0)
-			end
-			f:SetToplevel(true)
-			if not Grail.existsClassic then
-				f:SetScale(0.7)
-			end
-			f:SetText("Wholly")
-			f:SetScript("OnShow", function(self)
-									if nil == Gatherer_WorldMapDisplay then
-                                        if TomTomWorldFrame and TomTomWorldFrame.Player then
-											f:SetPoint("TOPLEFT", TomTomWorldFrame.Player, "TOPRIGHT", 10, 6)
-										elseif TitanMapCursorLocation then
-											f:SetPoint("TOPLEFT", TitanMapCursorLocation, "TOPRIGHT", 10, 6)
-										else
---											f:SetPoint("TOPLEFT", WorldMapFrameTutorialButton, "TOPRIGHT", 0, -30)
-if Grail.existsClassic then
-f:SetPoint("TOPRIGHT", WorldMapContinentDropDown, "TOPLEFT", 10, 0)
-else
-f:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame.Tutorial, "TOPRIGHT", 0, -30)
-end
-										end
-									else
-										self:SetPoint("TOPLEFT", Gatherer_WorldMapDisplay, "TOPRIGHT", 4, 0)
-									end
-								end)
-			f:SetScript("OnEnter", function(self) local t = Wholly.tooltip t:ClearLines() t:SetOwner(self) t:AddLine(Wholly.mapCountLine) t:Show() t:ClearAllPoints() t:SetPoint("TOPLEFT", self, "BOTTOMRIGHT") end)
-			f:SetScript("OnLeave", function(self) Wholly.tooltip:Hide() end)
-			f:SetScript("OnClick", function(self) Wholly.pairedConfigurationButton:Click() end)
-			f:Hide()
-			self.mapFrame = f
-
-			-- if the UI panel disappears (maximized WorldMapFrame) we need to change parents
-			UIParent:HookScript("OnHide", function()
-				self.tooltip:SetParent(WorldMapFrame);
-				self.tooltip:SetFrameStrata("TOOLTIP");
-			end)
-			UIParent:HookScript("OnShow", function()
-				self.tooltip:SetParent(UIParent);
-				self.tooltip:SetFrameStrata("TOOLTIP");
-			end)
-
-			GameTooltip:HookScript("OnTooltipSetUnit", Wholly._CheckNPCTooltip)
-
---			-- Code by Ashel from http://us.battle.net/wow/en/forum/topic/10388639018?page=2
---			if not WhollyDatabase.taintFixed and GRAIL.blizzardRelease < 17644 then		-- this is an arbitrary version from the PTR where things are fixed
---				UIParent:HookScript("OnEvent", function(s, e, a1, a2)
---					if e:find("ACTION_FORBIDDEN") and ((a1 or "")..(a2 or "")):find("IsDisabledByParentalControls") then
---						StaticPopup_Hide(e)
---					end
---				end)
---			end
-
-			-- Make it so the Blizzard quest log can display our tooltips
-			if not Grail.existsClassic then
-				hooksecurefunc("QuestMapLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
-			-- Now since the Blizzard UI has probably created a quest frame before I get
-			-- the chance to hook the function I need to go through all the quest frames
-			-- and hook them too.
-if not Grail.battleForAzeroth then
-			local titles = QuestMapFrame.QuestsFrame.Contents.Titles
-			for i = 1, #(titles) do
-				titles[i]:HookScript("OnEnter", Wholly._OnEnterBlizzardQuestButton)
-			end
-end
-else
-	hooksecurefunc("QuestLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
-end
-
-			-- Create the quest info frame
-			if nil == com_mithrandir_whollyQuestInfoFrame then
-				local frame = CreateFrame("Frame", "com_mithrandir_whollyQuestInfoFrame", QuestFrame)
-				frame:EnableMouse(true)
-				frame:SetSize(60, 14)
-				local xOffset, yOffset = -15, -35
-				if Grail.existsClassic then
-					xOffset, yOffset = -55, -55
-				end
-				frame:SetPoint("TOPRIGHT", QuestFrame, "TOPRIGHT", xOffset, yOffset)
-				frame:SetScript("OnEnter", function(self) Wholly:QuestInfoEnter(self) end)
-				frame:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
-				local fontString = frame:CreateFontString("com_mithrandir_whollyQuestInfoFrameText", "BACKGROUND", "GameFontNormal")
-				fontString:SetJustifyH("RIGHT")
-				fontString:SetSize(60, 20)
-				fontString:SetPoint("CENTER")	-- needed to add this even though it worked without this in XML
-				fontString:SetText("None")
-			end
-
-			-- Our frame positions are wrong for MoP, so we change them here.
-			com_mithrandir_whollyQuestInfoBuggedFrame:SetPoint("TOPLEFT", QuestFrame, "TOPLEFT", 100, -35)
-			com_mithrandir_whollyBreadcrumbFrame:SetPoint("TOPLEFT", QuestFrame, "BOTTOMLEFT", 16, -10)
-
-			local nf = CreateFrame("Frame")
-			self.notificationFrame = nf
-			nf:SetScript("OnEvent", function(frame, event, ...) self:_OnEvent(frame, event, ...) end)
-			nf:RegisterEvent("ADDON_LOADED")
-
-			if "deDE" == GetLocale() then
-				com_mithrandir_whollyFramePreferencesButton:SetText("Einstellungen")
-			end
-			if "ruRU" == GetLocale() then
-				com_mithrandir_whollyFrameSortButton:SetText("Сортировать")
-			end
-
-			com_mithrandir_whollyFrameSwitchZoneButton:SetText(self.s.MAP)
-			com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
-
 		end,
 
 		---
@@ -3917,6 +3732,208 @@ end
 			return retval
 		end,
 
+		_SetupBlizzardQuestLogSupport = function(self)
+			-- Make it so the Blizzard quest log can display our tooltips
+			if not Grail.existsClassic then
+				hooksecurefunc("QuestMapLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
+				-- Now since the Blizzard UI has probably created a quest frame before I get
+				-- the chance to hook the function I need to go through all the quest frames
+				-- and hook them too.
+				if not Grail.battleForAzeroth then
+					local titles = QuestMapFrame.QuestsFrame.Contents.Titles
+					for i = 1, #(titles) do
+						titles[i]:HookScript("OnEnter", Wholly._OnEnterBlizzardQuestButton)
+					end
+				end
+			else
+				hooksecurefunc("QuestLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
+			end
+		end,
+
+		_SetupDefaults = function(self)
+			local WDB = WhollyDatabase
+
+			if nil == WDB.defaultsLoaded then
+				WDB = self:_LoadDefaults()
+			end
+			if nil == WDB.currentSortingMode then
+				WDB.currentSortingMode = 1
+			end
+			if nil == WDB.closedHeaders then
+				WDB.closedHeaders = {}
+			end
+			if nil == WDB.ignoredQuests then
+				WDB.ignoredQuests = {}
+			end
+			-- Setup the colors, only setting those that do not already exist
+			WDB.color = WDB.color or {}
+			for code, colorCode in pairs(self.color) do
+				WDB.color[code] = WDB.color[code] or colorCode
+			end
+
+			-- Now to be nicer to those that have used the addon before the current
+			-- incarnation, newly added defaults will have their normal setting set
+			-- as appropriate.
+			if nil == WDB.version then		-- first loaded prior to version 006, so default options added in 006
+				WDB.displaysHolidaysAlways = true		-- version 006
+				WDB.updatesWorldMapOnZoneChange = true	-- version 006
+				WDB.version = 6							-- just to make sure none of the other checks fails
+			end
+			if WDB.version < 7 then
+				WDB.showsInLogQuestStatus = true			-- version 007
+			end
+			if WDB.version < 16 then
+				WDB.showsAchievementCompletionColors = true	-- version 016
+			end
+			if WDB.version < 17 then
+				-- transform old values into new ones as appropriate
+				if WDB.showsDailyQuests then
+					WDB.showsRepeatableQuests = true
+				end
+				WDB.loadAchievementData = true
+				WDB.loadReputationData = true
+			end
+			if WDB.version < 27 then WDB.showsHolidayQuests = true end
+			if WDB.version < 34 then WDB.loadDateData = true end
+			if WDB.version < 38 then WDB.displaysBlizzardQuestTooltips = true end
+			if WDB.version < 39 then WDB.showsWeeklyQuests = true end
+			if WDB.version < 51 then WDB.showsLegendaryQuests = true end
+			if WDB.version < 53 then WDB.showsPetBattleQuests = true end
+			if WDB.version < 56 then WDB.showsPVPQuests = true end
+			if WDB.version < 60 then WDB.showsWorldQuests = true end
+			WDB.version = Wholly.versionNumber
+
+			if WDB.maximumTooltipLines then
+				self.currentMaximumTooltipLines = WDB.maximumTooltipLines
+			else
+				self.currentMaximumTooltipLines = self.defaultMaximumTooltipLines
+			end
+		end,
+
+		_SetupLibDataBroker = function(self)
+			local LibStub = _G["LibStub"]
+			if LibStub then
+				local LDB = LibStub("LibDataBroker-1.1", true)
+				if LDB then
+					local launcher = LDB:NewDataObject("Wholly", {	type="launcher",
+																	icon="Interface\\Icons\\INV_Misc_Book_07",
+																	OnClick = function(theFrame, button)
+																		if button == "RightButton" then
+																			Wholly:_OpenInterfaceOptions()
+																		else
+																			Wholly.currentFrame:Show()
+																		end
+																	end,
+																	OnTooltipShow = function(tooltip)
+																		Wholly:_ProcessInitialUpdate()
+																		Wholly.ldbTooltipOwner = tooltip:GetOwner()
+																		local dropdownValue = Wholly:_Dropdown_GetText()
+																		local printValue = dropdownValue or ""
+																		tooltip:AddLine("Wholly - " .. printValue )
+																		tooltip:AddLine(Wholly.panelCountLine)
+																	end,
+																})
+					self.coordinates = LDB:NewDataObject("Wholly Coordinates", {	type="data source",
+																					icon="Interface\\Icons\\INV_Misc_Map02",
+																					text="",
+																					OnClick = function(theFrame, button)
+																						Wholly.pairedCoordinatesButton:Click()
+																					end,
+																					OnTooltipShow = function(tooltip)
+																						Wholly.ldbCoordinatesTooltipOwner = tooltip:GetOwner()
+																						local mapAreaId = Wholly.zoneInfo.zone.mapId
+																						local mapAreaName = Grail:MapAreaName(mapAreaId) or "UNKNOWN"
+																						tooltip:AddLine(strformat("%d %s", mapAreaId, mapAreaName))
+																					end,
+																				})
+				end
+			end
+		end,
+
+		_SetupQuestInfoFrame = function(self)
+			-- Create the quest info frame
+			if nil == com_mithrandir_whollyQuestInfoFrame then
+				local frame = CreateFrame("Frame", "com_mithrandir_whollyQuestInfoFrame", QuestFrame)
+				frame:EnableMouse(true)
+				frame:SetSize(60, 14)
+				local xOffset, yOffset = -15, -35
+				if Grail.existsClassic then
+					xOffset, yOffset = -55, -55
+				end
+				frame:SetPoint("TOPRIGHT", QuestFrame, "TOPRIGHT", xOffset, yOffset)
+				frame:SetScript("OnEnter", function(self) Wholly:QuestInfoEnter(self) end)
+				frame:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+				local fontString = frame:CreateFontString("com_mithrandir_whollyQuestInfoFrameText", "BACKGROUND", "GameFontNormal")
+				fontString:SetJustifyH("RIGHT")
+				fontString:SetSize(60, 20)
+				fontString:SetPoint("CENTER")	-- needed to add this even though it worked without this in XML
+				fontString:SetText("None")
+			end
+		end,
+
+		_SetupTooltip = function(self)
+			self.tooltip = CreateFrame("GameTooltip", "com_mithrandir_WhollyTooltip", UIParent, "GameTooltipTemplate");
+			self.tooltip:SetFrameStrata("TOOLTIP");
+			self.tooltip.large = com_mithrandir_WhollyTooltipTextLeft1:GetFontObject();
+			self.tooltip.small = com_mithrandir_WhollyTooltipTextLeft2:GetFontObject();
+			self.tooltip.SetLastFont = function(self, fontObj, rightText)
+				local txt = rightText and "Right" or "Left"
+				_G[format("com_mithrandir_WhollyTooltipText%s%d", txt, self:NumLines())]:SetFont(fontObj:GetFont())
+			end
+			self.tt = { [1] = GameTooltip }
+		end,
+
+		_SetupWorldMapWhollyButton = function(self)
+			local parentFrame = Grail.existsClassic and WorldMapFrame or WorldMapFrame.BorderFrame
+			local f = CreateFrame("Button", nil, parentFrame, "UIPanelButtonTemplate")
+			f:SetSize(100, 25)
+			if nil == Gatherer_WorldMapDisplay then
+				if Grail.existsClassic then
+					f:SetPoint("TOPRIGHT", WorldMapContinentDropDown, "TOPLEFT", 10, 0)
+				else
+					f:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame.Tutorial, "TOPRIGHT", 0, -30)
+				end
+			else
+				f:SetPoint("TOPLEFT", Gatherer_WorldMapDisplay, "TOPRIGHT", 4, 0)
+			end
+			f:SetToplevel(true)
+			if not Grail.existsClassic then
+				f:SetScale(0.7)
+			end
+			f:SetText("Wholly")
+			f:SetScript("OnShow", function(self)
+				if nil == Gatherer_WorldMapDisplay then
+					if TomTomWorldFrame and TomTomWorldFrame.Player then
+						f:SetPoint("TOPLEFT", TomTomWorldFrame.Player, "TOPRIGHT", 10, 6)
+					elseif TitanMapCursorLocation then
+						f:SetPoint("TOPLEFT", TitanMapCursorLocation, "TOPRIGHT", 10, 6)
+					else
+--											f:SetPoint("TOPLEFT", WorldMapFrameTutorialButton, "TOPRIGHT", 0, -30)
+						if Grail.existsClassic then
+							f:SetPoint("TOPRIGHT", WorldMapContinentDropDown, "TOPLEFT", 10, 0)
+						else
+							f:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame.Tutorial, "TOPRIGHT", 0, -30)
+						end
+					end
+				else
+					self:SetPoint("TOPLEFT", Gatherer_WorldMapDisplay, "TOPRIGHT", 4, 0)
+				end
+			end)
+			f:SetScript("OnEnter", function(self)
+				local t = Wholly.tooltip
+				t:ClearLines()
+				t:SetOwner(self)
+				t:AddLine(Wholly.mapCountLine)
+				t:Show()
+				t:ClearAllPoints()
+				t:SetPoint("TOPLEFT", self, "BOTTOMRIGHT")
+			end)
+			f:SetScript("OnLeave", function(self) Wholly.tooltip:Hide() end)
+			f:SetScript("OnClick", function(self) Wholly.pairedConfigurationButton:Click() end)
+			f:Hide()
+			self.mapFrame = f
+		end,
+
 		ShowBreadcrumbInfo = function(self)
 			local questId = self:_BreadcrumbQuestId()
 --			local breadcrumbs = Grail:AvailableBreadcrumbs(questId)
@@ -4252,6 +4269,11 @@ end
 		end,
 
 		}
+
+	local nf = CreateFrame("Frame")
+	Wholly.notificationFrame = nf
+	nf:SetScript("OnEvent", function(frame, event, ...) Wholly:_OnEvent(frame, event, ...) end)
+	nf:RegisterEvent("ADDON_LOADED")
 
 	local locale = GetLocale()
 	local S = Wholly.s
