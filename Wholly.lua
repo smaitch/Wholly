@@ -382,6 +382,7 @@
 --			Fixes the problem where exclusive classes in Classic were failing because of Retail classes.
 --			Adds the ability to have the Wholly information appear in a tooltip when hovering over a quest in the Blizzard quest panel.
 --			Adds the ability to have the Wholly tooltip contain the quest title and description in Classic, with the description in white.
+--		073	Makes it so lack of NPC name for item drops no longer causes a Lua error.
 --
 --	Known Issues
 --
@@ -1858,7 +1859,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 					end
 				end
 			end
-			local repuationQuest = false
+			local reputationQuest = false
 			if nil ~= currentMapId and currentMapId > Grail.mapAreaBaseReputation and currentMapId <= Grail.mapAreaMaximumReputation then
 				reputationQuest = true
 			end
@@ -3984,7 +3985,7 @@ end
 							if dist <= 0.02 then
 								if not npcList[npc.id] then
 									npcList[npc.id] = {}
-									local nameToUse = npc.name
+									local nameToUse = npc.name or "??"
 									if npc.dropName then
 										nameToUse = nameToUse .. " (" .. npc.dropName .. ')'
 									end
@@ -5461,7 +5462,7 @@ end
 	-- variables that represent specific strings.  In other words, these
 	-- do not need to be localized since Blizzard does the work for us.
 	S['MAILBOX'] = MINIMAP_TRACKING_MAILBOX								-- "Mailbox"
-	S['CREATED_ITEMS'] = NONEQUIPSLOT									-- "Created Items"
+	S['CREATED_ITEMS'] = NONEQUIPSLOT									-- "Created Items"	-- in Classic this is "Not equippable."
 	S['SLASH_TARGET'] = SLASH_TARGET1									-- "/target"
 	S['SPELLS'] = SPELLS												-- "Spells"
 	S['FACTION'] = FACTION												-- "Faction"
@@ -5480,8 +5481,8 @@ end
 	S['MAX_LEVEL'] = GUILD_RECRUITMENT_MAXLEVEL							-- "Max Level"
 	S['FEMALE'] = FEMALE												-- "Female"
 	S['MALE'] = MALE													-- "Male"
-	S['REPUTATION_CHANGES'] = COMBAT_TEXT_SHOW_REPUTATION_TEXT			-- "Reputation Changes"
-	S['QUEST_GIVERS'] = TUTORIAL_TITLE1									-- "Quest Givers"
+	S['REPUTATION_CHANGES'] = COMBAT_TEXT_SHOW_REPUTATION_TEXT			-- "Reputation Changes"	-- in Classic this is "Show Reputation"
+	S['QUEST_GIVERS'] = TUTORIAL_TITLE1									-- "Quest Givers"	-- in Classic this is "Questgivers"
 	S['TURN_IN'] = TURN_IN_QUEST										-- "Turn in"
 	S['DAILY'] = DAILY													-- "Daily"
 	S['WEEKLY'] = CALENDAR_REPEAT_WEEKLY								-- "Weekly"
