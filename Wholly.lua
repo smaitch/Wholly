@@ -383,6 +383,8 @@
 --			Adds the ability to have the Wholly information appear in a tooltip when hovering over a quest in the Blizzard quest panel.
 --			Adds the ability to have the Wholly tooltip contain the quest title and description in Classic, with the description in white.
 --		073	Makes it so lack of NPC name for item drops no longer causes a Lua error.
+--			Makes it so NPCs are colored red if they are not available to the player.
+--			Adds the ability to display the NPC comments in the Wholly quest tooltip.
 --
 --	Known Issues
 --
@@ -2519,10 +2521,24 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 							nameToUse = nameToUse .. " (" .. npc.dropName .. ')'
 						end
 						local prettiness = self:_PrettyNPCString(nameToUse, npc.kill, npc.realArea)
+						-- Check to ensure the NPC is available for this player
+						local soughtFactionCode = 'A'
+						if 'Horde' == Grail.playerFaction then
+							soughtFactionCode = 'H'
+						end
+						local factionCode = Grail:_NPCFaction(npcId)
+						if nil ~= factionCode and soughtFactionCode ~= factionCode then
+							-- We need to turn the NPC red because the player cannot access this
+							prettiness = "|cffff0000" .. prettiness .. "|r"
+						end
 						if processingPrerequisites then
 							self:_QuestInfoSection({prettiness, locationString}, second)
 						else
 							self:_AddLine(prettiness, locationString)
+						end
+						local comment = Grail:NPCComment(npcId)
+						if nil ~= comment then
+							self:_AddLine(" ", comment)
 						end
 						if meetsCriteria then
 							local desiredMacroValue = self.s.SLASH_TARGET .. ' ' .. rawNameToUse
