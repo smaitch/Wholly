@@ -385,6 +385,8 @@
 --		073	Makes it so lack of NPC name for item drops no longer causes a Lua error.
 --			Makes it so NPCs are colored red if they are not available to the player.
 --			Adds the ability to display the NPC comments in the Wholly quest tooltip.
+--		074	Makes it so the Wholly map button does not move when TomTom is installed.
+--			Makes it so the Wholly map button moves when Questie is also loaded.
 --
 --	Known Issues
 --
@@ -3920,8 +3922,10 @@ end
 			f:SetText("Wholly")
 			f:SetScript("OnShow", function(self)
 				if nil == Gatherer_WorldMapDisplay then
-					if TomTomWorldFrame and TomTomWorldFrame.Player then
+					if not Grail.existsClassic and TomTomWorldFrame and TomTomWorldFrame.Player then
 						f:SetPoint("TOPLEFT", TomTomWorldFrame.Player, "TOPRIGHT", 10, 6)
+					elseif Questie_Toggle then
+						f:SetPoint("TOPRIGHT", Questie_Toggle, "TOPLEFT", -8, 2)
 					elseif TitanMapCursorLocation then
 						f:SetPoint("TOPLEFT", TitanMapCursorLocation, "TOPRIGHT", 10, 6)
 					else
