@@ -387,6 +387,7 @@
 --			Adds the ability to display the NPC comments in the Wholly quest tooltip.
 --		074	Makes it so the Wholly map button does not move when TomTom is installed.
 --			Makes it so the Wholly map button moves when Questie is also loaded.
+--			Makes the Wholly quest panel appear much nicer in Classic.
 --
 --	Known Issues
 --
@@ -664,6 +665,8 @@ self.checkedGrailVersion = true
 
 					self:_SetupWhollyQuestPanel()
 
+					self:_SetupSearchFrame()
+
 com_mithrandir_whollyFrameTitleText:SetText("Wholly ".. com_mithrandir_whollyFrameTitleText:GetText())
 com_mithrandir_whollyFrameWideTitleText:SetText("Wholly ".. com_mithrandir_whollyFrameWideTitleText:GetText())
 
@@ -680,7 +683,7 @@ end
 self.currentFrame = com_mithrandir_whollyFrame
 
 -- The frame is not allowing button presses to things just on the outside of its bounds so we move the hit rect
-frame:SetHitRectInsets(0, 32, 0, 84)
+--frame:SetHitRectInsets(0, 32, 0, 84)
 
 					self:_SetupLibDataBroker()
 					self:_SetupTooltip()
@@ -3774,6 +3777,47 @@ end
 			end
 		end,
 
+		_SetupSearchFrame = function(self)
+			if nil == com_mithrandir_whollySearchFrame then
+				local frameName = "com_mithrandir_whollySearchFrame"
+				local frame = CreateFrame("Frame", frameName, com_mithrandir_whollyFrame)
+				frame:Hide()
+				frame:SetSize(288, 96)
+				frame:SetPoint("BOTTOMLEFT", com_mithrandir_whollyFrame, "TOPLEFT", 64, -14)
+
+				frame:SetBackdrop({	bgFile = "Interface/TutorialFrame/TutorialFrameBackground",
+									edgeFile = "Interface/DialogFrame/UI-DialogBox-Border",
+									tile = true,
+									tileSize = 32,
+									edgeSize = 16,
+									insets = { left = 5, right = 5, top = 5, bottom = 5 }
+									});
+
+				local fontString = frame:CreateFontString(frameName.."Title", "ARTWORK", "ChatFontNormal")
+				fontString:SetPoint("TOP", 0, -8)
+				fontString:SetText(SEARCH)
+
+				local closeButton = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+				closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -3, -3)
+				closeButton:SetScript("OnClick", function(self) com_mithrandir_whollySearchFrame:Hide() end)
+
+				local editBox = CreateFrame("EditBox", com_mithrandir_whollySearchEditBox, frame)
+				editBox:SetMaxLetters(50)
+				local texture = editBox:CreateTexture(nil, "BACKGROUND")
+				texture:SetColorTexture(.2, .2, .2, 1)
+				editBox:SetSize(190, 20)
+				editBox:SetPoint("TOP", 0, 32)
+				editBox:SetScript("OnEnterPressed", function(self) Wholly:SearchEntered() end)
+				editBox:SetScript("OnEscapePressed", function(self) com_mithrandir_whollySearchFrame:Hide() end)
+				editBox:CreateFontString(nil, "ARTWORK", "ChatFontNormal")
+
+				local searchButton = CreateFrame("Button", nil, frame, "OptionsButtonTemplate")
+				searchButton:SetText(SEARCH)
+				searchButton:SetPoint("BOTTOM", 0, 8)
+				searchButton:SetScript("OnClick", function(self) Wholly:SearchEntered() end)
+			end
+		end,
+
 		_SetupTooltip = function(self)
 			self.tooltip = CreateFrame("GameTooltip", "com_mithrandir_WhollyTooltip", UIParent, "GameTooltipTemplate");
 			self.tooltip:SetFrameStrata("TOOLTIP");
@@ -3788,73 +3832,94 @@ end
 
 		_SetupWhollyQuestPanel = function(self)
 			if nil == com_mithrandir_whollyFrame then
-				local frame = CreateFrame("Frame", "com_mithrandir_whollyFrame", UIParent)
+				local frameName = "com_mithrandir_whollyFrame"
+				local frame = CreateFrame("Frame", frameName, UIParent)
 				frame:SetToplevel(true)
 				frame:EnableMouse(true)
 				frame:SetMovable(true)
 				frame:Hide()
-				frame:SetSize(384, 512)
+				if Grail.existsClassic then
+					frame:SetSize(348, 445)
+				else
+					frame:SetSize(384, 512)
+				end
 				frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
 
 				local topLeftTexture = frame:CreateTexture(nil, "BORDER")
-				topLeftTexture:SetSize(256, 256)
 				topLeftTexture:SetPoint("TOPLEFT")
-				topLeftTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-TopLeft")
+				if Grail.existsClassic then
+					topLeftTexture:SetSize(348, 445)
+					topLeftTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLogDualPane-Left")
+					topLeftTexture:SetTexCoord(0, 0.6796875, 0, 0.86914)
+				else
+					topLeftTexture:SetSize(256, 256)
+					topLeftTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-TopLeft")
+				end
 
-				local topRightTexture = frame:CreateTexture(nil, "BORDER")
-				topRightTexture:SetSize(128, 256)
-				topRightTexture:SetPoint("TOPRIGHT")
-				topRightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-TopRight")
+				if not Grail.existsClassic then
+					local topRightTexture = frame:CreateTexture(nil, "BORDER")
+					topRightTexture:SetSize(128, 256)
+					topRightTexture:SetPoint("TOPRIGHT")
+					topRightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-TopRight")
 
-				local bottomLeftTexture = frame:CreateTexture(nil, "BORDER")
-				bottomLeftTexture:SetSize(256, 256)
-				bottomLeftTexture:SetPoint("BOTTOMLEFT")
-				bottomLeftTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BotLeft")
+					local bottomLeftTexture = frame:CreateTexture(nil, "BORDER")
+					bottomLeftTexture:SetSize(256, 256)
+					bottomLeftTexture:SetPoint("BOTTOMLEFT")
+					bottomLeftTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BotLeft")
 
-				local bottomRightTexture = frame:CreateTexture(nil, "BORDER")
-				bottomRightTexture:SetSize(128, 256)
-				bottomRightTexture:SetPoint("BOTTOMRIGHT")
-				bottomRightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BotRight")
+					local bottomRightTexture = frame:CreateTexture(nil, "BORDER")
+					bottomRightTexture:SetSize(128, 256)
+					bottomRightTexture:SetPoint("BOTTOMRIGHT")
+					bottomRightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BotRight")
+				end
 
 				local bookTexture = frame:CreateTexture(nil, "BACKGROUND")
 				bookTexture:SetSize(64, 64)
 				bookTexture:SetPoint("TOPLEFT", 3, -4)
 				bookTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BookIcon")
 
-				local fontString = frame:CreateFontString("com_mithrandir_whollyFrameTitleText", "ARTWORK", "GameFontNormal")
+				local fontString = frame:CreateFontString(frameName.."TitleText", "ARTWORK", "GameFontNormal")
 				fontString:SetSize(300, 14)
 				fontString:SetPoint("TOP", 0, -15)
 				fontString:SetText(QUEST_LOG)
 
-				local closeButton = CreateFrame("Button", "com_mithrandir_whollyFrameCloseButton", UIPanelCloseButton)
-				closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -30, -8)
+				local offsetX, offsetY = 0, 0
+				if Grail.existsClassic then
+					offsetX = 36
+					offsetY = -67
+				end
 
-				local sortButton = CreateFrame("Button", "com_mithrandir_whollyFrameSortButton", UIPanelButtonTemplate)
+				local closeButton = CreateFrame("Button", frameName.."CloseButton", frame, "UIPanelCloseButton")
+				closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -30 + offsetX, -8)
+
+				local sortButton = CreateFrame("Button", frameName.."SortButton", frame, "UIPanelButtonTemplate")
 				sortButton:SetText(TRACKER_SORT_LABEL)
 				sortButton:SetSize(110, 21)
-				sortButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -43, 80)
+				sortButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -43 + offsetX, 80 + offsetY)
 				sortButton:SetScript("OnClick", function(self) Wholly:Sort(self) end)
 				sortButton:SetScript("OnEnter", function(self) Wholly:SortButtonEnter(self) end)
 				sortButton:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
 
-				local preferencesButton = CreateFrame("Button", "com_mithrandir_whollyFramePreferencesButton", UIPanelButtonTemplate)
+				local preferencesButton = CreateFrame("Button", frameName.."PreferencesButton", frame, "UIPanelButtonTemplate")
 				preferencesButton:SetText(PREFERENCES)
 				preferencesButton:SetSize(110, 21)
-				preferencesButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -151, 80)
+				preferencesButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -151 + offsetX, 80 + offsetY)
 				preferencesButton:SetScript("OnClick", function(self) Wholly:_OpenInterfaceOptions() end)
 
-				local mapButton = CreateFrame("Button", "com_mithrandir_whollyFrameSwitchZoneButton", UIPanelButtonTemplate)
+				local mapButton = CreateFrame("Button", frameName.."SwitchZoneButton", frame, "UIPanelButtonTemplate")
 				mapButton:SetText(MAP)
 				mapButton:SetSize(110, 21)
-				mapButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -259, 80)
+				mapButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -259 + offsetX, 80 + offsetY)
 				mapButton:SetScript("OnClick", function(self) Wholly:SetCurrentMapToPanel(self) end)
 				mapButton:SetScript("OnEnter", function(self) Wholly:ZoneButtonEnter(self) end)
 				mapButton:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
 
-				local scrollFrame = CreateFrame("ScrollFrame", "com_mithrandir_whollyFrameScrollFrame", HybridScrollFrameTemplate)
+				local scrollFrameName = frameName.."ScrollFrame"
+				local scrollFrame = CreateFrame("ScrollFrame", scrollFrameName, frame, "HybridScrollFrameTemplate")
 				scrollFrame:SetSize(305, 335)
 				scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 19, -75)
-				local slider = CreateFrame("Slider", "com_mithrandir_whollyFrameScrollFrameScrollBar", HybridScrollBarTemplate)
+
+				local slider = CreateFrame("Slider", scrollFrameName.."ScrollBar", scrollFrame, "HybridScrollBarTemplate")
 				slider:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 0, -13)
 				slider:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 0, 14)
 				slider:SetScript("OnLoad", function(self)
@@ -3867,11 +3932,12 @@ end
 				end)
 				scrollFrame.scrollBar = slider	-- hopefully this is parentKey="scrollBar"
 
-				local subSubFrame = CreateFrame("Frame", "com_mithrandir_whollyFrameLogHighlightFrame")
+				local highlightName = scrollFrameName.."LogHighlightFrame"
+				local subSubFrame = CreateFrame("Frame", highlightName)
 				subSubFrame:Hide()
 				subSubFrame:SetPoint("TOPLEFT")
 				subSubFrame:SetPoint("BOTTOMRIGHT")
-				local highlightTexture = subSubFrame:CreateTexture("com_mithrandir_whollyFrameLogHighlightFrameLogSkillHighlight", "ARTWORK")
+				local highlightTexture = subSubFrame:CreateTexture(highlightName.."LogSkillHighlight", "ARTWORK")
 				highlightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
 			--				highlightTexture:SetAlphaMode("ADD")
 				subSubFrame:SetScript("OnLoad", function(self) self:SetParent(nil) end)
@@ -3895,14 +3961,14 @@ end
 						self.isMoving = false
 					end
 				end)
-				frame:SetScript("OnMouseDown", function(self)
+				frame:SetScript("OnMouseDown", function(self, button)
 					if (not self.isLocked or self.isLocked == 0) and button == "LeftButton" then
 						self:StartMoving()
 						self.isMoving = true
 					end
 				end)
 
---				Wholly:OnLoad(frame)	-- no need to do this, as it does nothing
+				Wholly:OnLoad(frame)	-- no need to do this, as it does nothing
 				tinsert(UISpecialFrames, frame:GetName())
 				Wholly:ScrollFrame_OnLoad(scrollFrame)
 			end
