@@ -388,6 +388,7 @@
 --		074	Makes it so the Wholly map button does not move when TomTom is installed.
 --			Makes it so the Wholly map button moves when Questie is also loaded.
 --			Makes the Wholly quest panel appear much nicer in Classic.
+--		075	Fixes a problem where the search edit box was not created properly.
 --
 --	Known Issues
 --
@@ -3801,15 +3802,15 @@ end
 				closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -3, -3)
 				closeButton:SetScript("OnClick", function(self) com_mithrandir_whollySearchFrame:Hide() end)
 
-				local editBox = CreateFrame("EditBox", com_mithrandir_whollySearchEditBox, frame)
+				local editBox = CreateFrame("EditBox", "com_mithrandir_whollySearchEditBox", frame)
 				editBox:SetMaxLetters(50)
 				local texture = editBox:CreateTexture(nil, "BACKGROUND")
 				texture:SetColorTexture(.2, .2, .2, 1)
 				editBox:SetSize(190, 20)
-				editBox:SetPoint("TOP", 0, 32)
+				editBox:SetPoint("TOP", 0, -32)
 				editBox:SetScript("OnEnterPressed", function(self) Wholly:SearchEntered() end)
 				editBox:SetScript("OnEscapePressed", function(self) com_mithrandir_whollySearchFrame:Hide() end)
-				editBox:CreateFontString(nil, "ARTWORK", "ChatFontNormal")
+				editBox:SetFontObject("ChatFontNormal")
 
 				local searchButton = CreateFrame("Button", nil, frame, "OptionsButtonTemplate")
 				searchButton:SetText(SEARCH)
