@@ -388,7 +388,10 @@
 --		074	Makes it so the Wholly map button does not move when TomTom is installed.
 --			Makes it so the Wholly map button moves when Questie is also loaded.
 --			Makes the Wholly quest panel appear much nicer in Classic.
---		075	Fixes a problem where the search edit box was not created properly.
+--		075 *** Requires Grail 104 or later ***
+--			Fixes a problem where the search edit box was not created properly.
+--			Shows quests that are turned in to a zone in the Wholly quest panel.
+--			Adds the ability to show map pins for quest turn in locations.
 --
 --	Known Issues
 --
@@ -445,7 +448,7 @@ local directoryName, _ = ...
 local versionFromToc = GetAddOnMetadata(directoryName, "Version")
 local _, _, versionValueFromToc = strfind(versionFromToc, "(%d+)")
 local Wholly_File_Version = tonumber(versionValueFromToc)
-local requiredGrailVersion = 100
+local requiredGrailVersion = 104
 
 --	Set up the bindings to use the localized name Blizzard supplies.  Note that the Bindings.xml file cannot
 --	just contain the TOGGLEQUESTLOG because then the entry for Wholly does not show up.  So, we use a version
@@ -488,6 +491,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 									self:_RecordTooltipNPCs(Grail.GetCurrentMapAreaID())
 								end,
 		color = {
+			['?'] = "FF00FF00",	-- green	[turn in]
 			['B'] = "FF996600",	-- brown	[unobtainable]
 			['C'] = "FF00FF00",	-- green	[completed]
 			['D'] = "FF0099CC",	-- daily	[repeatable]
@@ -774,13 +778,19 @@ function self.mapPinsProvider:RefreshAllData(fromOnShow)
         Wholly.cachedPinQuests = Wholly:_ClassifyQuestsInMap(uiMapID) or {}
         Wholly:_FilterPinQuests()
         local questsInMap = Wholly.filteredPinQuests
-        local codeMapping = { ['G'] = 1, ['W'] = 2, ['D'] = 3, ['R'] = 4, ['K'] = 5, ['H'] = 6, ['Y'] = 7, ['P'] = 8, ['L'] = 9, ['O'] = 10, ['U'] = 11, }
+        local codeMapping = { ['?'] = 0, ['G'] = 1, ['W'] = 2, ['D'] = 3, ['R'] = 4, ['K'] = 5, ['H'] = 6, ['Y'] = 7, ['P'] = 8, ['L'] = 9, ['O'] = 10, ['U'] = 11, ['I'] = 12, }
         for i = 1, #questsInMap do
             local id = questsInMap[i][1]
             local code = questsInMap[i][2]
             if 'D' == code and Grail:IsRepeatable(id) then code = 'R' end
+            if 'I' == code then
+            	local _, completed = Grail:IsQuestInQuestLog(id)
+            	if completed then
+	            	code = '?'
+				end
+			end
             local codeValue = codeMapping[code]
-            local locations = Grail:QuestLocationsAccept(id, false, false, true, uiMapID, true, 0)
+            local locations = '?' == code and Grail:QuestLocationsTurnin(id, true, false, true, uiMapID) or Grail:QuestLocationsAccept(id, false, false, true, uiMapID, true, 0)
             if nil ~= locations then
                 for _, npc in pairs(locations) do
                     local xcoord, ycoord, npcName, npcId = npc.x, npc.y, npc.name, npc.id
@@ -1076,6 +1086,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			['REPEATABLE_COMPLETED'] = "Show whether repeatable quests previously completed",
 			['IN_LOG_STATUS'] = "Show status of quests in log",
 			['MAP_PINS'] = "Display map pins for quest givers",
+			['MAP_PINS_TURNIN'] = "Display map pins for turn in for completed quests",
 			['MAP_BUTTON'] = "Display button on world map",
 			['MAP_DUNGEONS'] = "Display dungeon quests in outer map",
 			['MAP_UPDATES'] = "Open world map updates when zones change",
@@ -1392,7 +1403,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				local showsLoremasterOnly = WDB.showsLoremasterOnly
 				if mapId >= Grail.mapAreaBaseHoliday and mapId <= Grail.mapAreaMaximumHoliday then displaysHolidayQuestsAlways = true end
 				retval = {}
-				local questsInMap = Grail:QuestsInMap(mapId, WDB.displaysDungeonQuests, showsLoremasterOnly) or {}
+				local questsInMap = Grail:QuestsInMap(mapId, WDB.displaysDungeonQuests, showsLoremasterOnly, true) or {}
 				for _,questId in pairs(questsInMap) do
 					tinsert(retval, { questId, Grail:ClassificationOfQuestCode(questId, displaysHolidayQuestsAlways, WDB.buggedQuestsConsideredUnobtainable) })
 				end
@@ -1779,7 +1790,8 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				shouldAdd = shouldAdd and self:_FilterQuestsBasedOnSettings(questId, status, dealingWithHolidays)
 
 				if not forPanel then
-					if 'I' == statusCode or 'C' == statusCode then shouldAdd = false end
+					if (not WDB.displaysMapPinsTurnin and 'I' == statusCode) then shouldAdd = false end
+					if 'C' == statusCode then shouldAdd = false end
 					if 'B' == statusCode then shouldAdd = false end
 				end
 
@@ -1882,7 +1894,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 
 			-- WoD beta does not allow custom textures so we go back to the old way
 			if not Grail.existsWoD or Grail.blizzardRelease >= 18663 then
-				if 'R' == texType then
+				if 'R' == texType or '?' == texType or 'I' == texType then
 					pin.texture:SetTexture("Interface\\Addons\\Wholly\\question")
 				else
 					pin.texture:SetTexture("Interface\\Addons\\Wholly\\exclamation")
@@ -2381,6 +2393,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			db.showsPVPQuests = true
 			db.showsWorldQuests = true
 			db.loadDataData = true
+			db.displaysMapPinsTurnin = true
 			db.version = Wholly.versionNumber
 			WhollyDatabase = db
 			return db
@@ -3708,6 +3721,10 @@ end
 			if WDB.version < 53 then WDB.showsPetBattleQuests = true end
 			if WDB.version < 56 then WDB.showsPVPQuests = true end
 			if WDB.version < 60 then WDB.showsWorldQuests = true end
+			if WDB.version < 75 then
+				WDB.displaysMapPinsTurnin = true
+				WDB.color["?"] = self.color["?"]
+			end
 			WDB.version = Wholly.versionNumber
 
 			if WDB.maximumTooltipLines then
@@ -4065,11 +4082,12 @@ end
 			local npcNames = {}
 
 			local questsInMap = self.filteredPinQuests
-			local questId
+			local questId, code
 			for i = 1, #questsInMap do
 				questId = questsInMap[i][1]
+				code = questsInMap[i][2]
 --                local locations = Grail:QuestLocationsAccept(questId, false, false, true, parentFrame:GetMapID(), true, 0)
-				local locations = Grail:QuestLocationsAccept(questId, false, false, true, pin.map, true, 0)
+				local locations = 'I' == code and Grail:QuestLocationsTurnin(questId, true, false, true, pin.map) or Grail:QuestLocationsAccept(questId, false, false, true, pin.map, true, 0)
 				if nil ~= locations then
 					for _, npc in pairs(locations) do
 						if nil ~= npc.x then
@@ -5639,6 +5657,7 @@ end
 	Wholly.configuration[S.WORLD_MAP] = {
 		{ S.WORLD_MAP },
 		{ S.MAP_PINS, 'displaysMapPins', 'configurationScript2', nil, 'pairedConfigurationButton' },
+		{ S.MAP_PINS_TURNIN, 'displaysMapPinsTurnin', 'configurationScript2' },
 		{ S.MAP_BUTTON, 'displaysMapFrame', 'configurationScript3' },
 		{ S.MAP_DUNGEONS, 'displaysDungeonQuests', 'configurationScript4' },
 		{ S.MAP_UPDATES, 'updatesWorldMapOnZoneChange', 'configurationScript1' },
