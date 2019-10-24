@@ -1086,7 +1086,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			['REPEATABLE_COMPLETED'] = "Show whether repeatable quests previously completed",
 			['IN_LOG_STATUS'] = "Show status of quests in log",
 			['MAP_PINS'] = "Display map pins for quest givers",
-			['MAP_PINS_TURNIN'] = "Display map pins for turn in for completed quests",
+			['MAP_PINS_TURNIN'] = "Display map pins for turn in for quests in log",
 			['MAP_BUTTON'] = "Display button on world map",
 			['MAP_DUNGEONS'] = "Display dungeon quests in outer map",
 			['MAP_UPDATES'] = "Open world map updates when zones change",
