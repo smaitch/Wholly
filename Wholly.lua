@@ -392,6 +392,7 @@
 --			Fixes a problem where the search edit box was not created properly.
 --			Shows quests that are turned in to a zone in the Wholly quest panel.
 --			Adds the ability to show map pins for quest turn in locations.
+--		076	Updates the Classic Wholly quest panel to have a right side.
 --
 --	Known Issues
 --
@@ -3341,8 +3342,8 @@ end
 			if not InCombatLockdown() then
 				Wholly:ScrollFrame_Update()
 			else
-				self.combatScrollUpdate = true
-				self.notificationFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+				Wholly.combatScrollUpdate = true
+				Wholly.notificationFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 			end
 		end,
 
@@ -3866,20 +3867,28 @@ end
 				local topLeftTexture = frame:CreateTexture(nil, "BORDER")
 				topLeftTexture:SetPoint("TOPLEFT")
 				if Grail.existsClassic then
-					topLeftTexture:SetSize(348, 445)
+					local originalTextureX, originalTextureY = 512, 512
+					local desiredX, desiredY = 322, 445
+					topLeftTexture:SetSize(desiredX, desiredY)
 					topLeftTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLogDualPane-Left")
-					topLeftTexture:SetTexCoord(0, 0.6796875, 0, 0.86914)
+					topLeftTexture:SetTexCoord(0, desiredX / originalTextureX, 0, desiredY / originalTextureY)
 				else
 					topLeftTexture:SetSize(256, 256)
 					topLeftTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-TopLeft")
 				end
 
-				if not Grail.existsClassic then
-					local topRightTexture = frame:CreateTexture(nil, "BORDER")
+				local topRightTexture = frame:CreateTexture(nil, "BORDER")
+				topRightTexture:SetPoint("TOPRIGHT")
+				if Grail.existsClassic then
+					topRightTexture:SetSize(26, 445)
+					topRightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLogDualPane-Right")
+					topRightTexture:SetTexCoord(0.55, 0.65, 0, 0.86914)
+				else
 					topRightTexture:SetSize(128, 256)
-					topRightTexture:SetPoint("TOPRIGHT")
 					topRightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-TopRight")
+				end
 
+				if not Grail.existsClassic then
 					local bottomLeftTexture = frame:CreateTexture(nil, "BORDER")
 					bottomLeftTexture:SetSize(256, 256)
 					bottomLeftTexture:SetPoint("BOTTOMLEFT")
