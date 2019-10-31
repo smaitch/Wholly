@@ -492,7 +492,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 									self:_RecordTooltipNPCs(Grail.GetCurrentMapAreaID())
 								end,
 		color = {
-			['?'] = "FF00FF00",	-- green	[turn in]
+			['?'] = "FFFFFF00",	-- yellow	[turn in]
+			['*'] = "FFFFFFFF",	-- white	[turn in, not complete]
 			['B'] = "FF996600",	-- brown	[unobtainable]
 			['C'] = "FF00FF00",	-- green	[completed]
 			['D'] = "FF0099CC",	-- daily	[repeatable]
@@ -775,23 +776,22 @@ function self.mapPinsProvider:RefreshAllData(fromOnShow)
     self:RemoveAllData()
     if WhollyDatabase.displaysMapPins then
         local uiMapID = self:GetMap():GetMapID()
+        Wholly.zoneInfo.pins.mapId = uiMapID
         if not uiMapID then return end
         Wholly.cachedPinQuests = Wholly:_ClassifyQuestsInMap(uiMapID) or {}
         Wholly:_FilterPinQuests()
         local questsInMap = Wholly.filteredPinQuests
-        local codeMapping = { ['?'] = 0, ['G'] = 1, ['W'] = 2, ['D'] = 3, ['R'] = 4, ['K'] = 5, ['H'] = 6, ['Y'] = 7, ['P'] = 8, ['L'] = 9, ['O'] = 10, ['U'] = 11, ['I'] = 12, }
+        local codeMapping = { ['?'] = 0, ['G'] = 1, ['W'] = 2, ['D'] = 3, ['R'] = 4, ['K'] = 5, ['H'] = 6, ['Y'] = 7, ['P'] = 8, ['L'] = 9, ['O'] = 10, ['U'] = 11, ['*'] = 12, }
         for i = 1, #questsInMap do
             local id = questsInMap[i][1]
             local code = questsInMap[i][2]
             if 'D' == code and Grail:IsRepeatable(id) then code = 'R' end
             if 'I' == code then
             	local _, completed = Grail:IsQuestInQuestLog(id)
-            	if completed then
-	            	code = '?'
-				end
+            	code = completed and '?' or '*'
 			end
             local codeValue = codeMapping[code]
-            local locations = '?' == code and Grail:QuestLocationsTurnin(id, true, false, true, uiMapID) or Grail:QuestLocationsAccept(id, false, false, true, uiMapID, true, 0)
+            local locations = ('?' == code or '*' == code) and Grail:QuestLocationsTurnin(id, true, false, true, uiMapID) or Grail:QuestLocationsAccept(id, false, false, true, uiMapID, true, 0)
             if nil ~= locations then
                 for _, npc in pairs(locations) do
                     local xcoord, ycoord, npcName, npcId = npc.x, npc.y, npc.name, npc.id
@@ -1087,7 +1087,8 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			['REPEATABLE_COMPLETED'] = "Show whether repeatable quests previously completed",
 			['IN_LOG_STATUS'] = "Show status of quests in log",
 			['MAP_PINS'] = "Display map pins for quest givers",
-			['MAP_PINS_TURNIN'] = "Display map pins for turn in for quests in log",
+			['MAP_PINS_TURNIN'] = "Display map pins for turn in for completed quests in log",
+			['MAP_PINS_TURNIN_INCOMPLETE'] = "Display map pins for turn in for incomplete quests in log",
 			['MAP_BUTTON'] = "Display button on world map",
 			['MAP_DUNGEONS'] = "Display dungeon quests in outer map",
 			['MAP_UPDATES'] = "Open world map updates when zones change",
@@ -1791,7 +1792,17 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				shouldAdd = shouldAdd and self:_FilterQuestsBasedOnSettings(questId, status, dealingWithHolidays)
 
 				if not forPanel then
-					if (not WDB.displaysMapPinsTurnin and 'I' == statusCode) then shouldAdd = false end
+					if 'I' == statusCode then
+						shouldAdd = (nil ~= Grail:QuestLocationsTurnin(questId, true, false, true, self.zoneInfo.pins.mapId))
+						if shouldAdd then
+							local _, completed = Grail:IsQuestInQuestLog(questId)
+							if completed then
+								shouldAdd = WDB.displaysMapPinsTurnin
+							else
+								shouldAdd = WDB.displaysMapPinsTurninIncomplete
+							end
+						end
+					end
 					if 'C' == statusCode then shouldAdd = false end
 					if 'B' == statusCode then shouldAdd = false end
 				end
@@ -1895,7 +1906,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 
 			-- WoD beta does not allow custom textures so we go back to the old way
 			if not Grail.existsWoD or Grail.blizzardRelease >= 18663 then
-				if 'R' == texType or '?' == texType or 'I' == texType then
+				if 'R' == texType or '?' == texType or '*' == texType then
 					pin.texture:SetTexture("Interface\\Addons\\Wholly\\question")
 				else
 					pin.texture:SetTexture("Interface\\Addons\\Wholly\\exclamation")
@@ -2395,6 +2406,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			db.showsWorldQuests = true
 			db.loadDataData = true
 			db.displaysMapPinsTurnin = true
+			db.displaysMapPinsTurninIncomplete = false
 			db.version = Wholly.versionNumber
 			WhollyDatabase = db
 			return db
@@ -3725,6 +3737,10 @@ end
 			if WDB.version < 75 then
 				WDB.displaysMapPinsTurnin = true
 				WDB.color["?"] = self.color["?"]
+			end
+			if WDB.version < 76 then
+				WDB.displaysMapPinsTurninIncomplete = false
+				WDB.color["*"] = self.color["*"]
 			end
 			WDB.version = Wholly.versionNumber
 
@@ -5667,6 +5683,7 @@ end
 		{ S.WORLD_MAP },
 		{ S.MAP_PINS, 'displaysMapPins', 'configurationScript2', nil, 'pairedConfigurationButton' },
 		{ S.MAP_PINS_TURNIN, 'displaysMapPinsTurnin', 'configurationScript2' },
+		{ S.MAP_PINS_TURNIN_INCOMPLETE, 'displaysMapPinsTurninIncomplete', 'configurationScript2' },
 		{ S.MAP_BUTTON, 'displaysMapFrame', 'configurationScript3' },
 		{ S.MAP_DUNGEONS, 'displaysDungeonQuests', 'configurationScript4' },
 		{ S.MAP_UPDATES, 'updatesWorldMapOnZoneChange', 'configurationScript1' },
