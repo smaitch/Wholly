@@ -393,6 +393,9 @@
 --			Shows quests that are turned in to a zone in the Wholly quest panel.
 --			Adds the ability to show map pins for quest turn in locations.
 --		076	Updates the Classic Wholly quest panel to have a right side.
+--			Changes the colors for turn in pins to be white and yellow to match the NPCs in the world.
+--			Updates preferences to allow control over displaying turn in map pins that are complete or incomplete.
+--			Corrects issue where map button does not appear upon first login for new character.
 --
 --	Known Issues
 --
@@ -694,7 +697,7 @@ self.currentFrame = com_mithrandir_whollyFrame
 
 					self:_SetupLibDataBroker()
 					self:_SetupTooltip()
-					self:_SetupWorldMapWhollyButton()	-- TODO: Should clean up this implementation
+					self:_SetupWorldMapWhollyButton()
 
 
 -- if the UI panel disappears (maximized WorldMapFrame) we need to change parents
@@ -726,11 +729,10 @@ end
 com_mithrandir_whollyFrameSwitchZoneButton:SetText(self.s.MAP)
 com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 
-					local WDB = WhollyDatabase
 					local Grail = Grail
 					local TomTom = TomTom
 
-					self:_SetupDefaults()
+					local WDB = self:_SetupDefaults()
 
 					-- load all the localized quest names
 					Grail:LoadLocalizedQuestNames()
@@ -3684,7 +3686,7 @@ end
 		end,
 
 		_SetupDefaults = function(self)
-			local WDB = WhollyDatabase
+			local WDB = WhollyDatabase or {}
 
 			if nil == WDB.defaultsLoaded then
 				WDB = self:_LoadDefaults()
@@ -3749,6 +3751,8 @@ end
 			else
 				self.currentMaximumTooltipLines = self.defaultMaximumTooltipLines
 			end
+			WhollyDatabase = WDB
+			return WhollyDatabase
 		end,
 
 		_SetupLibDataBroker = function(self)
@@ -4021,38 +4025,24 @@ end
 			local parentFrame = Grail.existsClassic and WorldMapFrame or WorldMapFrame.BorderFrame
 			local f = CreateFrame("Button", nil, parentFrame, "UIPanelButtonTemplate")
 			f:SetSize(100, 25)
-			if nil == Gatherer_WorldMapDisplay then
-				if Grail.existsClassic then
-					f:SetPoint("TOPRIGHT", WorldMapContinentDropDown, "TOPLEFT", 10, 0)
-				else
-					f:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame.Tutorial, "TOPRIGHT", 0, -30)
-				end
-			else
-				f:SetPoint("TOPLEFT", Gatherer_WorldMapDisplay, "TOPRIGHT", 4, 0)
-			end
 			f:SetToplevel(true)
 			if not Grail.existsClassic then
 				f:SetScale(0.7)
 			end
 			f:SetText("Wholly")
 			f:SetScript("OnShow", function(self)
-				if nil == Gatherer_WorldMapDisplay then
-					if not Grail.existsClassic and TomTomWorldFrame and TomTomWorldFrame.Player then
-						f:SetPoint("TOPLEFT", TomTomWorldFrame.Player, "TOPRIGHT", 10, 6)
-					elseif Questie_Toggle then
-						f:SetPoint("TOPRIGHT", Questie_Toggle, "TOPLEFT", -8, 2)
-					elseif TitanMapCursorLocation then
-						f:SetPoint("TOPLEFT", TitanMapCursorLocation, "TOPRIGHT", 10, 6)
-					else
---											f:SetPoint("TOPLEFT", WorldMapFrameTutorialButton, "TOPRIGHT", 0, -30)
-						if Grail.existsClassic then
-							f:SetPoint("TOPRIGHT", WorldMapContinentDropDown, "TOPLEFT", 10, 0)
-						else
-							f:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame.Tutorial, "TOPRIGHT", 0, -30)
-						end
-					end
-				else
+				if Gatherer_WorldMapDisplay then
 					self:SetPoint("TOPLEFT", Gatherer_WorldMapDisplay, "TOPRIGHT", 4, 0)
+				elseif Questie_Toggle then
+					self:SetPoint("TOPRIGHT", Questie_Toggle, "TOPLEFT", -8, 2)
+				elseif TitanMapCursorLocation then
+					self:SetPoint("TOPLEFT", TitanMapCursorLocation, "TOPRIGHT", 10, 6)
+				elseif Grail.existsClassic then
+					self:SetPoint("TOPRIGHT", WorldMapContinentDropDown, "TOPLEFT", 10, 0)
+				elseif TomTomWorldFrame and TomTomWorldFrame.Player then
+					self:SetPoint("TOPLEFT", TomTomWorldFrame.Player, "TOPRIGHT", 10, 6)
+				else
+					self:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame.Tutorial, "TOPRIGHT", 0, -30)
 				end
 			end)
 			f:SetScript("OnEnter", function(self)
