@@ -497,6 +497,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		color = {
 			['?'] = "FFFFFF00",	-- yellow	[turn in]
 			['*'] = "FFFFFFFF",	-- white	[turn in, not complete]
+			['!'] = "FFFF0000",	-- red		[turn in, failed]
 			['B'] = "FF996600",	-- brown	[unobtainable]
 			['C'] = "FF00FF00",	-- green	[completed]
 			['D'] = "FF0099CC",	-- daily	[repeatable]
@@ -783,17 +784,24 @@ function self.mapPinsProvider:RefreshAllData(fromOnShow)
         Wholly.cachedPinQuests = Wholly:_ClassifyQuestsInMap(uiMapID) or {}
         Wholly:_FilterPinQuests()
         local questsInMap = Wholly.filteredPinQuests
-        local codeMapping = { ['?'] = 0, ['G'] = 1, ['W'] = 2, ['D'] = 3, ['R'] = 4, ['K'] = 5, ['H'] = 6, ['Y'] = 7, ['P'] = 8, ['L'] = 9, ['O'] = 10, ['U'] = 11, ['*'] = 12, }
+        local codeMapping = { ['?'] = 0, ['G'] = 1, ['W'] = 2, ['D'] = 3, ['R'] = 4, ['K'] = 5, ['H'] = 6, ['Y'] = 7, ['P'] = 8, ['L'] = 9, ['O'] = 10, ['U'] = 11, ['*'] = 12, ['!'] = 13 }
         for i = 1, #questsInMap do
             local id = questsInMap[i][1]
             local code = questsInMap[i][2]
             if 'D' == code and Grail:IsRepeatable(id) then code = 'R' end
             if 'I' == code then
             	local _, completed = Grail:IsQuestInQuestLog(id)
-            	code = completed and '?' or '*'
+            	completed = completed or 0
+            	if completed > 0 then
+            		code = '?'
+				elseif completed < 0 then
+					code = '!'
+				else
+					code = '*'
+				end
 			end
             local codeValue = codeMapping[code]
-            local locations = ('?' == code or '*' == code) and Grail:QuestLocationsTurnin(id, true, false, true, uiMapID) or Grail:QuestLocationsAccept(id, false, false, true, uiMapID, true, 0)
+            local locations = ('?' == code or '*' == code or '!' == code) and Grail:QuestLocationsTurnin(id, true, false, true, uiMapID) or Grail:QuestLocationsAccept(id, false, false, true, uiMapID, true, 0)
             if nil ~= locations then
                 for _, npc in pairs(locations) do
                     local xcoord, ycoord, npcName, npcId = npc.x, npc.y, npc.name, npc.id
@@ -1908,7 +1916,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 
 			-- WoD beta does not allow custom textures so we go back to the old way
 			if not Grail.existsWoD or Grail.blizzardRelease >= 18663 then
-				if 'R' == texType or '?' == texType or '*' == texType then
+				if 'R' == texType or '?' == texType or '*' == texType or '!' == texType then
 					pin.texture:SetTexture("Interface\\Addons\\Wholly\\question")
 				else
 					pin.texture:SetTexture("Interface\\Addons\\Wholly\\exclamation")
@@ -3743,6 +3751,7 @@ end
 			if WDB.version < 76 then
 				WDB.displaysMapPinsTurninIncomplete = false
 				WDB.color["*"] = self.color["*"]
+				WDB.color["!"] = self.color["!"]
 			end
 			WDB.version = Wholly.versionNumber
 
