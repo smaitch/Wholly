@@ -396,6 +396,7 @@
 --			Changes the colors for turn in pins to be white and yellow to match the NPCs in the world.
 --			Updates preferences to allow control over displaying turn in map pins that are complete or incomplete.
 --			Corrects issue where map button does not appear upon first login for new character.
+--		077	Adjusts the position of the breadcrumb frame to look better in Classic.
 --
 --	Known Issues
 --
@@ -718,7 +719,11 @@ GameTooltip:HookScript("OnTooltipSetUnit", Wholly._CheckNPCTooltip)
 
 -- Our frame positions are wrong for MoP, so we change them here.
 com_mithrandir_whollyQuestInfoBuggedFrame:SetPoint("TOPLEFT", QuestFrame, "TOPLEFT", 100, -35)
+if Grail.existsClassic then
+com_mithrandir_whollyBreadcrumbFrame:SetPoint("TOPLEFT", QuestFrame, "BOTTOMLEFT", 16, 70)
+else
 com_mithrandir_whollyBreadcrumbFrame:SetPoint("TOPLEFT", QuestFrame, "BOTTOMLEFT", 16, -10)
+end
 
 if "deDE" == GetLocale() then
 com_mithrandir_whollyFramePreferencesButton:SetText("Einstellungen")

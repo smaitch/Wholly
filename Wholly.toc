@@ -1,5 +1,5 @@
 ## Interface: 80205
-## ClassicInterface: 11302
+## ClassicInterface: 11303
 ## Title: Wholly
 ## Author: Scott M Harrison
 ## Notes: Shows quest database and map pins
