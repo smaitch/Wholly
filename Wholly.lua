@@ -447,7 +447,7 @@ local UIParent = UIParent
 local QuestFrame = QuestFrame
 local WorldMapFrame = WorldMapFrame
 
-local GRAIL = nil	-- will be set in ADDON_LOADED
+local GRAIL = nil	-- will be set in PLAYER_LOGIN
 
 local directoryName, _ = ...
 local versionFromToc = GetAddOnMetadata(directoryName, "Version")
@@ -662,8 +662,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			['QUEST_PROGRESS'] = function(self, frame)
 				self:BreadcrumbUpdate(frame, true)
 			end,
-			['ADDON_LOADED'] = function(self, frame, arg1)
-				if "Wholly" == arg1 then
+			['PLAYER_LOGIN'] = function(self, frame, arg1)
+--				if "Wholly" == arg1 then	-- this is a remnant from when this was ADDON_LOADED and not PLAYER_LOGIN
 GRAIL = Grail
 if not GRAIL or GRAIL.versionNumber < requiredGrailVersion then
 local errorMessage = format(self.s.REQUIRES_FORMAT, requiredGrailVersion)
@@ -936,7 +936,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 					self:_InitializeLevelOneData()
 					if WDB.useWidePanel then self:ToggleCurrentFrame() end
 
-				end
+--				end	-- matching the if arg1 == "Wholly" then
 			end,
 			['PLAYER_ENTERING_WORLD'] = function(self, frame)
 				self.zoneInfo.zone.mapId = Grail.GetCurrentMapAreaID()
@@ -2730,6 +2730,8 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 					typeString = format(" [%s, %s]", self.s.COMPLETE, self.s.TURNED_IN)
 				elseif questCode == 'H' then
 					typeString = format(" [%s]", self.s.EVER_COMPLETED)
+				elseif questCode == 'h' then
+					typeString = format(" ![%s]", self.s.EVER_COMPLETED)
 				elseif questCode == 'M' then
 					typeString = format(" [%s]", self.s.ABANDONED)
 				elseif questCode == 'm' then
@@ -4414,7 +4416,7 @@ end
 	local nf = CreateFrame("Frame")
 	Wholly.notificationFrame = nf
 	nf:SetScript("OnEvent", function(frame, event, ...) Wholly:_OnEvent(frame, event, ...) end)
-	nf:RegisterEvent("ADDON_LOADED")
+	nf:RegisterEvent("PLAYER_LOGIN")
 
 	local locale = GetLocale()
 	local S = Wholly.s
