@@ -2705,7 +2705,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				return format("|c%s%s %s [%s]|r", colorCode, phaseLocation, questCode, phaseString)
 			elseif questCode == 'x' then
 				return format("|c%s"..ARTIFACTS_KNOWLEDGE_TOOLTIP_LEVEL.."|r", colorCode, numeric)
-			elseif questCode == 'a' then
+			elseif questCode == 'a' or questCode == 'b' then
 				return format("|c%s"..AVAILABLE_QUEST.."|r", colorCode)
 			elseif questCode == '@' then
 				return format("|c%s%s %s %d|r", colorCode, Grail:NPCName(100000000 + subcode), self.s.LEVEL, numeric)
