@@ -397,6 +397,7 @@
 --			Updates preferences to allow control over displaying turn in map pins that are complete or incomplete.
 --			Corrects issue where map button does not appear upon first login for new character.
 --		077	Adjusts the position of the breadcrumb frame to look better in Classic.
+--			Adds support for Heart of Azeroth level requirements.
 --
 --	Known Issues
 --
@@ -2712,6 +2713,9 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			elseif questCode == '#' then
 				return format(GARRISON_MISSION_TIME, format("|c%s%s|r", colorCode, Grail:MissionName(numeric) or numeric))
 --				return format("Mission Needed: |c%s%s|r", colorCode, Grail:MissionName(numeric))	-- GARRISON_MISSION_TIME
+			elseif questCode == '&' then
+				local message = format(REQUIRES_AZERITE_LEVEL_TOOLTIP, numeric)
+				return format("|c%s%s|r", colorCode, message)
 			else
 				questId = numeric
 				local typeString = ""
