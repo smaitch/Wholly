@@ -398,6 +398,7 @@
 --			Corrects issue where map button does not appear upon first login for new character.
 --		077	Adjusts the position of the breadcrumb frame to look better in Classic.
 --			Adds support for Heart of Azeroth level requirements.
+--		078	Updates the Classic interface to 11304 to match the latest Blizzard release.
 --
 --	Known Issues
 --
