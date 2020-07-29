@@ -3844,7 +3844,7 @@ end
 		_SetupSearchFrame = function(self)
 			if nil == com_mithrandir_whollySearchFrame then
 				local frameName = "com_mithrandir_whollySearchFrame"
-				local frame = CreateFrame("Frame", frameName, com_mithrandir_whollyFrame)
+				local frame = CreateFrame("Frame", frameName, com_mithrandir_whollyFrame, BackdropTemplateMixin and "BackdropTemplate")
 				frame:Hide()
 				frame:SetSize(288, 96)
 				frame:SetPoint("BOTTOMLEFT", com_mithrandir_whollyFrame, "TOPLEFT", 64, -14)
