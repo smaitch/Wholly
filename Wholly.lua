@@ -406,6 +406,8 @@
 --		080	*** Requires Grail 111 or later ***
 --			Changes to start supporting Shadowlands.
 --			Changes interface to 90001.
+--		081 *** Requires Grail 112 or later ***
+--			Changes the reputation section to allow for future expansions without code change.
 --
 --	Known Issues
 --
@@ -462,7 +464,7 @@ local directoryName, _ = ...
 local versionFromToc = GetAddOnMetadata(directoryName, "Version")
 local _, _, versionValueFromToc = strfind(versionFromToc, "(%d+)")
 local Wholly_File_Version = tonumber(versionValueFromToc)
-local requiredGrailVersion = 111
+local requiredGrailVersion = 112
 
 --	Set up the bindings to use the localized name Blizzard supplies.  Note that the Bindings.xml file cannot
 --	just contain the TOGGLEQUESTLOG because then the entry for Wholly does not show up.  So, we use a version
@@ -2119,17 +2121,13 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			--	Reputation Changes
 			if WDB.loadReputationData then
 				t1 = { displayName = COMBAT_TEXT_SHOW_REPUTATION_TEXT, header = 3, children = {} }
-				tinsert(t1.children, { displayName = EXPANSION_NAME0, index = -100 })
-				if not Grail.existsClassic then
-					tinsert(t1.children, { displayName = EXPANSION_NAME1, index = -101 })
-					tinsert(t1.children, { displayName = EXPANSION_NAME2, index = -102 })
-					tinsert(t1.children, { displayName = EXPANSION_NAME3, index = -103 })
-					tinsert(t1.children, { displayName = EXPANSION_NAME4, index = -104 })
-					tinsert(t1.children, { displayName = EXPANSION_NAME5, index = -105 })
-					tinsert(t1.children, { displayName = EXPANSION_NAME6, index = -106 })
-					tinsert(t1.children, { displayName = EXPANSION_NAME7, index = -107 })
-					if EXPANSION_NAME8 then
-						tinsert(t1.children, { displayName = EXPANSION_NAME8, index = -108 })
+				local highestSupportedExpansion = Grail:_HighestSupportedExpansion()
+				for expansionIndex = 0, highestSupportedExpansion do
+					local expansionName = Grail:_ExpansionName(expansionIndex)
+					if nil ~= expansionName then
+						tinsert(t1.children, { displayName = expansionName, index = -100 - expansionIndex })
+					else
+						break
 					end
 				end
 				tinsert(entries, t1)
