@@ -409,6 +409,7 @@
 --		081 *** Requires Grail 112 or later ***
 --			Changes the reputation section to allow for future expansions without code change.
 --			Adds the ability to use Blizzard's user waypoint.
+--			Changes interface to 90002.
 --
 --	Known Issues
 --
