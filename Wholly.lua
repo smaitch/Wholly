@@ -410,6 +410,7 @@
 --			Changes the reputation section to allow for future expansions without code change.
 --			Adds the ability to use Blizzard's user waypoint.
 --			Changes interface to 90002.
+--		082 Adds the ability to display covenant renown level prerequisites.
 --
 --	Known Issues
 --
@@ -2737,6 +2738,8 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			elseif questCode == '&' then
 				local message = format(REQUIRES_AZERITE_LEVEL_TOOLTIP, numeric)
 				return format("|c%s%s|r", colorCode, message)
+			elseif questCode == '$' then
+				return format("|c%s%s - %s|r", colorCode, LANDING_PAGE_RENOWN_LABEL, C_Covenants.GetCovenantData(subcode).name or "???", numeric)
 			else
 				questId = numeric
 				local typeString = ""
