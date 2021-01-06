@@ -411,6 +411,8 @@
 --			Adds the ability to use Blizzard's user waypoint.
 --			Changes interface to 90002.
 --		082 Adds the ability to display covenant renown level prerequisites.
+--			Adds the ability to display calling quests availability prerequisites.
+--			Adds the ability to display quest types for biweekly, threat and calling quests.
 --
 --	Known Issues
 --
@@ -2728,7 +2730,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				return format("|c%s%s %s [%s]|r", colorCode, phaseLocation, questCode, phaseString)
 			elseif questCode == 'x' then
 				return format("|c%s"..ARTIFACTS_KNOWLEDGE_TOOLTIP_LEVEL.."|r", colorCode, numeric)
-			elseif questCode == 'a' or questCode == 'b' then
+			elseif questCode == 'a' or questCode == 'b' or questCode == '^' then
 				return format("|c%s"..AVAILABLE_QUEST.."|r", colorCode)
 			elseif questCode == '@' then
 				return format("|c%s%s %s %d|r", colorCode, Grail:NPCName(100000000 + subcode), self.s.LEVEL, numeric)
@@ -3278,6 +3280,9 @@ end
 				if bitband(bitValue, Grail.bitMaskQuestRareMob) > 0 then retval = retval .. self.s.RARE_MOBS .. " " end
 				if bitband(bitValue, Grail.bitMaskQuestTreasure) > 0 then retval = retval .. self.s.TREASURE .. " " end
 				if bitband(bitValue, Grail.bitMaskQuestWorldQuest) > 0 then retval = retval .. self.s.WORLD_QUEST .. " " end
+				if bitband(bitValue, Grail.bitMaskQuestBiweekly) > 0 then retval = retval .. self.s.BIWEEKLY .. " " end
+				if bitband(bitValue, Grail.bitMaskQuestThreatQuest) > 0 then retval = retval .. self.s.THREAT_QUEST .. " " end
+				if bitband(bitValue, Grail.bitMaskQuestCallingQuest) > 0 then retval = retval .. self.s.CALLING_QUEST .. " " end
 			end
 			return trim(retval)
 		end,
@@ -5680,6 +5685,9 @@ end
 	S['PET_BATTLES'] = BATTLE_PET_SOURCE_5								-- "Pet Battle"
 	S['PLAYER'] = PLAYER												-- "Player"
 	S['WORLD_QUEST'] = TRACKER_HEADER_WORLD_QUESTS						-- "World Quests"
+	S['BIWEEKLY'] = CALENDAR_REPEAT_BIWEEKLY							-- "Biweekly"
+	S['THREAT_QUEST'] = WORLD_MAP_THREATS								-- "N'Zoth Assaults"
+	S['CALLING_QUEST'] = CALLINGS_QUESTS								-- "Callings"
 
 	local C = Wholly.color
 	Wholly.configuration = {}
