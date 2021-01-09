@@ -3041,6 +3041,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			self:_QuestInfoSection(self.s.OAC, Grail:QuestOnAcceptCompletes(questId))
 			self:_QuestInfoSection(self.s.OCC, Grail:QuestOnCompletionCompletes(questId))
 			self:_QuestInfoTurninSection(self.s.OTC, Grail:QuestOnTurninCompletes(questId))
+			self:_QuestInfoSection(self.s.OTC, Grail:QuestOnDoneCompletes(questId))
 			if nil ~= Grail.quests[questId] and nil ~= Grail.quests[questId]['AZ'] then
 				self:_AddLine(" ")
 				if "table" == type(Grail.quests[questId]['AZ']) then
