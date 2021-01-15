@@ -431,7 +431,7 @@ local mathmax, mathmin, sqrt = math.max, math.min, math.sqrt
 
 local CloseDropDownMenus					= CloseDropDownMenus
 local CreateFrame							= CreateFrame
-local GetAchievementInfo					= GetAchievementInfo
+--local GetAchievementInfo					= GetAchievementInfo
 local GetAddOnMetadata						= GetAddOnMetadata
 local GetBuildInfo							= GetBuildInfo
 local GetCursorPosition						= GetCursorPosition
@@ -2665,11 +2665,11 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				local name = GetSpellInfo(numeric)
 				return format("|c%s%s|r [%s]", colorCode, name, self.s.EVER_CAST)
 			elseif questCode == 'J' or questCode == 'j' then
-				local id, name = GetAchievementInfo(numeric)
+				local name = Grail:GetBasicAchievementInfo(numeric)
 				local negateString = (questCode == 'j') and "!" or ""
 				return format("|c%s%s|r %s[%s]", colorCode, name, negateString, self.s.ACHIEVEMENTS)
 			elseif questCode == 'Y' or questCode == 'y' then
-				local id, name = GetAchievementInfo(numeric, true)
+				local name = Grail:GetBasicAchievementInfo(numeric, true)
 				local negateString = (questCode == 'y') and "!" or ""
 				return format("|c%s%s|r %s[%s][%s]", colorCode, name, negateString, self.s.ACHIEVEMENTS, self.s.PLAYER)
 			elseif questCode == 'K' or questCode == 'k' then
