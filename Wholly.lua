@@ -411,7 +411,7 @@
 --			Adds the ability to use Blizzard's user waypoint.
 --			Changes interface to 90002.
 --		082	*** Requires Grail 114 or later ***
---			Adds the ability to display covenant renown level prerequisites.
+--			Adds the ability to display covenant renown level prerequisites (minimum and maximum).
 --			Adds the ability to display calling quests availability prerequisites.
 --			Adds the ability to display quest types for biweekly, threat and calling quests.
 --			Adds the ability to display covenant talent prerequisites.
@@ -2745,6 +2745,8 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				return format("|c%s%s|r", colorCode, message)
 			elseif questCode == '$' then
 				return format("|c%s%s - %s|r", colorCode, LANDING_PAGE_RENOWN_LABEL, C_Covenants.GetCovenantData(subcode).name or "???", numeric)
+			elseif questCode == '*' then
+				return format("|c%s%s - %s <|r", colorCode, LANDING_PAGE_RENOWN_LABEL, C_Covenants.GetCovenantData(subcode).name or "???", numeric)
 			elseif questCode == '%' then
 				local _, mainTitle, title = Grail:_GarrisonTalentResearched(numeric)
 				return format("|c%s%s - %s|r", colorCode, mainTitle, title)
