@@ -416,6 +416,7 @@
 --			Adds the ability to display quest types for biweekly, threat and calling quests.
 --			Adds the ability to display covenant talent prerequisites.
 --			Adds the ability to display custom achivements Grail supports.
+--		083	Adds the ability to display the expansion associated with the quest.
 --
 --	Known Issues
 --
@@ -2866,6 +2867,9 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			end
 
 			questId = aliasQuestId or questId	-- remap to the alias now that the Blizzard interaction is done
+			if GetQuestExpansion then
+				self:_AddLine(EXPANSION_FILTER_TEXT, Grail:_ExpansionName(GetQuestExpansion(questId)))
+			end
 			local obtainersCode = Grail:CodeObtainers(questId)
 			local obtainersRaceCode = Grail:CodeObtainersRace(questId)
 			local holidayCode = Grail:CodeHoliday(questId)
