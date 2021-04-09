@@ -417,6 +417,7 @@
 --			Adds the ability to display covenant talent prerequisites.
 --			Adds the ability to display custom achivements Grail supports.
 --		083	Adds the ability to display the expansion associated with the quest.
+--			Changes interface to 90005.
 --
 --	Known Issues
 --
