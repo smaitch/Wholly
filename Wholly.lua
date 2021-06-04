@@ -418,6 +418,7 @@
 --			Adds the ability to display custom achivements Grail supports.
 --		083	Adds the ability to display the expansion associated with the quest.
 --			Changes interface to 90005 (and 20501 for Classic Burning Crusade).
+--		084	Switched to a unified addon for all of Blizzard's releases.
 --
 --	Known Issues
 --
