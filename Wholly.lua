@@ -419,6 +419,7 @@
 --		083	Adds the ability to display the expansion associated with the quest.
 --			Changes interface to 90005 (and 20501 for Classic Burning Crusade).
 --		084	Switched to a unified addon for all of Blizzard's releases.
+--			Enables displaying a requirement of a renown level independent of covenant.
 --
 --	Known Issues
 --
@@ -2747,10 +2748,10 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			elseif questCode == '&' then
 				local message = format(REQUIRES_AZERITE_LEVEL_TOOLTIP, numeric)
 				return format("|c%s%s|r", colorCode, message)
-			elseif questCode == '$' then
-				return format("|c%s%s - %s|r", colorCode, LANDING_PAGE_RENOWN_LABEL, C_Covenants.GetCovenantData(subcode).name or "???", numeric)
-			elseif questCode == '*' then
-				return format("|c%s%s - %s <|r", colorCode, LANDING_PAGE_RENOWN_LABEL, C_Covenants.GetCovenantData(subcode).name or "???", numeric)
+			elseif questCode == '$' or questCode == '*' then
+				local covenantNameToDisplay = (0 == subcode) and "" or C_Covenants.GetCovenantData(subcode).name or "???"
+				local comparisonToDisplay = (questCode == '*') and " <" or ""
+				return format("|c%s%s - %s%s|r", colorCode, LANDING_PAGE_RENOWN_LABEL, covenantNameToDisplay, comparisonToDisplay, numeric)
 			elseif questCode == '%' then
 				return format("|c%s%s|r", colorCode, self:_QuestName(400000 + numeric))
 			else
