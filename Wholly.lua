@@ -420,6 +420,7 @@
 --			Changes interface to 90005 (and 20501 for Classic Burning Crusade).
 --		084	Switched to a unified addon for all of Blizzard's releases.
 --			Enables displaying a requirement of a renown level independent of covenant.
+--			Transforms the Wholly map button into one with just "W" and puts it at the top left of the map.
 --
 --	Known Issues
 --
@@ -4089,27 +4090,35 @@ end
 		_SetupWorldMapWhollyButton = function(self)
 			local parentFrame = Grail.existsClassic and WorldMapFrame or WorldMapFrame.BorderFrame
 			local f = CreateFrame("Button", nil, parentFrame, "UIPanelButtonTemplate")
-			f:SetSize(100, 25)
+--			f:SetSize(100, 25)
+			f:SetSize(24, 22)
 			f:SetToplevel(true)
 			if not Grail.existsClassic then
 				f:SetScale(0.7)
 			end
-			f:SetText("Wholly")
-			f:SetScript("OnShow", function(self)
-				if Gatherer_WorldMapDisplay then
-					self:SetPoint("TOPLEFT", Gatherer_WorldMapDisplay, "TOPRIGHT", 4, 0)
-				elseif Questie_Toggle then
-					self:SetPoint("TOPRIGHT", Questie_Toggle, "TOPLEFT", -8, 2)
-				elseif TitanMapCursorLocation then
-					self:SetPoint("TOPLEFT", TitanMapCursorLocation, "TOPRIGHT", 10, 6)
-				elseif Grail.existsClassic then
-					self:SetPoint("TOPRIGHT", WorldMapContinentDropDown, "TOPLEFT", 10, 0)
-				elseif TomTomWorldFrame and TomTomWorldFrame.Player then
-					self:SetPoint("TOPLEFT", TomTomWorldFrame.Player, "TOPRIGHT", 10, 6)
-				else
-					self:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame.Tutorial, "TOPRIGHT", 0, -30)
-				end
-			end)
+--			f:SetText("Wholly")
+			f:SetText("W")
+			if Grail.existsClassic then
+				f:SetFrameLevel(10)
+				f:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame, "TOPLEFT", 5, -37)
+			else
+				f:SetPoint("TOPLEFT", WorldMapFrameHomeButton, "BOTTOMLEFT", -25, 25)
+			end
+--			f:SetScript("OnShow", function(self)
+--				if Gatherer_WorldMapDisplay then
+--					self:SetPoint("TOPLEFT", Gatherer_WorldMapDisplay, "TOPRIGHT", 4, 0)
+--				elseif Questie_Toggle then
+--					self:SetPoint("TOPRIGHT", Questie_Toggle, "TOPLEFT", -8, 2)
+--				elseif TitanMapCursorLocation then
+--					self:SetPoint("TOPLEFT", TitanMapCursorLocation, "TOPRIGHT", 10, 6)
+--				elseif Grail.existsClassic then
+--					self:SetPoint("TOPRIGHT", WorldMapContinentDropDown, "TOPLEFT", 10, 0)
+--				elseif TomTomWorldFrame and TomTomWorldFrame.Player then
+--					self:SetPoint("TOPLEFT", TomTomWorldFrame.Player, "TOPRIGHT", 10, 6)
+--				else
+--					self:SetPoint("TOPLEFT", WorldMapFrame.BorderFrame.Tutorial, "TOPRIGHT", 0, -30)
+--				end
+--			end)
 			f:SetScript("OnEnter", function(self)
 				local t = Wholly.tooltip
 				t:ClearLines()
