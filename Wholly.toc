@@ -1,4 +1,4 @@
-## Interface: 90005
+## Interface: 90100
 ## Title: Wholly
 ## Author: Scott M Harrison
 ## Notes: Shows quest database and map pins

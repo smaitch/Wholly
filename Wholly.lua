@@ -423,6 +423,7 @@
 --			Enables displaying a requirement of a renown level independent of covenant.
 --			Transforms the Wholly map button into one with just "W" and puts it at the top left of the map.
 --			Reintroduces some ability to filter Blizzard map pins in Retail.
+--			Changes retail interface to 90100.
 --
 --	Known Issues
 --
