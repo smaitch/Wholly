@@ -424,6 +424,8 @@
 --			Transforms the Wholly map button into one with just "W" and puts it at the top left of the map.
 --			Reintroduces some ability to filter Blizzard map pins in Retail.
 --			Changes retail interface to 90100.
+--		085	Updates _OnUpdate to ensure coordinates are returned before updating locations.
+--			Changes retail interface to 90105, BCC to 20502 and Classic to 11400.
 --
 --	Known Issues
 --
@@ -2640,7 +2642,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			self.lastUpdate = self.lastUpdate + elapsed
 			if self.lastUpdate < self.updateThreshold then return end
 			local x, y = Grail.GetPlayerMapPosition('player')
-			if self.previousX ~= x or self.previousY ~= y then
+			if x and y and (self.previousX ~= x or self.previousY ~= y) then
 				if nil ~= self.coordinates then
 					self.coordinates.text = strformat("%.2f, %.2f", x * 100, y * 100)
 				end
