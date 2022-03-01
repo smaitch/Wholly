@@ -426,6 +426,7 @@
 --			Changes retail interface to 90100.
 --		085	Updates _OnUpdate to ensure coordinates are returned before updating locations.
 --			Changes retail interface to 90105, BCC to 20502 and Classic to 11400.
+--      086 Changes retail interface to 90200.
 --
 --	Known Issues
 --
