@@ -429,6 +429,7 @@
 --      086 Changes retail interface to 90200.
 --			Adds support for quests that only become available after the next daily reset.
 --			Adds an option to hide the quest ID on the Quest Frame.
+--			Adds support for quests that only become available when currency requirements are met.
 --
 --	Known Issues
 --
@@ -2815,10 +2816,10 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			elseif questCode == 'a' or questCode == 'b' or questCode == '^' then
 				return format("|c%s"..AVAILABLE_QUEST.."|r", colorCode)
 			elseif questCode == '@' then
-				return format("|c%s%s %s %d|r", colorCode, Grail:NPCName(100000000 + subcode), self.s.LEVEL, numeric)
+				return format("|c%s%s %s %d|r", colorCode, GRAIL:NPCName(100000000 + subcode), self.s.LEVEL, numeric)
 			elseif questCode == '#' then
-				return format(GARRISON_MISSION_TIME, format("|c%s%s|r", colorCode, Grail:MissionName(numeric) or numeric))
---				return format("Mission Needed: |c%s%s|r", colorCode, Grail:MissionName(numeric))	-- GARRISON_MISSION_TIME
+				return format(GARRISON_MISSION_TIME, format("|c%s%s|r", colorCode, GRAIL:MissionName(numeric) or numeric))
+--				return format("Mission Needed: |c%s%s|r", colorCode, GRAIL:MissionName(numeric))	-- GARRISON_MISSION_TIME
 			elseif questCode == '&' then
 				local message = format(REQUIRES_AZERITE_LEVEL_TOOLTIP, numeric)
 				return format("|c%s%s|r", colorCode, message)
@@ -2831,8 +2832,11 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			elseif questCode == '(' then
 				local todayResetDate = C_DateAndTime.AdjustTimeByMinutes(C_DateAndTime.GetCurrentCalendarTime(), (C_DateAndTime.GetSecondsUntilDailyReset() - (86400 * 1)) / 60)
 				local presentableDate = strformat("%4d-%02d-%02d %02d:%02d", todayResetDate.year, todayResetDate.monthDay, todayResetDate.day, todayResetDate.hour, todayResetDate.minute)
-				local completedColorCode = Grail:IsQuestCompleted(numeric) and WDB.color['C'] or WDB.color['P']
+				local completedColorCode = GRAIL:IsQuestCompleted(numeric) and WDB.color['C'] or WDB.color['P']
 				return format("|c%s%s |r|c%s< %s|r", completedColorCode, self:_QuestName(numeric), colorCode, presentableDate)
+			elseif questCode == ')' then
+				local currencyName, currentAmount = GRAIL:GetCurrencyInfo(subcode)
+				return format("|c%s%s|r", colorCode, currencyName)
 			else
 				questId = numeric
 				local typeString = ""
