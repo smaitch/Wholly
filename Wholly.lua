@@ -426,7 +426,7 @@
 --			Changes retail interface to 90100.
 --		085	Updates _OnUpdate to ensure coordinates are returned before updating locations.
 --			Changes retail interface to 90105, BCC to 20502 and Classic to 11400.
---      086 Changes retail interface to 90200, BCC to 20504 and Classic to 11402.
+--      086 Changes retail interface to 90205, BCC to 20504 and Classic to 11402.
 --			Adds support for quests that only become available after the next daily reset.
 --			Adds an option to hide the quest ID on the Quest Frame.
 --			Adds support for quests that only become available when currency requirements are met.
