@@ -430,6 +430,8 @@
 --			Adds support for quests that only become available after the next daily reset.
 --			Adds an option to hide the quest ID on the Quest Frame.
 --			Adds support for quests that only become available when currency requirements are met.
+--		087 *** Requires Grail 119 or later ***
+--			Changes retail interface to 90207, Wrath to 30400 and Vanilla to 11403.
 --
 --	Known Issues
 --
@@ -486,7 +488,7 @@ local directoryName, _ = ...
 local versionFromToc = GetAddOnMetadata(directoryName, "Version")
 local _, _, versionValueFromToc = strfind(versionFromToc, "(%d+)")
 local Wholly_File_Version = tonumber(versionValueFromToc)
-local requiredGrailVersion = 116
+local requiredGrailVersion = 119
 
 --	Set up the bindings to use the localized name Blizzard supplies.  Note that the Bindings.xml file cannot
 --	just contain the TOGGLEQUESTLOG because then the entry for Wholly does not show up.  So, we use a version
