@@ -431,7 +431,7 @@
 --			Adds an option to hide the quest ID on the Quest Frame.
 --			Adds support for quests that only become available when currency requirements are met.
 --		087 *** Requires Grail 119 or later ***
---			Changes retail interface to 90207, Wrath to 30400 and Vanilla to 11403.
+--			Changes retail interface to 100000, Wrath to 30400 and Vanilla to 11403.
 --
 --	Known Issues
 --
@@ -787,7 +787,8 @@ self.tooltip:SetParent(UIParent);
 self.tooltip:SetFrameStrata("TOOLTIP");
 end)
 
-GameTooltip:HookScript("OnTooltipSetUnit", Wholly._CheckNPCTooltip)
+--DRAGONFLIGHT:
+--GameTooltip:HookScript("OnTooltipSetUnit", Wholly._CheckNPCTooltip)
 
 					self:_SetupBlizzardQuestLogSupport()
 					self:_SetupQuestInfoFrame()
@@ -4001,7 +4002,7 @@ end
 				editBox:SetScript("OnEscapePressed", function(self) com_mithrandir_whollySearchFrame:Hide() end)
 				editBox:SetFontObject("ChatFontNormal")
 
-				local searchButton = CreateFrame("Button", nil, frame, "OptionsButtonTemplate")
+				local searchButton = CreateFrame("Button", nil, frame)
 				searchButton:SetText(SEARCH)
 				searchButton:SetPoint("BOTTOM", 0, 8)
 				searchButton:SetScript("OnClick", function(self) Wholly:SearchEntered() end)
