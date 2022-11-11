@@ -2529,7 +2529,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			db.showsPetBattleQuests = true
 			db.showsPVPQuests = true
 			db.showsWorldQuests = true
-			db.loadDataData = true
+			db.loadDateData = true
 			db.displaysMapPinsTurnin = true
 			db.displaysMapPinsTurninIncomplete = false
 			db.version = Wholly.versionNumber
