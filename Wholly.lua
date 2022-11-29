@@ -431,7 +431,7 @@
 --			Adds an option to hide the quest ID on the Quest Frame.
 --			Adds support for quests that only become available when currency requirements are met.
 --		087 *** Requires Grail 119 or later ***
---			Changes retail interface to 100000, Wrath to 30400 and Vanilla to 11403.
+--			Changes retail interface to 100002, Wrath to 30400 and Vanilla to 11403.
 --
 --	Known Issues
 --
