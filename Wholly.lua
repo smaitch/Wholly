@@ -432,6 +432,7 @@
 --			Adds support for quests that only become available when currency requirements are met.
 --		087 *** Requires Grail 119 or later ***
 --			Changes retail interface to 100002, Wrath to 30400 and Vanilla to 11403.
+--		088	Corrects the problem where mouse clicks on the Wholly quest panel failed to act.
 --
 --	Known Issues
 --
@@ -1550,7 +1551,6 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 		--	Left-click			:	Directional arrows for questgivers
 		-- This is named this way with this function signature because it is called from the SecureActionButtonTemplate exactly like this.
 		Click = function(self, leftOrRight)
-			local TomTom = TomTom
 			if IsShiftKeyDown() and "RightButton" == leftOrRight then
 				self:_TagProcess(self.clickingButton.questId)
 				return
