@@ -433,6 +433,7 @@
 --		087 *** Requires Grail 119 or later ***
 --			Changes retail interface to 100002, Wrath to 30400 and Vanilla to 11403.
 --		088	Corrects the problem where mouse clicks on the Wholly quest panel failed to act.
+--			Corrects the problem where the location of the Wholly quest panel is not retained across restarts.
 --
 --	Known Issues
 --
@@ -4045,13 +4046,19 @@ end
 				frame:SetToplevel(true)
 				frame:EnableMouse(true)
 				frame:SetMovable(true)
+				frame:SetUserPlaced(true)
 				frame:Hide()
 				if Grail.existsClassic then
 					frame:SetSize(348, 445)
 				else
 					frame:SetSize(384, 512)
 				end
-				frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
+				local frameInfo = WhollyDatabase[frame:GetName()]
+				if frameInfo then
+					frame:SetPoint(frameInfo[1], UIParent, frameInfo[2], frameInfo[3], frameInfo[4])
+				else
+					frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
+				end
 
 				local topLeftTexture = frame:CreateTexture(nil, "BORDER")
 				topLeftTexture:SetPoint("TOPLEFT")
@@ -4153,6 +4160,8 @@ end
 					if self.isMoving then
 						self:StopMovingOrSizing()
 						self.isMoving = false
+						local p1, _, p2, p3, p4 = self:GetPoint()
+						WhollyDatabase[self:GetName()] = { p1, p2, p3, p4 }
 					end
 				end)
 				frame:SetScript("OnMouseDown", function(self, button)
@@ -4172,9 +4181,15 @@ end
 				frame:SetToplevel(true)
 				frame:EnableMouse(true)
 				frame:SetMovable(true)
+				frame:SetUserPlaced(true)
 				frame:Hide()
 				frame:SetSize(682, 447)
-				frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
+				local frameInfo = WhollyDatabase[frame:GetName()]
+				if frameInfo then
+					frame:SetPoint(frameInfo[1], UIParent, frameInfo[2], frameInfo[3], frameInfo[4])
+				else
+					frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
+				end
 
 				local bookTexture = frame:CreateTexture(nil, "BACKGROUND")
 				bookTexture:SetSize(64, 64)
@@ -4287,6 +4302,8 @@ end
 					if self.isMoving then
 						self:StopMovingOrSizing()
 						self.isMoving = false
+						local p1, _, p2, p3, p4 = self:GetPoint()
+						WhollyDatabase[self:GetName()] = { p1, p2, p3, p4 }
 					end
 				end)
 				frame:SetScript("OnMouseDown", function(self, button)
