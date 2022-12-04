@@ -434,6 +434,7 @@
 --			Changes retail interface to 100002, Wrath to 30400 and Vanilla to 11403.
 --		088	Corrects the problem where mouse clicks on the Wholly quest panel failed to act.
 --			Corrects the problem where the location of the Wholly quest panel is not retained across restarts.
+--			Adds support for quests that have major faction renown level prerequisites.
 --
 --	Known Issues
 --
@@ -2835,6 +2836,8 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			elseif questCode == ')' then
 				local currencyName, currentAmount = GRAIL:GetCurrencyInfo(subcode)
 				return format("|c%s%s|r", colorCode, currencyName)
+			elseif questCode == '_' then
+				return format("|c%s%s - %s|r", colorCode, LANDING_PAGE_RENOWN_LABEL, GRAIL.reputationMapping[subcode])
 			else
 				questId = numeric
 				local typeString = ""
