@@ -780,6 +780,12 @@ self.currentFrame = com_mithrandir_whollyFrame
 					self:_SetupWorldMapWhollyButton()
 
 
+if ImmersionContentFrame then
+	QuestFrame = ImmersionContentFrame
+	com_mithrandir_whollyQuestInfoBuggedFrame:SetParent(QuestFrame)
+	com_mithrandir_whollyBreadcrumbFrame:SetParent(QuestFrame)
+end
+
 -- if the UI panel disappears (maximized WorldMapFrame) we need to change parents
 UIParent:HookScript("OnHide", function()
 self.tooltip:SetParent(WorldMapFrame);
