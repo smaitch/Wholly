@@ -435,6 +435,7 @@
 --		088	Corrects the problem where mouse clicks on the Wholly quest panel failed to act.
 --			Corrects the problem where the location of the Wholly quest panel is not retained across restarts.
 --			Adds support for quests that have major faction renown level prerequisites.
+--			Adds support for quests that have POI presence prerequisites.
 --
 --	Known Issues
 --
@@ -2838,6 +2839,20 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				return format("|c%s%s|r", colorCode, currencyName)
 			elseif questCode == '_' then
 				return format("|c%s%s - %s|r", colorCode, LANDING_PAGE_RENOWN_LABEL, GRAIL.reputationMapping[subcode])
+			elseif questCode == '`' then
+				local mapId = tonumber(subcode)
+				local poiId = tonumber(numeric)
+				if mapId and poiId and C_AreaPoiInfo and C_AreaPoiInfo.GetAreaPOIInfo then
+					local poiInfo = C_AreaPoiInfo.GetAreaPOIInfo(mapId, poiId)
+					local nameToUse
+					if poiInfo then
+						nameToUse = poiInfo.name
+					else
+						nameToUse = self:_QuestName(100000000 + mapId * 10000 + poiId)
+					end
+					return format("|c%s%s - %s|r", colorCode, MINIMAP_TRACKING_POI, nameToUse)	-- "Points of Interest"
+				end
+				return format("|c%sPOI ERROR|r", colorCode)
 			else
 				questId = numeric
 				local typeString = ""
