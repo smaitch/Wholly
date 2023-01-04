@@ -2837,8 +2837,9 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			elseif questCode == ')' then
 				local currencyName, currentAmount = GRAIL:GetCurrencyInfo(subcode)
 				return format("|c%s%s|r", colorCode, currencyName)
-			elseif questCode == '_' then
-				return format("|c%s%s - %s|r", colorCode, LANDING_PAGE_RENOWN_LABEL, GRAIL.reputationMapping[subcode])
+			elseif questCode == '_' or questCode == '~' then
+				local extra = questCode == '~' and " [" .. Grail.accountUnlock .. "]" or ""
+				return format("|c%s%s%s - %s|r", colorCode, LANDING_PAGE_RENOWN_LABEL, extra, GRAIL.reputationMapping[subcode])
 			elseif questCode == '`' then
 				local mapId = tonumber(subcode)
 				local poiId = tonumber(numeric)
