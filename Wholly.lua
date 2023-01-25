@@ -436,6 +436,8 @@
 --			Corrects the problem where the location of the Wholly quest panel is not retained across restarts.
 --			Adds support for quests that have major faction renown level prerequisites.
 --			Adds support for quests that have POI presence prerequisites.
+--			Adds support for items with specific counts as prerequisites.
+--			Changes retail interface to 100005.
 --
 --	Known Issues
 --
@@ -2756,7 +2758,9 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			elseif questCode == 'K' or questCode == 'k' then
 				local name = GRAIL:NPCName(numeric)
 				local itemString = (questCode == 'k') and self.s.ITEM_LACK or self.s.ITEM
-				return format("|c%s%s|r [%s]", colorCode, name, itemString)
+				local count = tonumber(subcode)
+				local countString = count and "("..count..") " or ""
+				return format("|c%s%s|r %s[%s]", colorCode, name, countString, itemString)
 			elseif questCode == 'L' or questCode == 'l' then
 				local lessThanString = (questCode == 'l') and "<" or ""
 				return format("|c%s%s %s%d|r", colorCode, self.s.LEVEL, lessThanString, numeric)
