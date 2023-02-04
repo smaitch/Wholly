@@ -438,6 +438,7 @@
 --			Adds support for quests that have POI presence prerequisites.
 --			Adds support for items with specific counts as prerequisites.
 --			Changes retail interface to 100005.
+--			Adds support group membership completion counts being exact (to support Dragon Isles Waygate quests).
 --
 --	Known Issues
 --
@@ -2741,6 +2742,9 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			elseif questCode == 'w' then
 				local questTable = GRAIL.questStatusCache['G'][subcode] or {}
 				return format("|c%s%d|r/%d [%s, %s]", colorCode, numeric, #(questTable), self.s.COMPLETE, self.s.TURNED_IN)
+			elseif questCode == 'r' then
+				local questTable = GRAIL.questStatusCache['G'][subcode] or {}
+				return format("|c%s%d|r/%d [%s, %s]", colorCode, numeric, #(questTable), self.s.IN_LOG, self.s.TURNED_IN)
 			elseif questCode == 't' or questCode == 'T' or questCode == 'u' or questCode == 'U' then
 				if ('t' == questCode or 'u' == questCode) and 'P' == filterCode then colorCode = WDB.color.B end
 				return format("|c%s%s|r [%s]", colorCode, GRAIL.reputationMapping[subcode], self.s.REPUTATION_REQUIRED)
@@ -3328,7 +3332,7 @@ end
 			local code, subcode, numeric = Grail:CodeParts(innorItem)
 			local classification = Grail:ClassificationOfQuestCode(innorItem, nil, WDB.buggedQuestsConsideredUnobtainable)
 			local wSpecial = false
-			if 'V' == code or 'W' == code or 'w' == code then
+			if 'V' == code or 'W' == code or 'w' == code or 'r' == code then
 				wSpecial, numeric = true, ''
 			elseif 'T' == code or 't' == code then
 				local reputationName, reputationLevelName = Grail:ReputationNameAndLevelName(subcode, numeric)
