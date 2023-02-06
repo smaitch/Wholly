@@ -439,6 +439,7 @@
 --			Adds support for items with specific counts as prerequisites.
 --			Changes retail interface to 100005.
 --			Adds support group membership completion counts being exact (to support Dragon Isles Waygate quests).
+--		089 Changes Classic Wrath interface to 30401.
 --
 --	Known Issues
 --
