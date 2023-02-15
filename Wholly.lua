@@ -435,6 +435,11 @@
 --		088	Corrects the problem where mouse clicks on the Wholly quest panel failed to act.
 --			Corrects the problem where the location of the Wholly quest panel is not retained across restarts.
 --			Adds support for quests that have major faction renown level prerequisites.
+--			Adds support for quests that have POI presence prerequisites.
+--			Adds support for items with specific counts as prerequisites.
+--			Changes retail interface to 100005.
+--			Adds support group membership completion counts being exact (to support Dragon Isles Waygate quests).
+--		089 Changes Classic Wrath interface to 30401.
 --
 --	Known Issues
 --
@@ -2744,6 +2749,9 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			elseif questCode == 'w' then
 				local questTable = GRAIL.questStatusCache['G'][subcode] or {}
 				return format("|c%s%d|r/%d [%s, %s]", colorCode, numeric, #(questTable), self.s.COMPLETE, self.s.TURNED_IN)
+			elseif questCode == 'r' then
+				local questTable = GRAIL.questStatusCache['G'][subcode] or {}
+				return format("|c%s%d|r/%d [%s, %s]", colorCode, numeric, #(questTable), self.s.IN_LOG, self.s.TURNED_IN)
 			elseif questCode == 't' or questCode == 'T' or questCode == 'u' or questCode == 'U' then
 				if ('t' == questCode or 'u' == questCode) and 'P' == filterCode then colorCode = WDB.color.B end
 				return format("|c%s%s|r [%s]", colorCode, GRAIL.reputationMapping[subcode], self.s.REPUTATION_REQUIRED)
@@ -2761,7 +2769,9 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			elseif questCode == 'K' or questCode == 'k' then
 				local name = GRAIL:NPCName(numeric)
 				local itemString = (questCode == 'k') and self.s.ITEM_LACK or self.s.ITEM
-				return format("|c%s%s|r [%s]", colorCode, name, itemString)
+				local count = tonumber(subcode)
+				local countString = count and "("..count..") " or ""
+				return format("|c%s%s|r %s[%s]", colorCode, name, countString, itemString)
 			elseif questCode == 'L' or questCode == 'l' then
 				local lessThanString = (questCode == 'l') and "<" or ""
 				return format("|c%s%s %s%d|r", colorCode, self.s.LEVEL, lessThanString, numeric)
@@ -2842,8 +2852,23 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			elseif questCode == ')' then
 				local currencyName, currentAmount = GRAIL:GetCurrencyInfo(subcode)
 				return format("|c%s%s|r", colorCode, currencyName)
-			elseif questCode == '_' then
-				return format("|c%s%s - %s|r", colorCode, LANDING_PAGE_RENOWN_LABEL, GRAIL.reputationMapping[subcode])
+			elseif questCode == '_' or questCode == '~' then
+				local extra = questCode == '~' and " [" .. Grail.accountUnlock .. "]" or ""
+				return format("|c%s%s%s - %s|r", colorCode, LANDING_PAGE_RENOWN_LABEL, extra, GRAIL.reputationMapping[subcode])
+			elseif questCode == '`' then
+				local mapId = tonumber(subcode)
+				local poiId = tonumber(numeric)
+				if mapId and poiId and C_AreaPoiInfo and C_AreaPoiInfo.GetAreaPOIInfo then
+					local poiInfo = C_AreaPoiInfo.GetAreaPOIInfo(mapId, poiId)
+					local nameToUse
+					if poiInfo then
+						nameToUse = poiInfo.name
+					else
+						nameToUse = self:_QuestName(100000000 + mapId * 10000 + poiId)
+					end
+					return format("|c%s%s - %s|r", colorCode, MINIMAP_TRACKING_POI, nameToUse)	-- "Points of Interest"
+				end
+				return format("|c%sPOI ERROR|r", colorCode)
 			else
 				questId = numeric
 				local typeString = ""
@@ -3314,7 +3339,7 @@ end
 			local code, subcode, numeric = Grail:CodeParts(innorItem)
 			local classification = Grail:ClassificationOfQuestCode(innorItem, nil, WDB.buggedQuestsConsideredUnobtainable)
 			local wSpecial = false
-			if 'V' == code or 'W' == code or 'w' == code then
+			if 'V' == code or 'W' == code or 'w' == code or 'r' == code then
 				wSpecial, numeric = true, ''
 			elseif 'T' == code or 't' == code then
 				local reputationName, reputationLevelName = Grail:ReputationNameAndLevelName(subcode, numeric)
