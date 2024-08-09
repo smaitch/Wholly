@@ -461,15 +461,16 @@ local CreateFrame							= CreateFrame
 --local GetAchievementInfo					= GetAchievementInfo
 local GetAddOnMetadata						= GetAddOnMetadata
 local GetBuildInfo							= GetBuildInfo
+local GetCoinTextureString					= GetCoinTextureString or C_CurrencyInfo.GetCoinTextureString
 local GetCursorPosition						= GetCursorPosition
 local GetCVarBool							= GetCVarBool
 local GetLocale								= GetLocale
 local GetQuestID							= GetQuestID
 local GetRealZoneText						= GetRealZoneText
-local GetSpellInfo							= GetSpellInfo
+--local GetSpellInfo							= GetSpellInfo
 local GetTitleText							= GetTitleText
 local InCombatLockdown						= InCombatLockdown
-local InterfaceOptions_AddCategory			= InterfaceOptions_AddCategory
+--local InterfaceOptions_AddCategory			= InterfaceOptions_AddCategory
 local InterfaceOptionsFrame_OpenToCategory	= InterfaceOptionsFrame_OpenToCategory
 local IsControlKeyDown						= IsControlKeyDown
 local IsShiftKeyDown						= IsShiftKeyDown
@@ -494,7 +495,8 @@ local WorldMapFrame = WorldMapFrame
 local GRAIL = nil	-- will be set in PLAYER_LOGIN
 
 local directoryName, _ = ...
-local versionFromToc = GetAddOnMetadata(directoryName, "Version")
+local GetAddOnMetadata_API = GetAddOnMetadata or C_AddOns.GetAddOnMetadata
+local versionFromToc = GetAddOnMetadata_API(directoryName, "Version")
 local _, _, versionValueFromToc = strfind(versionFromToc, "(%d+)")
 local Wholly_File_Version = tonumber(versionValueFromToc)
 local requiredGrailVersion = 119
@@ -670,7 +672,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 									Wholly.ToggleWorldMapFrameMixin(BonusObjectiveDataProviderMixin, WhollyDatabase.hidesBlizzardWorldMapCallingQuests)
 								end,
 		configurationScript21 = function(self)
-									Wholly.ToggleWorldMapFrameMixin(StorylineQuestDataProviderMixin, WhollyDatabase.hidesBlizzardWorldMapCampaignQuests)
+-- StorylineQuestDataProviderMixin disappeared
+--									Wholly.ToggleWorldMapFrameMixin(StorylineQuestDataProviderMixin, WhollyDatabase.hidesBlizzardWorldMapCampaignQuests)
 								end,
 		configurationScript22 = function(self)
 									Wholly.ToggleWorldMapFrameMixin(WorldQuestDataProviderMixin, WhollyDatabase.hidesBlizzardWorldMapWorldQuests)
@@ -867,98 +870,9 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyLoadDataConfigFrame, Wholly.s.LOAD_DATA, "Wholly")
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyOtherConfigFrame, Wholly.s.OTHER_PREFERENCE, "Wholly")
 
-self.mapPinsPool.parent = WorldMapFrame:GetCanvas()
-self.mapPinsPool.creationFunc = function(framepool)
-    local frame = CreateFrame(framepool.frameType, nil, framepool.parent)
-    frame:SetSize(16, 16)
-    return Mixin(frame, self.mapPinsProviderPin)
-end
-self.mapPinsPool.resetterFunc = function(pinPool, pin)
-    FramePool_HideAndClearAnchors(pinPool, pin)
-    pin:OnReleased()
-    pin.pinTemplate = nil
-    pin.owningMap = nil
-end
-WorldMapFrame.pinPools[Wholly.mapPinsTemplateName] = self.mapPinsPool
-
-function self.mapPinsProvider:RemoveAllData()
-    self:GetMap():RemoveAllPinsByTemplate(Wholly.mapPinsTemplateName)
-end
-function self.mapPinsProvider:RefreshAllData(fromOnShow)
-    self:RemoveAllData()
-    if WhollyDatabase.displaysMapPins then
-        local uiMapID = self:GetMap():GetMapID()
-        Wholly.zoneInfo.pins.mapId = uiMapID
-        if not uiMapID then return end
-        Wholly.cachedPinQuests = Wholly:_ClassifyQuestsInMap(uiMapID) or {}
-        Wholly:_FilterPinQuests()
-        local questsInMap = Wholly.filteredPinQuests
-        local codeMapping = { ['?'] = 0, ['G'] = 1, ['W'] = 2, ['D'] = 3, ['R'] = 4, ['K'] = 5, ['H'] = 6, ['Y'] = 7, ['P'] = 8, ['L'] = 9, ['O'] = 10, ['U'] = 11, ['*'] = 12, ['!'] = 13 }
-        for i = 1, #questsInMap do
-            local id = questsInMap[i][1]
-            local code = questsInMap[i][2]
-            if 'D' == code and Grail:IsRepeatable(id) then code = 'R' end
-            if 'I' == code then
-            	local _, completed = Grail:IsQuestInQuestLog(id)
-            	completed = completed or 0
-            	if completed > 0 then
-            		code = '?'
-				elseif completed < 0 then
-					code = '!'
-				else
-					code = '*'
-				end
-			end
-            local codeValue = codeMapping[code]
-            local locations = ('?' == code or '*' == code or '!' == code) and Grail:QuestLocationsTurnin(id, true, false, true, uiMapID) or Grail:QuestLocationsAccept(id, false, false, true, uiMapID, true)
-            if nil ~= locations then
-                for _, npc in pairs(locations) do
-                    local xcoord, ycoord, npcName, npcId = npc.x, npc.y, npc.name, npc.id
-                    if nil ~= xcoord then
-						-- Either find an existing pin to see whether we need to change its texture type or create
-						-- a new pin.  We might need to change the texture depending on how many quests are going
-						-- to be displayed for the NPC.  We want the map to show one pin for the NPC and have its
-						-- texture be for the "best" quest type that NPC shows.
-						local possibleExistingPin = Wholly:RegisteredMapPin(xcoord, ycoord, npcId)
-						if nil ~= possibleExistingPin then
-							if codeValue < codeMapping[possibleExistingPin.texType] then
-								possibleExistingPin:SetType(code)
-							end
-						else
-							self:GetMap():AcquirePin(Wholly.mapPinsTemplateName, code, self:GetMap(), xcoord, ycoord, npcId)
-						end
-                    end
-                end
-            end
-        end
-    else
-        Wholly.mapCountLine = ""        -- do not display a tooltip for pins we are not showing
-    end
-end
-
-function self.mapPinsProviderPin:OnLoad()
-    self:UseFrameLevelType("PIN_FRAME_LEVEL_AREA_POI")
-	self.texture = self:CreateTexture()
-	self:SetScalingLimits(1, 1.0, 1.2)
-	self:SetMouseMotionEnabled(true)
-	self:SetScript("OnEnter", function(self) Wholly:ShowTooltip(self) end)
-	self:SetScript("OnLeave", function() Wholly:_HideTooltip() end)
-	self.SetType = Wholly._PinSetType
-end
-function self.mapPinsProviderPin:OnAcquired(code, map, x, y, npcId)
-	self:SetPosition(x/100, y/100)
-	self:SetType(code)
-	self.map = map
-	self.npcId = npcId
-	self.xcoord = x
-	self.ycoord = y
-	Wholly:RegisterMapPin(self, x, y, npcId)
-	self:Show()
-end
-function self.mapPinsProviderPin:OnReleased()
-	Wholly:UnregisterMapPin(self)
-end
-WorldMapFrame:AddDataProvider(self.mapPinsProvider)
+					self:_SetupMapPinsProvider()
+					self:_SetupMapPinsProviderPin()
+					self:_SetupMapPinsPool()	-- this needs to happen after calling _SetupMapPinsProviderPin() because it references items therein
 
 					self:_DisplayMapFrame(WDB.displaysMapFrame)
 					Grail:RegisterObserver("Status", self._CallbackHandler)
@@ -1107,9 +1021,9 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 		levelTwoData = nil,
 		mapFrame = nil,			-- the world map frame that contains the checkbox to toggle pins
         mapPins = {},
-        mapPinsPool = CreateFramePool("FRAME"),
-        mapPinsProvider = CreateFromMixins(MapCanvasDataProviderMixin),
-        mapPinsProviderPin = CreateFromMixins(MapCanvasPinMixin),
+        mapPinsPool = nil,			-- set up in _SetupMapPinsPool()
+        mapPinsProvider = nil,		-- set up in _SetupMapPinsProvider()
+        mapPinsProviderPin = nil,	-- set up in _SetupMapPinsProviderPin()
         mapPinsRegistry = {},
 		mapPinsTemplateName = "WhollyPinsTemplate",
 		mapPinCount = 0,
@@ -1688,7 +1602,18 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				panel.parent = panelParentName
 			end
 			panel:Hide()
-			InterfaceOptions_AddCategory(panel)
+			if InterfaceOptions_AddCategory then
+				InterfaceOptions_AddCategory(panel)
+			else
+				-- When panelParentName is nil we are dealing with the top-level
+				if nil == panelParentName then
+					local category, layout = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
+					Settings.RegisterAddOnCategory(category)
+					Wholly.settingsCategory = category
+				else
+					local subcategory = Settings.RegisterCanvasLayoutSubcategory(Wholly.settingsCategory, panel, panel.name)
+				end
+			end
 			local parent = panel:GetName()
 			local indentLevel
 			local lineLevel = 0
@@ -2023,6 +1948,21 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			local cy = (top - y/scale) / height;
 	
 			return mathmin(mathmax(cx, 0), 1), mathmin(mathmax(cy, 0), 1);
+		end,
+
+		-- Blizzard has change API from GetSpellInfo to C_Spell.GetSpellInfo and we use the
+		-- proper one here, but just to get the name.
+		GetSpellInfo = function(self, spellId)
+			if C_Spell and C_Spell.GetSpellInfo then
+				local info = C_Spell.GetSpellInfo(spellId)
+				if info then
+					return info.name
+				else
+					return nil
+				end
+			else
+				return GetSpellInfo(spellId)
+			end
 		end,
 
 		_PinSetType = function(pin, texType)
@@ -2672,8 +2612,12 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 		--	For some odd reason, if the options have never been opened they will default to opening to a Blizzard
 		--	option and not the desired one.  So a brutal workaround is to call it twice, which seems to do the job.
 		_OpenInterfaceOptions = function(self)
-			InterfaceOptionsFrame_OpenToCategory("Wholly")
-			InterfaceOptionsFrame_OpenToCategory("Wholly")
+			if InterfaceOptionsFrame_OpenToCategory then
+				InterfaceOptionsFrame_OpenToCategory("Wholly")
+				InterfaceOptionsFrame_OpenToCategory("Wholly")
+			else
+				Settings.OpenToCategory(Wholly.settingsCategory.ID)
+			end
 		end,
 
 		_PresentTooltipForBlizzardQuest = function(self, blizzardQuestButton)
@@ -2730,7 +2674,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			local filterCode = questTable[2]
 			local colorCode = WDB.color[filterCode]
 			if questCode == 'I' or questCode == 'i' then
-				local name = GetSpellInfo(numeric)
+				local name = self:GetSpellInfo(numeric)
 				local negateString = (questCode == 'i') and "!" or ""
 				return format("|c%s%s|r %s[%s]", colorCode, name, negateString, self.s.SPELLS)
 			elseif questCode == 'F' then
@@ -2751,7 +2695,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				if ('t' == questCode or 'u' == questCode) and 'P' == filterCode then colorCode = WDB.color.B end
 				return format("|c%s%s|r [%s]", colorCode, GRAIL.reputationMapping[subcode], self.s.REPUTATION_REQUIRED)
 			elseif questCode == 'Z' then
-				local name = GetSpellInfo(numeric)
+				local name = self:GetSpellInfo(numeric)
 				return format("|c%s%s|r [%s]", colorCode, name, self.s.EVER_CAST)
 			elseif questCode == 'J' or questCode == 'j' then
 				local name = Grail:GetBasicAchievementInfo(numeric)
@@ -2794,14 +2738,14 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				local comparison = questCode == 'Q' and ">=" or '<'
 				return format("|c%s%s %s %s|r", colorCode, self.s.CURRENTLY_EQUIPPED, comparison, self.s.ILEVEL)
 			elseif questCode == 'R' then
-				local name = GetSpellInfo(numeric)
+				local name = self:GetSpellInfo(numeric)
 				return format("|c%s%s|r [%s]", colorCode, name, self.s.EVER_EXPERIENCED)
 			elseif questCode == 'S' or questCode == 's' then
 				local skillName
 				if numeric > 200000000 then
 					skillName = GRAIL:NPCName(numeric)
 				else
-					skillName = GetSpellInfo(numeric)
+					skillName = self:GetSpellInfo(numeric)
 				end
 				local negateString = (questCode == 's') and "!" or ""
 				return format("|c%s%s|r %s[%s]", colorCode, skillName, negateString, self.s.SKILL)
@@ -3209,8 +3153,15 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				self:_AddLine(GetCoinTextureString(rewardMoney))
 			end
 			local numberRewardCurrencies = 0
-			if not Grail.existsClassic then
-				numberRewardCurrencies = GetNumQuestLogRewardCurrencies(questId)
+			if GetNumQuestLogRewardCurrencies then
+				if not Grail.existsClassic then
+					numberRewardCurrencies = GetNumQuestLogRewardCurrencies(questId)
+				end
+			else
+				local info = C_QuestInfoSystem.GetQuestRewardCurrencies(questId)
+				if info then
+					self:_AddLine(info.name, info.totalRewardAmount, info.texture)
+				end
 			end
 			for counter = 1, numberRewardCurrencies do
 				local currencyName, currencyTexture, currencyCount = GetQuestLogRewardCurrencyInfo(counter, questId)
@@ -3921,6 +3872,131 @@ end
 			end
 			WhollyDatabase = WDB
 			return WhollyDatabase
+		end,
+
+		_SetupMapPinsPool = function(self)
+			if CreateUnsecuredRegionPoolInstance then
+				self.mapPinsPool = CreateUnsecuredRegionPoolInstance(self.mapPinsTemplateName)
+			else
+				self.mapPinsPool = CreateFramePool("FRAME")
+			end
+		
+			self.mapPinsPool.parent = WorldMapFrame:GetCanvas()
+			
+			self.mapPinsPool.creationFunc = function()
+				local frame = CreateFrame("Frame", nil, WorldMapFrame:GetCanvas())
+				frame:SetSize(16, 16)
+				return Mixin(frame, self.mapPinsProviderPin)
+			end
+			
+			-- Blizzard uses a new function name in the 11.x world
+			self.mapPinsPool.createFunc = self.mapPinsPool.creationFunc
+			
+			self.mapPinsPool.resetterFunc = function(pinPool, pin)
+				pin:Hide()
+				pin:ClearAllPoints()
+				pin:OnReleased()
+				pin.pinTemplate = nil
+				pin.owningMap = nil
+			end
+			
+			-- Blizzard uses a new function name in the 11.x world
+			self.mapPinsPool.resetFunc = self.mapPinsPool.resetterFunc
+			
+			WorldMapFrame.pinPools[self.mapPinsTemplateName] = self.mapPinsPool
+		end,
+
+		_SetupMapPinsProvider = function(self)
+			self.mapPinsProvider = CreateFromMixins(MapCanvasDataProviderMixin)
+		
+			self.mapPinsProvider.RemoveAllData = function(self)
+				self:GetMap():RemoveAllPinsByTemplate(Wholly.mapPinsTemplateName)
+			end
+			
+			self.mapPinsProvider.RefreshAllData = function(self, fromOnShow)
+				self:RemoveAllData()
+				if WhollyDatabase.displaysMapPins then
+					local uiMapID = self:GetMap():GetMapID()
+					Wholly.zoneInfo.pins.mapId = uiMapID
+					if not uiMapID then return end
+					Wholly.cachedPinQuests = Wholly:_ClassifyQuestsInMap(uiMapID) or {}
+					Wholly:_FilterPinQuests()
+					local questsInMap = Wholly.filteredPinQuests
+					local codeMapping = { ['?'] = 0, ['G'] = 1, ['W'] = 2, ['D'] = 3, ['R'] = 4, ['K'] = 5, ['H'] = 6, ['Y'] = 7, ['P'] = 8, ['L'] = 9, ['O'] = 10, ['U'] = 11, ['*'] = 12, ['!'] = 13 }
+					for i = 1, #questsInMap do
+						local id = questsInMap[i][1]
+						local code = questsInMap[i][2]
+						if 'D' == code and Grail:IsRepeatable(id) then code = 'R' end
+						if 'I' == code then
+							local _, completed = Grail:IsQuestInQuestLog(id)
+							completed = completed or 0
+							if completed > 0 then
+								code = '?'
+							elseif completed < 0 then
+								code = '!'
+							else
+								code = '*'
+							end
+						end
+						local codeValue = codeMapping[code]
+						local locations = ('?' == code or '*' == code or '!' == code) and Grail:QuestLocationsTurnin(id, true, false, true, uiMapID) or Grail:QuestLocationsAccept(id, false, false, true, uiMapID, true)
+						if nil ~= locations then
+							for _, npc in pairs(locations) do
+								local xcoord, ycoord, npcName, npcId = npc.x, npc.y, npc.name, npc.id
+								if nil ~= xcoord then
+									-- Either find an existing pin to see whether we need to change its texture type or create
+									-- a new pin.  We might need to change the texture depending on how many quests are going
+									-- to be displayed for the NPC.  We want the map to show one pin for the NPC and have its
+									-- texture be for the "best" quest type that NPC shows.
+									local possibleExistingPin = Wholly:RegisteredMapPin(xcoord, ycoord, npcId)
+									if nil ~= possibleExistingPin then
+										if codeValue < codeMapping[possibleExistingPin.texType] then
+											possibleExistingPin:SetType(code)
+										end
+									else
+										self:GetMap():AcquirePin(Wholly.mapPinsTemplateName, code, self:GetMap(), xcoord, ycoord, npcId)
+									end
+								end
+							end
+						end
+					end
+				else
+					Wholly.mapCountLine = ""        -- do not display a tooltip for pins we are not showing
+				end
+			end
+			
+			WorldMapFrame:AddDataProvider(self.mapPinsProvider)
+		end,
+
+		_SetupMapPinsProviderPin = function(self)
+			self.mapPinsProviderPin = CreateFromMixins(MapCanvasPinMixin)
+			self.mapPinsProviderPin.OnLoad = function(self)
+				self:UseFrameLevelType("PIN_FRAME_LEVEL_AREA_POI")
+				self.texture = self:CreateTexture()
+				self:SetScalingLimits(1, 1.0, 1.2)
+				self:SetMouseMotionEnabled(true)
+				self:SetScript("OnEnter", function(self) Wholly:ShowTooltip(self) end)
+				self:SetScript("OnLeave", function() Wholly:_HideTooltip() end)
+				self.SetType = Wholly._PinSetType
+			end
+			
+			self.mapPinsProviderPin.OnAcquired = function(self, code, map, x, y, npcId)
+				self:SetPosition(x/100, y/100)
+				self:SetType(code)
+				self.map = map
+				self.npcId = npcId
+				self.xcoord = x
+				self.ycoord = y
+				Wholly:RegisterMapPin(self, x, y, npcId)
+				self:Show()
+			end
+
+			self.mapPinsProviderPin.OnReleased = function(self)
+				Wholly:UnregisterMapPin(self)
+			end
+
+			-- Copied hack from Here Be Dragons to avoid in-combat error on 10.1.5
+			self.mapPinsProviderPin.SetPassThroughButtons = function() end
 		end,
 
 		_SetupLibDataBroker = function(self)
@@ -4736,6 +4812,10 @@ end
 		end,
 
 		}
+
+	Wholly_ToggleUI = function()
+		Wholly.ToggleUI(Wholly)
+	end
 
 	local nf = CreateFrame("Frame")
 	Wholly.notificationFrame = nf
