@@ -2144,7 +2144,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					if nil ~= Grail.worldEventAchievements and nil ~= Grail.worldEventAchievements[Grail.playerFaction] then
 						for holidayKey, _ in pairs(Grail.worldEventAchievements[Grail.playerFaction]) do
 							i = i + 1
-							tinsert(t1.children, { displayName = Grail.holidayMapping[holidayKey], index = 15000 + i, holidayName = Grail.holidayMapping[holidayKey]})
+							tinsert(t1.children, { displayName = Grail.holidayMapping[holidayKey], index = 95000 + i, holidayName = Grail.holidayMapping[holidayKey]})
 						end
 					end
 				end
@@ -2152,11 +2152,11 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				if nil ~= Grail.professionAchievements and nil ~= Grail.professionAchievements[Grail.playerFaction] then
 					for professionKey, _ in pairs(Grail.professionAchievements[Grail.playerFaction]) do
 						i = i + 1
-						tinsert(t1.children, { displayName = Grail.professionMapping[professionKey], index = 16000 + i, professionName = Grail.professionMapping[professionKey] })
+						tinsert(t1.children, { displayName = Grail.professionMapping[professionKey], index = 96000 + i, professionName = Grail.professionMapping[professionKey] })
 					end
 				end
-				tinsert(t1.children, { displayName = BATTLE_PET_SOURCE_5, index = 17000 })
-				tinsert(t1.children, { displayName = Wholly.s.OTHER, index = 17001 })
+				tinsert(t1.children, { displayName = BATTLE_PET_SOURCE_5, index = 97000 })
+				tinsert(t1.children, { displayName = Wholly.s.OTHER, index = 97001 })
 				tinsert(entries, t1)
 			end
 
@@ -2303,7 +2303,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 						tinsert(t, t1)
 					end
 				end
-			elseif which >= 13000 and which < 15000 then		-- Continent Achievements
+			elseif which >= 13000 and which < 95000 then		-- Continent Achievements
 				local mapAreas = Grail.achievements[Grail.playerFaction] and Grail.achievements[Grail.playerFaction][which - 13000] or {}
 				for i = 1, #mapAreas do
 					local t1 = {}
@@ -2312,7 +2312,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					t1.mapID = mapAreas[i]
 					tinsert(t, t1)
 				end
-			elseif which >= 15000 and which < 16000 then		-- Holiday Achievements
+			elseif which >= 95000 and which < 96000 then		-- Holiday Achievements
 				local mapAreas = Grail.worldEventAchievements[Grail.playerFaction] and Grail.worldEventAchievements[Grail.playerFaction][Grail.reverseHolidayMapping[self.levelOneCurrent.holidayName]] or {}
 				for i = 1, #mapAreas do
 					local t1 = {}
@@ -2321,7 +2321,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					t1.mapID = mapAreas[i]
 					tinsert(t, t1)
 				end
-			elseif which >= 16000 and which < 17000 then		-- Profession Achievements
+			elseif which >= 96000 and which < 97000 then		-- Profession Achievements
 				local mapAreas = Grail.professionAchievements[Grail.playerFaction] and Grail.professionAchievements[Grail.playerFaction][Grail.reverseProfessionMapping[self.levelOneCurrent.professionName]] or {}
 				for i = 1, #mapAreas do
 					local t1 = {}
@@ -2330,7 +2330,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					t1.mapID = mapAreas[i]
 					tinsert(t, t1)
 				end
-			elseif 17001 == which then		-- Other Achievements
+			elseif 97001 == which then		-- Other Achievements
 				-- 5 Dungeon Achievement
 				local t1 = {}
 				local mapID = Grail.mapAreaBaseAchievement + 4956
@@ -2398,7 +2398,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					self.justAddedSearch = nil
 				end
 				tinsert(t, { sortName = lastUsed + 1, displayName = Wholly.s.SEARCH_ALL_QUESTS, f = function() Wholly.SearchForAllQuests(Wholly) Wholly.zoneInfo.panel.mapId = 0 Wholly._ForcePanelMapArea(Wholly, true) CloseDropDownMenus() end })
-			elseif 17000 == which then		-- Pet Battle achievements
+			elseif 97000 == which then		-- Pet Battle achievements
 				local mapAreas = Grail.petBattleAchievements[Grail.playerFaction] or {}
 				for i = 1, #mapAreas do
 					local t1 = {}
