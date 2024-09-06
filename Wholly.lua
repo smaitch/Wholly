@@ -441,6 +441,8 @@
 --			Adds support group membership completion counts being exact (to support Dragon Isles Waygate quests).
 --		089 Changes Classic Wrath interface to 30401.
 --		090 Changes retail interface to 100007.
+--		091 Adds initial support for The War Within.
+--			Switches TOC to have a single Interface that lists all supported versions.
 --
 --	Known Issues
 --
