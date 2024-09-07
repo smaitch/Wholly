@@ -443,6 +443,7 @@
 --		090 Changes retail interface to 100007.
 --		091 Adds initial support for The War Within.
 --			Switches TOC to have a single Interface that lists all supported versions.
+--		092	Adds support to indicate a quest was completed by someone else in the account (warband).
 --
 --	Known Issues
 --
@@ -501,7 +502,7 @@ local GetAddOnMetadata_API = GetAddOnMetadata or C_AddOns.GetAddOnMetadata
 local versionFromToc = GetAddOnMetadata_API(directoryName, "Version")
 local _, _, versionValueFromToc = strfind(versionFromToc, "(%d+)")
 local Wholly_File_Version = tonumber(versionValueFromToc)
-local requiredGrailVersion = 119
+local requiredGrailVersion = 124
 
 --	Set up the bindings to use the localized name Blizzard supplies.  Note that the Bindings.xml file cannot
 --	just contain the TOGGLEQUESTLOG because then the entry for Wholly does not show up.  So, we use a version
@@ -2915,6 +2916,8 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				if nil == when then
 					if Grail:IsQuestCompleted(questId) or Grail:HasQuestEverBeenCompleted(questId) then
 						when = self.s.TIME_UNKNOWN
+					elseif Grail:IsQuestFlaggedCompletedOnAccount(questId) then
+						when = ACCOUNT_QUEST_LABEL	-- "Warband"
 					end
 				end
 				if nil ~= when then
