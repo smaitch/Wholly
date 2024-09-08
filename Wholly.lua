@@ -444,6 +444,7 @@
 --		091 Adds initial support for The War Within.
 --			Switches TOC to have a single Interface that lists all supported versions.
 --		092	Adds support to indicate a quest was completed by someone else in the account (warband).
+--			Adds some new filters based on Grail support for different quest types.
 --
 --	Known Issues
 --
@@ -1106,8 +1107,13 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			['ABANDONED'] = "Abandoned",
 			['NEVER_ABANDONED'] = "Never Abandoned",
 			['ACCEPTED'] = "Accepted",	-- ? CALENDAR_STATUS_ACCEPTED ?
-			['LEGENDARY'] = "Legendary",
+			['LEGENDARY'] = QUEST_CLASSIFICATION_LEGENDARY,
+			['CALLING'] = QUEST_CLASSIFICATION_CALLING,
 			['ACCOUNT'] = "Account",
+			['SHARABLE'] = "Sharable",
+			['BOUNTY'] = "Bounty",
+			['INVASION'] = "Invasion",
+			['TASK'] = "Task",
 			['EVER_CAST'] = "Has ever cast",
 			['EVER_EXPERIENCED'] = "Has ever experienced",
 			['TAGS'] = "Tags",
@@ -1899,6 +1905,12 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			if not WDB.showsPetBattleQuests and Grail:IsPetBattle(questId) then return false end
 			if not WDB.showsPVPQuests and Grail:IsPVP(questId) then return false end
 			if not WDB.showsWorldQuests and Grail:IsWorldQuest(questId) then return false end
+			if not WDB.showsCallingQuests and Grail:IsCallingQuest(questId) then return false end
+			if not WDB.showsImportantQuests and Grail:IsImportantQuest(questId) then return false end
+			if not WDB.showsThreatQuests and Grail:IsThreatQuest(questId) then return false end
+			if not WDB.showsInvasionQuests and Grail:IsInvasionQuest(questId) then return false end
+			if not WDB.showsAccountWideQuests and Grail:IsAccountWide(questId) then return false end
+			if not WDB.showsWarbandCompletedQuests and Grail:IsQuestFlaggedCompletedOnAccount(questId) then return false end
 			return true
 		end,
 
@@ -2474,6 +2486,11 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			db.showsPetBattleQuests = true
 			db.showsPVPQuests = true
 			db.showsWorldQuests = true
+			db.showsCallingQuests = true
+			db.showsImportantQuests = true
+			db.showsInvasionQuests = true
+			db.showsAccountWideQuests = true
+			db.showsWarbandCompletedQuests = true
 			db.loadDateData = true
 			db.displaysMapPinsTurnin = true
 			db.displaysMapPinsTurninIncomplete = false
@@ -2976,6 +2993,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			elseif Grail.bitMaskClassAll == bitband(obtainersCode, Grail.bitMaskClassAll) then
 				classString = self.s.CLASS_ANY
 			else
+				local t = {}
 				classString = ""
 				for letterCode, bitValue in pairs(Grail.classToBitMapping) do
 					if 0 < bitband(obtainersCode, bitValue) then
@@ -2983,10 +3001,11 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 						local localizedGenderClassName = Grail:CreateClassNameLocalizedGenderized(englishName)
 						local classColor = RAID_CLASS_COLORS[englishName]
 						if nil ~= localizedGenderClassName and nil ~= classColor then
-							classString = classString .. format("|cff%.2x%.2x%.2x%s|r ", classColor.r*255, classColor.g*255, classColor.b*255, localizedGenderClassName)
+							t = Grail:_TableAppend(t, format("|cff%.2x%.2x%.2x%s|r", classColor.r*255, classColor.g*255, classColor.b*255, localizedGenderClassName))
 						end
 					end
 				end
+				classString = self:_StringFromTable(t, ", ")
 				classString = trim(classString)
 			end
 			if bitband(statusCode, Grail.bitMaskClass) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorClass) > 0 then colorCode = orangeColor else colorCode = normalColor end
@@ -3011,14 +3030,17 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				raceString = self.s.RACE_ANY
 			else
 				raceString = ""
+				local t = {}
 				for letterCode, raceTable in pairs(Grail.races) do
 					local bitValue = raceTable[4]
 					if 0 < bitband(obtainersRaceCode, bitValue) then
 						local englishName = Grail.races[letterCode][1]
 						local localizedGenderRaceName = Grail:CreateRaceNameLocalizedGenderized(englishName)
-						raceString = raceString .. localizedGenderRaceName .. " "
+						t = Grail:_TableAppend(t, localizedGenderRaceName)
+--						raceString = raceString .. localizedGenderRaceName .. " "
 					end
 				end
+				raceString = self:_StringFromTable(t, ", ")
 				raceString = trim(raceString)
 			end
 			if bitband(statusCode, Grail.bitMaskRace) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorRace) > 0 then colorCode = orangeColor else colorCode = normalColor end
@@ -3339,32 +3361,60 @@ end
 			return Grail:QuestName(questId) or "NO NAME"
 		end,
 
+		_StringFromTable = function(self, t, separator)
+			local tableLength = Grail:_TableLength(t)
+			if tableLength == 0 then
+				return ""
+			elseif tableLength == 1 then
+				return t[1]
+			else
+				local retval = ""
+				local count = 0
+				for key, value in pairs(t) do
+					count = count + 1
+					retval = retval .. value
+					if count < tableLength then
+						retval = retval .. separator
+					end
+				end
+				return retval
+			end
+		end,
+
 		_QuestTypeString = function(self, questId)
+			local t = {}
 			local retval = ""
 			local bitValue = Grail:CodeType(questId)
 			if bitValue > 0 then
-				if bitband(bitValue, Grail.bitMaskQuestRepeatable) > 0 then retval = retval .. self.s.REPEATABLE .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestDaily) > 0 then retval = retval .. self.s.DAILY .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestWeekly) > 0 then retval = retval .. self.s.WEEKLY .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestMonthly) > 0 then retval = retval .. self.s.MONTHLY .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestYearly) > 0 then retval = retval .. self.s.YEARLY .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestEscort) > 0 then retval = retval .. self.s.ESCORT .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestDungeon) > 0 then retval = retval .. self.s.DUNGEON .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestRaid) > 0 then retval = retval .. self.s.RAID .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestPVP) > 0 then retval = retval .. self.s.PVP .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestGroup) > 0 then retval = retval .. self.s.GROUP .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestHeroic) > 0 then retval = retval .. self.s.HEROIC .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestScenario) > 0 then retval = retval .. self.s.SCENARIO .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestLegendary) > 0 then retval = retval .. self.s.LEGENDARY .. " " end
-				if Grail.bitMaskQuestAccountWide and bitband(bitValue, Grail.bitMaskQuestAccountWide) > 0 then retval = retval .. self.s.ACCOUNT .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestPetBattle) > 0 then retval = retval .. self.s.PET_BATTLES .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestBonus) > 0 then retval = retval .. self.s.BONUS_OBJECTIVE .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestRareMob) > 0 then retval = retval .. self.s.RARE_MOBS .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestTreasure) > 0 then retval = retval .. self.s.TREASURE .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestWorldQuest) > 0 then retval = retval .. self.s.WORLD_QUEST .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestBiweekly) > 0 then retval = retval .. self.s.BIWEEKLY .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestThreatQuest) > 0 then retval = retval .. self.s.THREAT_QUEST .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestCallingQuest) > 0 then retval = retval .. self.s.CALLING_QUEST .. " " end
+				if Grail:IsRepeatable(questId) then t = Grail:_TableAppend(t, self.s.REPEATABLE) end
+				if Grail:IsDaily(questId) then t = Grail:_TableAppend(t, self.s.DAILY) end
+				if Grail:IsWeekly(questId) then t = Grail:_TableAppend(t, self.s.WEEKLY) end
+				if Grail:IsBiweekly(questId) then t = Grail:_TableAppend(t, self.s.BIWEEKLY) end
+				if Grail:IsMonthly(questId) then t = Grail:_TableAppend(t, self.s.MONTHLY) end
+				if Grail:IsYearly(questId) then t = Grail:_TableAppend(t, self.s.YEARLY) end
+				if Grail:IsEscort(questId) then t = Grail:_TableAppend(t, self.s.ESCORT) end
+				if Grail:IsDungeon(questId) then t = Grail:_TableAppend(t, self.s.DUNGEON) end
+				if Grail:IsRaid(questId) then t = Grail:_TableAppend(t, self.s.RAID) end
+				if Grail:IsPVP(questId) then t = Grail:_TableAppend(t, self.s.PVP) end
+				if Grail:IsGroup(questId) then t = Grail:_TableAppend(t, self.s.GROUP) end
+				if Grail:IsHeroic(questId) then t = Grail:_TableAppend(t, self.s.HEROIC) end
+				if Grail:IsScenario(questId) then t = Grail:_TableAppend(t, self.s.SCENARIO) end
+				if Grail:IsLegendary(questId) then t = Grail:_TableAppend(t, self.s.LEGENDARY) end
+				if Grail:IsAccountWide(questId) then t = Grail:_TableAppend(t, self.s.ACCOUNT) end
+				if Grail:IsPetBattle(questId) then t = Grail:_TableAppend(t, self.s.PET_BATTLES) end
+				if Grail:IsBonusObjective(questId) then t = Grail:_TableAppend(t, self.s.BONUS_OBJECTIVE) end
+				if Grail:IsRareMob(questId) then t = Grail:_TableAppend(t, self.s.RARE_MOBS) end
+				if Grail:IsTreasure(questId) then t = Grail:_TableAppend(t, self.s.TREASURE) end
+				if Grail:IsWorldQuest(questId) then t = Grail:_TableAppend(t, self.s.WORLD_QUEST) end
+				if Grail:IsThreatQuest(questId) then t = Grail:_TableAppend(t, self.s.THREAT_QUEST) end
+				if Grail:IsCallingQuest(questId) then t = Grail:_TableAppend(t, self.s.CALLING) end
+				if Grail:IsImportantQuest(questId) then t = Grail:_TableAppend(t, self.s.IMPORTANT) end
+				if Grail:IsMetaQuest(questId) then t = Grail:_TableAppend(t, self.s.META) end
+				if Grail:IsSharableQuest(questId) then t = Grail:_TableAppend(t, self.s.SHARABLE) end
+				if Grail:IsBountyQuest(questId) then t = Grail:_TableAppend(t, self.s.BOUNTY) end
+				if Grail:IsInvasionQuest(questId) then t = Grail:_TableAppend(t, self.s.INVASION) end
+--				if bitband(bitValue, Grail.bitMaskQuestTask) > 0 then t = Grail:_TableAppend(t, self.s.TASK) end
+				retval = self:_StringFromTable(t, ", ")
 			end
 			return trim(retval)
 		end,
@@ -3867,6 +3917,13 @@ end
 				WDB.displaysMapPinsTurninIncomplete = false
 				WDB.color["*"] = self.color["*"]
 				WDB.color["!"] = self.color["!"]
+			end
+			if WDB.version < 92 then
+				WDB.showsCallingQuests = true
+				WDB.showsImportantQuests = true
+				WDB.showsInvasionQuests = true
+				WDB.showsAccountWideQuests = true
+				WDB.showsWarbandCompletedQuests = true
 			end
 			WDB.version = Wholly.versionNumber
 
@@ -6026,6 +6083,13 @@ end
 	S['BIWEEKLY'] = CALENDAR_REPEAT_BIWEEKLY							-- "Biweekly"
 	S['THREAT_QUEST'] = WORLD_MAP_THREATS								-- "N'Zoth Assaults"
 	S['CALLING_QUEST'] = CALLINGS_QUESTS								-- "Callings"
+	S['CALLING'] = QUEST_CLASSIFICATION_CALLING							-- "Calling"
+	S['CAMPAIGN'] = QUEST_CLASSIFICATION_CAMPAIGN						-- "Campaign"
+	S['IMPORTANT'] = QUEST_CLASSIFICATION_IMPORTANT						-- "Important"
+	S['LEGENDARY'] = QUEST_CLASSIFICATION_LEGENDARY						-- "Legendary"
+	S['META'] = QUEST_CLASSIFICATION_META								-- "Meta"
+	S['STORYLINE'] = QUEST_CLASSIFICATION_QUESTLINE						-- "Storyline"
+	S['REPEATABLE'] = QUEST_CLASSIFICATION_RECURRING					-- "Repeatable"
 
 	local C = Wholly.color
 	Wholly.configuration = {}
@@ -6051,6 +6115,11 @@ end
 		{ S.PET_BATTLES, 'showsPetBattleQuests', 'configurationScript1' },
 		{ S.PVP, 'showsPVPQuests', 'configurationScript1' },
 		{ S.WORLD_QUEST, 'showsWorldQuests', 'configurationScript1', nil, nil, 'O' },
+		{ S.CALLING, 'showsCallingQuests', 'configurationScript1' },
+		{ S.IMPORTANT, 'showsImportantQuests', 'configurationScript1' },
+		{ S.INVASION, 'showsInvasionQuests', 'configurationScript1' },
+		{ S.ACCOUNT, 'showsAccountWideQuests', 'configurationScript1' },
+		{ ACCOUNT_QUEST_LABEL, 'showsWarbandCompletedQuests', 'configurationScript1' },	-- "Warband"
 		}
 	Wholly.configuration[S.TITLE_APPEARANCE] = {
 		{ S.TITLE_APPEARANCE },
