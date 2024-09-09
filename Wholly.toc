@@ -4,7 +4,7 @@
 ## Notes: Shows quest database and map pins
 ## Version: 092
 ## Dependencies: Grail
-## OptionalDeps: LibStub, LibDataBroker, TomTom, Gatherer, Questie
+## OptionalDeps: LibStub, LibDataBroker, TomTom, Gatherer, Questie, Immersion
 ## SavedVariablesPerCharacter: WhollyDatabase
 ## AddonCompartmentFunc: Wholly_ToggleUI
 ## IconTexture: Interface\Icons\achievement_quests_completed_06
