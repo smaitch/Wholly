@@ -440,6 +440,11 @@
 --			Changes retail interface to 100005.
 --			Adds support group membership completion counts being exact (to support Dragon Isles Waygate quests).
 --		089 Changes Classic Wrath interface to 30401.
+--		090 Changes retail interface to 100007.
+--		091 Adds initial support for The War Within.
+--			Switches TOC to have a single Interface that lists all supported versions.
+--		092	Adds support to indicate a quest was completed by someone else in the account (warband).
+--			Adds some new filters based on Grail support for different quest types.
 --
 --	Known Issues
 --
@@ -460,15 +465,16 @@ local CreateFrame							= CreateFrame
 --local GetAchievementInfo					= GetAchievementInfo
 local GetAddOnMetadata						= GetAddOnMetadata
 local GetBuildInfo							= GetBuildInfo
+local GetCoinTextureString					= GetCoinTextureString or C_CurrencyInfo.GetCoinTextureString
 local GetCursorPosition						= GetCursorPosition
 local GetCVarBool							= GetCVarBool
 local GetLocale								= GetLocale
 local GetQuestID							= GetQuestID
 local GetRealZoneText						= GetRealZoneText
-local GetSpellInfo							= GetSpellInfo
+--local GetSpellInfo							= GetSpellInfo
 local GetTitleText							= GetTitleText
 local InCombatLockdown						= InCombatLockdown
-local InterfaceOptions_AddCategory			= InterfaceOptions_AddCategory
+--local InterfaceOptions_AddCategory			= InterfaceOptions_AddCategory
 local InterfaceOptionsFrame_OpenToCategory	= InterfaceOptionsFrame_OpenToCategory
 local IsControlKeyDown						= IsControlKeyDown
 local IsShiftKeyDown						= IsShiftKeyDown
@@ -493,10 +499,11 @@ local WorldMapFrame = WorldMapFrame
 local GRAIL = nil	-- will be set in PLAYER_LOGIN
 
 local directoryName, _ = ...
-local versionFromToc = GetAddOnMetadata(directoryName, "Version")
+local GetAddOnMetadata_API = GetAddOnMetadata or C_AddOns.GetAddOnMetadata
+local versionFromToc = GetAddOnMetadata_API(directoryName, "Version")
 local _, _, versionValueFromToc = strfind(versionFromToc, "(%d+)")
 local Wholly_File_Version = tonumber(versionValueFromToc)
-local requiredGrailVersion = 119
+local requiredGrailVersion = 124
 
 --	Set up the bindings to use the localized name Blizzard supplies.  Note that the Bindings.xml file cannot
 --	just contain the TOGGLEQUESTLOG because then the entry for Wholly does not show up.  So, we use a version
@@ -669,7 +676,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 									Wholly.ToggleWorldMapFrameMixin(BonusObjectiveDataProviderMixin, WhollyDatabase.hidesBlizzardWorldMapCallingQuests)
 								end,
 		configurationScript21 = function(self)
-									Wholly.ToggleWorldMapFrameMixin(StorylineQuestDataProviderMixin, WhollyDatabase.hidesBlizzardWorldMapCampaignQuests)
+-- StorylineQuestDataProviderMixin disappeared
+--									Wholly.ToggleWorldMapFrameMixin(StorylineQuestDataProviderMixin, WhollyDatabase.hidesBlizzardWorldMapCampaignQuests)
 								end,
 		configurationScript22 = function(self)
 									Wholly.ToggleWorldMapFrameMixin(WorldQuestDataProviderMixin, WhollyDatabase.hidesBlizzardWorldMapWorldQuests)
@@ -872,98 +880,9 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyLoadDataConfigFrame, Wholly.s.LOAD_DATA, "Wholly")
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyOtherConfigFrame, Wholly.s.OTHER_PREFERENCE, "Wholly")
 
-self.mapPinsPool.parent = WorldMapFrame:GetCanvas()
-self.mapPinsPool.creationFunc = function(framepool)
-    local frame = CreateFrame(framepool.frameType, nil, framepool.parent)
-    frame:SetSize(16, 16)
-    return Mixin(frame, self.mapPinsProviderPin)
-end
-self.mapPinsPool.resetterFunc = function(pinPool, pin)
-    FramePool_HideAndClearAnchors(pinPool, pin)
-    pin:OnReleased()
-    pin.pinTemplate = nil
-    pin.owningMap = nil
-end
-WorldMapFrame.pinPools[Wholly.mapPinsTemplateName] = self.mapPinsPool
-
-function self.mapPinsProvider:RemoveAllData()
-    self:GetMap():RemoveAllPinsByTemplate(Wholly.mapPinsTemplateName)
-end
-function self.mapPinsProvider:RefreshAllData(fromOnShow)
-    self:RemoveAllData()
-    if WhollyDatabase.displaysMapPins then
-        local uiMapID = self:GetMap():GetMapID()
-        Wholly.zoneInfo.pins.mapId = uiMapID
-        if not uiMapID then return end
-        Wholly.cachedPinQuests = Wholly:_ClassifyQuestsInMap(uiMapID) or {}
-        Wholly:_FilterPinQuests()
-        local questsInMap = Wholly.filteredPinQuests
-        local codeMapping = { ['?'] = 0, ['G'] = 1, ['W'] = 2, ['D'] = 3, ['R'] = 4, ['K'] = 5, ['H'] = 6, ['Y'] = 7, ['P'] = 8, ['L'] = 9, ['O'] = 10, ['U'] = 11, ['*'] = 12, ['!'] = 13 }
-        for i = 1, #questsInMap do
-            local id = questsInMap[i][1]
-            local code = questsInMap[i][2]
-            if 'D' == code and Grail:IsRepeatable(id) then code = 'R' end
-            if 'I' == code then
-            	local _, completed = Grail:IsQuestInQuestLog(id)
-            	completed = completed or 0
-            	if completed > 0 then
-            		code = '?'
-				elseif completed < 0 then
-					code = '!'
-				else
-					code = '*'
-				end
-			end
-            local codeValue = codeMapping[code]
-            local locations = ('?' == code or '*' == code or '!' == code) and Grail:QuestLocationsTurnin(id, true, false, true, uiMapID) or Grail:QuestLocationsAccept(id, false, false, true, uiMapID, true)
-            if nil ~= locations then
-                for _, npc in pairs(locations) do
-                    local xcoord, ycoord, npcName, npcId = npc.x, npc.y, npc.name, npc.id
-                    if nil ~= xcoord then
-						-- Either find an existing pin to see whether we need to change its texture type or create
-						-- a new pin.  We might need to change the texture depending on how many quests are going
-						-- to be displayed for the NPC.  We want the map to show one pin for the NPC and have its
-						-- texture be for the "best" quest type that NPC shows.
-						local possibleExistingPin = Wholly:RegisteredMapPin(xcoord, ycoord, npcId)
-						if nil ~= possibleExistingPin then
-							if codeValue < codeMapping[possibleExistingPin.texType] then
-								possibleExistingPin:SetType(code)
-							end
-						else
-							self:GetMap():AcquirePin(Wholly.mapPinsTemplateName, code, self:GetMap(), xcoord, ycoord, npcId)
-						end
-                    end
-                end
-            end
-        end
-    else
-        Wholly.mapCountLine = ""        -- do not display a tooltip for pins we are not showing
-    end
-end
-
-function self.mapPinsProviderPin:OnLoad()
-    self:UseFrameLevelType("PIN_FRAME_LEVEL_AREA_POI")
-	self.texture = self:CreateTexture()
-	self:SetScalingLimits(1, 1.0, 1.2)
-	self:SetMouseMotionEnabled(true)
-	self:SetScript("OnEnter", function(self) Wholly:ShowTooltip(self) end)
-	self:SetScript("OnLeave", function() Wholly:_HideTooltip() end)
-	self.SetType = Wholly._PinSetType
-end
-function self.mapPinsProviderPin:OnAcquired(code, map, x, y, npcId)
-	self:SetPosition(x/100, y/100)
-	self:SetType(code)
-	self.map = map
-	self.npcId = npcId
-	self.xcoord = x
-	self.ycoord = y
-	Wholly:RegisterMapPin(self, x, y, npcId)
-	self:Show()
-end
-function self.mapPinsProviderPin:OnReleased()
-	Wholly:UnregisterMapPin(self)
-end
-WorldMapFrame:AddDataProvider(self.mapPinsProvider)
+					self:_SetupMapPinsProvider()
+					self:_SetupMapPinsProviderPin()
+					self:_SetupMapPinsPool()	-- this needs to happen after calling _SetupMapPinsProviderPin() because it references items therein
 
 					self:_DisplayMapFrame(WDB.displaysMapFrame)
 					Grail:RegisterObserver("Status", self._CallbackHandler)
@@ -1112,9 +1031,9 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 		levelTwoData = nil,
 		mapFrame = nil,			-- the world map frame that contains the checkbox to toggle pins
         mapPins = {},
-        mapPinsPool = CreateFramePool("FRAME"),
-        mapPinsProvider = CreateFromMixins(MapCanvasDataProviderMixin),
-        mapPinsProviderPin = CreateFromMixins(MapCanvasPinMixin),
+        mapPinsPool = nil,			-- set up in _SetupMapPinsPool()
+        mapPinsProvider = nil,		-- set up in _SetupMapPinsProvider()
+        mapPinsProviderPin = nil,	-- set up in _SetupMapPinsProviderPin()
         mapPinsRegistry = {},
 		mapPinsTemplateName = "WhollyPinsTemplate",
 		mapPinCount = 0,
@@ -1194,8 +1113,13 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			['ABANDONED'] = "Abandoned",
 			['NEVER_ABANDONED'] = "Never Abandoned",
 			['ACCEPTED'] = "Accepted",	-- ? CALENDAR_STATUS_ACCEPTED ?
-			['LEGENDARY'] = "Legendary",
+			['LEGENDARY'] = QUEST_CLASSIFICATION_LEGENDARY,
+			['CALLING'] = QUEST_CLASSIFICATION_CALLING,
 			['ACCOUNT'] = "Account",
+			['SHARABLE'] = "Sharable",
+			['BOUNTY'] = "Bounty",
+			['INVASION'] = "Invasion",
+			['TASK'] = "Task",
 			['EVER_CAST'] = "Has ever cast",
 			['EVER_EXPERIENCED'] = "Has ever experienced",
 			['TAGS'] = "Tags",
@@ -1693,7 +1617,18 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				panel.parent = panelParentName
 			end
 			panel:Hide()
-			InterfaceOptions_AddCategory(panel)
+			if InterfaceOptions_AddCategory then
+				InterfaceOptions_AddCategory(panel)
+			else
+				-- When panelParentName is nil we are dealing with the top-level
+				if nil == panelParentName then
+					local category, layout = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
+					Settings.RegisterAddOnCategory(category)
+					Wholly.settingsCategory = category
+				else
+					local subcategory = Settings.RegisterCanvasLayoutSubcategory(Wholly.settingsCategory, panel, panel.name)
+				end
+			end
 			local parent = panel:GetName()
 			local indentLevel
 			local lineLevel = 0
@@ -1976,6 +1911,12 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			if not WDB.showsPetBattleQuests and Grail:IsPetBattle(questId) then return false end
 			if not WDB.showsPVPQuests and Grail:IsPVP(questId) then return false end
 			if not WDB.showsWorldQuests and Grail:IsWorldQuest(questId) then return false end
+			if not WDB.showsCallingQuests and Grail:IsCallingQuest(questId) then return false end
+			if not WDB.showsImportantQuests and Grail:IsImportantQuest(questId) then return false end
+			if not WDB.showsThreatQuests and Grail:IsThreatQuest(questId) then return false end
+			if not WDB.showsInvasionQuests and Grail:IsInvasionQuest(questId) then return false end
+			if not WDB.showsAccountWideQuests and Grail:IsAccountWide(questId) then return false end
+			if not WDB.showsWarbandCompletedQuests and Grail:IsQuestFlaggedCompletedOnAccount(questId) then return false end
 			return true
 		end,
 
@@ -2028,6 +1969,21 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			local cy = (top - y/scale) / height;
 	
 			return mathmin(mathmax(cx, 0), 1), mathmin(mathmax(cy, 0), 1);
+		end,
+
+		-- Blizzard has change API from GetSpellInfo to C_Spell.GetSpellInfo and we use the
+		-- proper one here, but just to get the name.
+		GetSpellInfo = function(self, spellId)
+			if C_Spell and C_Spell.GetSpellInfo then
+				local info = C_Spell.GetSpellInfo(spellId)
+				if info then
+					return info.name
+				else
+					return nil
+				end
+			else
+				return GetSpellInfo(spellId)
+			end
 		end,
 
 		_PinSetType = function(pin, texType)
@@ -2209,7 +2165,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 					if nil ~= Grail.worldEventAchievements and nil ~= Grail.worldEventAchievements[Grail.playerFaction] then
 						for holidayKey, _ in pairs(Grail.worldEventAchievements[Grail.playerFaction]) do
 							i = i + 1
-							tinsert(t1.children, { displayName = Grail.holidayMapping[holidayKey], index = 15000 + i, holidayName = Grail.holidayMapping[holidayKey]})
+							tinsert(t1.children, { displayName = Grail.holidayMapping[holidayKey], index = 95000 + i, holidayName = Grail.holidayMapping[holidayKey]})
 						end
 					end
 				end
@@ -2217,11 +2173,11 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				if nil ~= Grail.professionAchievements and nil ~= Grail.professionAchievements[Grail.playerFaction] then
 					for professionKey, _ in pairs(Grail.professionAchievements[Grail.playerFaction]) do
 						i = i + 1
-						tinsert(t1.children, { displayName = Grail.professionMapping[professionKey], index = 16000 + i, professionName = Grail.professionMapping[professionKey] })
+						tinsert(t1.children, { displayName = Grail.professionMapping[professionKey], index = 96000 + i, professionName = Grail.professionMapping[professionKey] })
 					end
 				end
-				tinsert(t1.children, { displayName = BATTLE_PET_SOURCE_5, index = 17000 })
-				tinsert(t1.children, { displayName = Wholly.s.OTHER, index = 17001 })
+				tinsert(t1.children, { displayName = BATTLE_PET_SOURCE_5, index = 97000 })
+				tinsert(t1.children, { displayName = Wholly.s.OTHER, index = 97001 })
 				tinsert(entries, t1)
 			end
 
@@ -2368,7 +2324,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 						tinsert(t, t1)
 					end
 				end
-			elseif which >= 13000 and which < 15000 then		-- Continent Achievements
+			elseif which >= 13000 and which < 95000 then		-- Continent Achievements
 				local mapAreas = Grail.achievements[Grail.playerFaction] and Grail.achievements[Grail.playerFaction][which - 13000] or {}
 				for i = 1, #mapAreas do
 					local t1 = {}
@@ -2377,7 +2333,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 					t1.mapID = mapAreas[i]
 					tinsert(t, t1)
 				end
-			elseif which >= 15000 and which < 16000 then		-- Holiday Achievements
+			elseif which >= 95000 and which < 96000 then		-- Holiday Achievements
 				local mapAreas = Grail.worldEventAchievements[Grail.playerFaction] and Grail.worldEventAchievements[Grail.playerFaction][Grail.reverseHolidayMapping[self.levelOneCurrent.holidayName]] or {}
 				for i = 1, #mapAreas do
 					local t1 = {}
@@ -2386,7 +2342,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 					t1.mapID = mapAreas[i]
 					tinsert(t, t1)
 				end
-			elseif which >= 16000 and which < 17000 then		-- Profession Achievements
+			elseif which >= 96000 and which < 97000 then		-- Profession Achievements
 				local mapAreas = Grail.professionAchievements[Grail.playerFaction] and Grail.professionAchievements[Grail.playerFaction][Grail.reverseProfessionMapping[self.levelOneCurrent.professionName]] or {}
 				for i = 1, #mapAreas do
 					local t1 = {}
@@ -2395,7 +2351,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 					t1.mapID = mapAreas[i]
 					tinsert(t, t1)
 				end
-			elseif 17001 == which then		-- Other Achievements
+			elseif 97001 == which then		-- Other Achievements
 				-- 5 Dungeon Achievement
 				local t1 = {}
 				local mapID = Grail.mapAreaBaseAchievement + 4956
@@ -2463,7 +2419,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 					self.justAddedSearch = nil
 				end
 				tinsert(t, { sortName = lastUsed + 1, displayName = Wholly.s.SEARCH_ALL_QUESTS, f = function() Wholly.SearchForAllQuests(Wholly) Wholly.zoneInfo.panel.mapId = 0 Wholly._ForcePanelMapArea(Wholly, true) CloseDropDownMenus() end })
-			elseif 17000 == which then		-- Pet Battle achievements
+			elseif 97000 == which then		-- Pet Battle achievements
 				local mapAreas = Grail.petBattleAchievements[Grail.playerFaction] or {}
 				for i = 1, #mapAreas do
 					local t1 = {}
@@ -2536,6 +2492,11 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			db.showsPetBattleQuests = true
 			db.showsPVPQuests = true
 			db.showsWorldQuests = true
+			db.showsCallingQuests = true
+			db.showsImportantQuests = true
+			db.showsInvasionQuests = true
+			db.showsAccountWideQuests = true
+			db.showsWarbandCompletedQuests = true
 			db.loadDateData = true
 			db.displaysMapPinsTurnin = true
 			db.displaysMapPinsTurninIncomplete = false
@@ -2677,8 +2638,12 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 		--	For some odd reason, if the options have never been opened they will default to opening to a Blizzard
 		--	option and not the desired one.  So a brutal workaround is to call it twice, which seems to do the job.
 		_OpenInterfaceOptions = function(self)
-			InterfaceOptionsFrame_OpenToCategory("Wholly")
-			InterfaceOptionsFrame_OpenToCategory("Wholly")
+			if InterfaceOptionsFrame_OpenToCategory then
+				InterfaceOptionsFrame_OpenToCategory("Wholly")
+				InterfaceOptionsFrame_OpenToCategory("Wholly")
+			else
+				Settings.OpenToCategory(Wholly.settingsCategory.ID)
+			end
 		end,
 
 		_PresentTooltipForBlizzardQuest = function(self, blizzardQuestButton)
@@ -2735,7 +2700,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			local filterCode = questTable[2]
 			local colorCode = WDB.color[filterCode]
 			if questCode == 'I' or questCode == 'i' then
-				local name = GetSpellInfo(numeric)
+				local name = self:GetSpellInfo(numeric)
 				local negateString = (questCode == 'i') and "!" or ""
 				return format("|c%s%s|r %s[%s]", colorCode, name, negateString, self.s.SPELLS)
 			elseif questCode == 'F' then
@@ -2756,7 +2721,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				if ('t' == questCode or 'u' == questCode) and 'P' == filterCode then colorCode = WDB.color.B end
 				return format("|c%s%s|r [%s]", colorCode, GRAIL.reputationMapping[subcode], self.s.REPUTATION_REQUIRED)
 			elseif questCode == 'Z' then
-				local name = GetSpellInfo(numeric)
+				local name = self:GetSpellInfo(numeric)
 				return format("|c%s%s|r [%s]", colorCode, name, self.s.EVER_CAST)
 			elseif questCode == 'J' or questCode == 'j' then
 				local name = Grail:GetBasicAchievementInfo(numeric)
@@ -2799,14 +2764,14 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				local comparison = questCode == 'Q' and ">=" or '<'
 				return format("|c%s%s %s %s|r", colorCode, self.s.CURRENTLY_EQUIPPED, comparison, self.s.ILEVEL)
 			elseif questCode == 'R' then
-				local name = GetSpellInfo(numeric)
+				local name = self:GetSpellInfo(numeric)
 				return format("|c%s%s|r [%s]", colorCode, name, self.s.EVER_EXPERIENCED)
 			elseif questCode == 'S' or questCode == 's' then
 				local skillName
 				if numeric > 200000000 then
 					skillName = GRAIL:NPCName(numeric)
 				else
-					skillName = GetSpellInfo(numeric)
+					skillName = self:GetSpellInfo(numeric)
 				end
 				local negateString = (questCode == 's') and "!" or ""
 				return format("|c%s%s|r %s[%s]", colorCode, skillName, negateString, self.s.SKILL)
@@ -2974,6 +2939,8 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				if nil == when then
 					if Grail:IsQuestCompleted(questId) or Grail:HasQuestEverBeenCompleted(questId) then
 						when = self.s.TIME_UNKNOWN
+					elseif Grail:IsQuestFlaggedCompletedOnAccount(questId) then
+						when = ACCOUNT_QUEST_LABEL	-- "Warband"
 					end
 				end
 				if nil ~= when then
@@ -3032,6 +2999,7 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 			elseif Grail.bitMaskClassAll == bitband(obtainersCode, Grail.bitMaskClassAll) then
 				classString = self.s.CLASS_ANY
 			else
+				local t = {}
 				classString = ""
 				for letterCode, bitValue in pairs(Grail.classToBitMapping) do
 					if 0 < bitband(obtainersCode, bitValue) then
@@ -3039,10 +3007,11 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 						local localizedGenderClassName = Grail:CreateClassNameLocalizedGenderized(englishName)
 						local classColor = RAID_CLASS_COLORS[englishName]
 						if nil ~= localizedGenderClassName and nil ~= classColor then
-							classString = classString .. format("|cff%.2x%.2x%.2x%s|r ", classColor.r*255, classColor.g*255, classColor.b*255, localizedGenderClassName)
+							t = Grail:_TableAppend(t, format("|cff%.2x%.2x%.2x%s|r", classColor.r*255, classColor.g*255, classColor.b*255, localizedGenderClassName))
 						end
 					end
 				end
+				classString = self:_StringFromTable(t, ", ")
 				classString = trim(classString)
 			end
 			if bitband(statusCode, Grail.bitMaskClass) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorClass) > 0 then colorCode = orangeColor else colorCode = normalColor end
@@ -3067,14 +3036,17 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				raceString = self.s.RACE_ANY
 			else
 				raceString = ""
+				local t = {}
 				for letterCode, raceTable in pairs(Grail.races) do
 					local bitValue = raceTable[4]
 					if 0 < bitband(obtainersRaceCode, bitValue) then
 						local englishName = Grail.races[letterCode][1]
 						local localizedGenderRaceName = Grail:CreateRaceNameLocalizedGenderized(englishName)
-						raceString = raceString .. localizedGenderRaceName .. " "
+						t = Grail:_TableAppend(t, localizedGenderRaceName)
+--						raceString = raceString .. localizedGenderRaceName .. " "
 					end
 				end
+				raceString = self:_StringFromTable(t, ", ")
 				raceString = trim(raceString)
 			end
 			if bitband(statusCode, Grail.bitMaskRace) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorRace) > 0 then colorCode = orangeColor else colorCode = normalColor end
@@ -3214,8 +3186,15 @@ WorldMapFrame:AddDataProvider(self.mapPinsProvider)
 				self:_AddLine(GetCoinTextureString(rewardMoney))
 			end
 			local numberRewardCurrencies = 0
-			if not Grail.existsClassic then
-				numberRewardCurrencies = GetNumQuestLogRewardCurrencies(questId)
+			if GetNumQuestLogRewardCurrencies then
+				if not Grail.existsClassic then
+					numberRewardCurrencies = GetNumQuestLogRewardCurrencies(questId)
+				end
+			else
+				local info = C_QuestInfoSystem.GetQuestRewardCurrencies(questId)
+				if info then
+					self:_AddLine(info.name, info.totalRewardAmount, info.texture)
+				end
 			end
 			for counter = 1, numberRewardCurrencies do
 				local currencyName, currencyTexture, currencyCount = GetQuestLogRewardCurrencyInfo(counter, questId)
@@ -3388,32 +3367,60 @@ end
 			return Grail:QuestName(questId) or "NO NAME"
 		end,
 
+		_StringFromTable = function(self, t, separator)
+			local tableLength = Grail:_TableLength(t)
+			if tableLength == 0 then
+				return ""
+			elseif tableLength == 1 then
+				return t[1]
+			else
+				local retval = ""
+				local count = 0
+				for key, value in pairs(t) do
+					count = count + 1
+					retval = retval .. value
+					if count < tableLength then
+						retval = retval .. separator
+					end
+				end
+				return retval
+			end
+		end,
+
 		_QuestTypeString = function(self, questId)
+			local t = {}
 			local retval = ""
 			local bitValue = Grail:CodeType(questId)
 			if bitValue > 0 then
-				if bitband(bitValue, Grail.bitMaskQuestRepeatable) > 0 then retval = retval .. self.s.REPEATABLE .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestDaily) > 0 then retval = retval .. self.s.DAILY .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestWeekly) > 0 then retval = retval .. self.s.WEEKLY .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestMonthly) > 0 then retval = retval .. self.s.MONTHLY .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestYearly) > 0 then retval = retval .. self.s.YEARLY .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestEscort) > 0 then retval = retval .. self.s.ESCORT .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestDungeon) > 0 then retval = retval .. self.s.DUNGEON .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestRaid) > 0 then retval = retval .. self.s.RAID .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestPVP) > 0 then retval = retval .. self.s.PVP .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestGroup) > 0 then retval = retval .. self.s.GROUP .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestHeroic) > 0 then retval = retval .. self.s.HEROIC .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestScenario) > 0 then retval = retval .. self.s.SCENARIO .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestLegendary) > 0 then retval = retval .. self.s.LEGENDARY .. " " end
-				if Grail.bitMaskQuestAccountWide and bitband(bitValue, Grail.bitMaskQuestAccountWide) > 0 then retval = retval .. self.s.ACCOUNT .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestPetBattle) > 0 then retval = retval .. self.s.PET_BATTLES .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestBonus) > 0 then retval = retval .. self.s.BONUS_OBJECTIVE .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestRareMob) > 0 then retval = retval .. self.s.RARE_MOBS .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestTreasure) > 0 then retval = retval .. self.s.TREASURE .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestWorldQuest) > 0 then retval = retval .. self.s.WORLD_QUEST .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestBiweekly) > 0 then retval = retval .. self.s.BIWEEKLY .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestThreatQuest) > 0 then retval = retval .. self.s.THREAT_QUEST .. " " end
-				if bitband(bitValue, Grail.bitMaskQuestCallingQuest) > 0 then retval = retval .. self.s.CALLING_QUEST .. " " end
+				if Grail:IsRepeatable(questId) then t = Grail:_TableAppend(t, self.s.REPEATABLE) end
+				if Grail:IsDaily(questId) then t = Grail:_TableAppend(t, self.s.DAILY) end
+				if Grail:IsWeekly(questId) then t = Grail:_TableAppend(t, self.s.WEEKLY) end
+				if Grail:IsBiweekly(questId) then t = Grail:_TableAppend(t, self.s.BIWEEKLY) end
+				if Grail:IsMonthly(questId) then t = Grail:_TableAppend(t, self.s.MONTHLY) end
+				if Grail:IsYearly(questId) then t = Grail:_TableAppend(t, self.s.YEARLY) end
+				if Grail:IsEscort(questId) then t = Grail:_TableAppend(t, self.s.ESCORT) end
+				if Grail:IsDungeon(questId) then t = Grail:_TableAppend(t, self.s.DUNGEON) end
+				if Grail:IsRaid(questId) then t = Grail:_TableAppend(t, self.s.RAID) end
+				if Grail:IsPVP(questId) then t = Grail:_TableAppend(t, self.s.PVP) end
+				if Grail:IsGroup(questId) then t = Grail:_TableAppend(t, self.s.GROUP) end
+				if Grail:IsHeroic(questId) then t = Grail:_TableAppend(t, self.s.HEROIC) end
+				if Grail:IsScenario(questId) then t = Grail:_TableAppend(t, self.s.SCENARIO) end
+				if Grail:IsLegendary(questId) then t = Grail:_TableAppend(t, self.s.LEGENDARY) end
+				if Grail:IsAccountWide(questId) then t = Grail:_TableAppend(t, self.s.ACCOUNT) end
+				if Grail:IsPetBattle(questId) then t = Grail:_TableAppend(t, self.s.PET_BATTLES) end
+				if Grail:IsBonusObjective(questId) then t = Grail:_TableAppend(t, self.s.BONUS_OBJECTIVE) end
+				if Grail:IsRareMob(questId) then t = Grail:_TableAppend(t, self.s.RARE_MOBS) end
+				if Grail:IsTreasure(questId) then t = Grail:_TableAppend(t, self.s.TREASURE) end
+				if Grail:IsWorldQuest(questId) then t = Grail:_TableAppend(t, self.s.WORLD_QUEST) end
+				if Grail:IsThreatQuest(questId) then t = Grail:_TableAppend(t, self.s.THREAT_QUEST) end
+				if Grail:IsCallingQuest(questId) then t = Grail:_TableAppend(t, self.s.CALLING) end
+				if Grail:IsImportantQuest(questId) then t = Grail:_TableAppend(t, self.s.IMPORTANT) end
+				if Grail:IsMetaQuest(questId) then t = Grail:_TableAppend(t, self.s.META) end
+				if Grail:IsSharableQuest(questId) then t = Grail:_TableAppend(t, self.s.SHARABLE) end
+				if Grail:IsBountyQuest(questId) then t = Grail:_TableAppend(t, self.s.BOUNTY) end
+				if Grail:IsInvasionQuest(questId) then t = Grail:_TableAppend(t, self.s.INVASION) end
+--				if bitband(bitValue, Grail.bitMaskQuestTask) > 0 then t = Grail:_TableAppend(t, self.s.TASK) end
+				retval = self:_StringFromTable(t, ", ")
 			end
 			return trim(retval)
 		end,
@@ -3917,6 +3924,13 @@ end
 				WDB.color["*"] = self.color["*"]
 				WDB.color["!"] = self.color["!"]
 			end
+			if WDB.version < 92 then
+				WDB.showsCallingQuests = true
+				WDB.showsImportantQuests = true
+				WDB.showsInvasionQuests = true
+				WDB.showsAccountWideQuests = true
+				WDB.showsWarbandCompletedQuests = true
+			end
 			WDB.version = Wholly.versionNumber
 
 			if WDB.maximumTooltipLines then
@@ -3926,6 +3940,131 @@ end
 			end
 			WhollyDatabase = WDB
 			return WhollyDatabase
+		end,
+
+		_SetupMapPinsPool = function(self)
+			if CreateUnsecuredRegionPoolInstance then
+				self.mapPinsPool = CreateUnsecuredRegionPoolInstance(self.mapPinsTemplateName)
+			else
+				self.mapPinsPool = CreateFramePool("FRAME")
+			end
+		
+			self.mapPinsPool.parent = WorldMapFrame:GetCanvas()
+			
+			self.mapPinsPool.creationFunc = function()
+				local frame = CreateFrame("Frame", nil, WorldMapFrame:GetCanvas())
+				frame:SetSize(16, 16)
+				return Mixin(frame, self.mapPinsProviderPin)
+			end
+			
+			-- Blizzard uses a new function name in the 11.x world
+			self.mapPinsPool.createFunc = self.mapPinsPool.creationFunc
+			
+			self.mapPinsPool.resetterFunc = function(pinPool, pin)
+				pin:Hide()
+				pin:ClearAllPoints()
+				pin:OnReleased()
+				pin.pinTemplate = nil
+				pin.owningMap = nil
+			end
+			
+			-- Blizzard uses a new function name in the 11.x world
+			self.mapPinsPool.resetFunc = self.mapPinsPool.resetterFunc
+			
+			WorldMapFrame.pinPools[self.mapPinsTemplateName] = self.mapPinsPool
+		end,
+
+		_SetupMapPinsProvider = function(self)
+			self.mapPinsProvider = CreateFromMixins(MapCanvasDataProviderMixin)
+		
+			self.mapPinsProvider.RemoveAllData = function(self)
+				self:GetMap():RemoveAllPinsByTemplate(Wholly.mapPinsTemplateName)
+			end
+			
+			self.mapPinsProvider.RefreshAllData = function(self, fromOnShow)
+				self:RemoveAllData()
+				if WhollyDatabase.displaysMapPins then
+					local uiMapID = self:GetMap():GetMapID()
+					Wholly.zoneInfo.pins.mapId = uiMapID
+					if not uiMapID then return end
+					Wholly.cachedPinQuests = Wholly:_ClassifyQuestsInMap(uiMapID) or {}
+					Wholly:_FilterPinQuests()
+					local questsInMap = Wholly.filteredPinQuests
+					local codeMapping = { ['?'] = 0, ['G'] = 1, ['W'] = 2, ['D'] = 3, ['R'] = 4, ['K'] = 5, ['H'] = 6, ['Y'] = 7, ['P'] = 8, ['L'] = 9, ['O'] = 10, ['U'] = 11, ['*'] = 12, ['!'] = 13 }
+					for i = 1, #questsInMap do
+						local id = questsInMap[i][1]
+						local code = questsInMap[i][2]
+						if 'D' == code and Grail:IsRepeatable(id) then code = 'R' end
+						if 'I' == code then
+							local _, completed = Grail:IsQuestInQuestLog(id)
+							completed = completed or 0
+							if completed > 0 then
+								code = '?'
+							elseif completed < 0 then
+								code = '!'
+							else
+								code = '*'
+							end
+						end
+						local codeValue = codeMapping[code]
+						local locations = ('?' == code or '*' == code or '!' == code) and Grail:QuestLocationsTurnin(id, true, false, true, uiMapID) or Grail:QuestLocationsAccept(id, false, false, true, uiMapID, true)
+						if nil ~= locations then
+							for _, npc in pairs(locations) do
+								local xcoord, ycoord, npcName, npcId = npc.x, npc.y, npc.name, npc.id
+								if nil ~= xcoord then
+									-- Either find an existing pin to see whether we need to change its texture type or create
+									-- a new pin.  We might need to change the texture depending on how many quests are going
+									-- to be displayed for the NPC.  We want the map to show one pin for the NPC and have its
+									-- texture be for the "best" quest type that NPC shows.
+									local possibleExistingPin = Wholly:RegisteredMapPin(xcoord, ycoord, npcId)
+									if nil ~= possibleExistingPin then
+										if codeValue < codeMapping[possibleExistingPin.texType] then
+											possibleExistingPin:SetType(code)
+										end
+									else
+										self:GetMap():AcquirePin(Wholly.mapPinsTemplateName, code, self:GetMap(), xcoord, ycoord, npcId)
+									end
+								end
+							end
+						end
+					end
+				else
+					Wholly.mapCountLine = ""        -- do not display a tooltip for pins we are not showing
+				end
+			end
+			
+			WorldMapFrame:AddDataProvider(self.mapPinsProvider)
+		end,
+
+		_SetupMapPinsProviderPin = function(self)
+			self.mapPinsProviderPin = CreateFromMixins(MapCanvasPinMixin)
+			self.mapPinsProviderPin.OnLoad = function(self)
+				self:UseFrameLevelType("PIN_FRAME_LEVEL_AREA_POI")
+				self.texture = self:CreateTexture()
+				self:SetScalingLimits(1, 1.0, 1.2)
+				self:SetMouseMotionEnabled(true)
+				self:SetScript("OnEnter", function(self) Wholly:ShowTooltip(self) end)
+				self:SetScript("OnLeave", function() Wholly:_HideTooltip() end)
+				self.SetType = Wholly._PinSetType
+			end
+			
+			self.mapPinsProviderPin.OnAcquired = function(self, code, map, x, y, npcId)
+				self:SetPosition(x/100, y/100)
+				self:SetType(code)
+				self.map = map
+				self.npcId = npcId
+				self.xcoord = x
+				self.ycoord = y
+				Wholly:RegisterMapPin(self, x, y, npcId)
+				self:Show()
+			end
+
+			self.mapPinsProviderPin.OnReleased = function(self)
+				Wholly:UnregisterMapPin(self)
+			end
+
+			-- Copied hack from Here Be Dragons to avoid in-combat error on 10.1.5
+			self.mapPinsProviderPin.SetPassThroughButtons = function() end
 		end,
 
 		_SetupLibDataBroker = function(self)
@@ -4741,6 +4880,10 @@ end
 		end,
 
 		}
+
+	Wholly_ToggleUI = function()
+		Wholly.ToggleUI(Wholly)
+	end
 
 	local nf = CreateFrame("Frame")
 	Wholly.notificationFrame = nf
@@ -5946,6 +6089,13 @@ end
 	S['BIWEEKLY'] = CALENDAR_REPEAT_BIWEEKLY							-- "Biweekly"
 	S['THREAT_QUEST'] = WORLD_MAP_THREATS								-- "N'Zoth Assaults"
 	S['CALLING_QUEST'] = CALLINGS_QUESTS								-- "Callings"
+	S['CALLING'] = QUEST_CLASSIFICATION_CALLING							-- "Calling"
+	S['CAMPAIGN'] = QUEST_CLASSIFICATION_CAMPAIGN						-- "Campaign"
+	S['IMPORTANT'] = QUEST_CLASSIFICATION_IMPORTANT						-- "Important"
+	S['LEGENDARY'] = QUEST_CLASSIFICATION_LEGENDARY						-- "Legendary"
+	S['META'] = QUEST_CLASSIFICATION_META								-- "Meta"
+	S['STORYLINE'] = QUEST_CLASSIFICATION_QUESTLINE						-- "Storyline"
+	S['REPEATABLE'] = QUEST_CLASSIFICATION_RECURRING					-- "Repeatable"
 
 	local C = Wholly.color
 	Wholly.configuration = {}
@@ -5971,6 +6121,11 @@ end
 		{ S.PET_BATTLES, 'showsPetBattleQuests', 'configurationScript1' },
 		{ S.PVP, 'showsPVPQuests', 'configurationScript1' },
 		{ S.WORLD_QUEST, 'showsWorldQuests', 'configurationScript1', nil, nil, 'O' },
+		{ S.CALLING, 'showsCallingQuests', 'configurationScript1' },
+		{ S.IMPORTANT, 'showsImportantQuests', 'configurationScript1' },
+		{ S.INVASION, 'showsInvasionQuests', 'configurationScript1' },
+		{ S.ACCOUNT, 'showsAccountWideQuests', 'configurationScript1' },
+		{ ACCOUNT_QUEST_LABEL, 'showsWarbandCompletedQuests', 'configurationScript1' },	-- "Warband"
 		}
 	Wholly.configuration[S.TITLE_APPEARANCE] = {
 		{ S.TITLE_APPEARANCE },

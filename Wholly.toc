@@ -1,11 +1,13 @@
-## Interface: 100005
+## Interface: 11502, 11503, 20504, 30403, 40400, 100207, 110000, 110002
 ## Title: Wholly
 ## Author: Scott M Harrison
 ## Notes: Shows quest database and map pins
-## Version: 089
+## Version: 092
 ## Dependencies: Grail
 ## OptionalDeps: LibStub, LibDataBroker, TomTom, Gatherer, Questie, Immersion
 ## SavedVariablesPerCharacter: WhollyDatabase
+## AddonCompartmentFunc: Wholly_ToggleUI
+## IconTexture: Interface\Icons\achievement_quests_completed_06
 
 Wholly.lua
 Wholly.xml
