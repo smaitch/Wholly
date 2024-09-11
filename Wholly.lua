@@ -847,6 +847,32 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 
 					-- Add some options based on game capabilities (which basically means version (retail vs classic))
 					local S = Wholly.s
+					if Grail.capabilities.usesLegendaryQuests then
+						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.LEGENDARY, 'showsLegendaryQuests', 'configurationScript1', nil, nil, 'Y' })
+					end
+					if Grail.capabilities.usesPetBattles then
+						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.PET_BATTLES, 'showsPetBattleQuests', 'configurationScript1' })
+					end
+						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.PVP, 'showsPVPQuests', 'configurationScript1' })
+					if Grail.capabilities.usesWorldQuests then
+						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.WORLD_QUEST, 'showsWorldQuests', 'configurationScript1', nil, nil, 'O' })
+					end
+					if Grail.capabilities.usesCallingQuests then
+						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.CALLING, 'showsCallingQuests', 'configurationScript1' })
+					end
+					if Grail.capabilities.usesImportantQuests then
+						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.IMPORTANT, 'showsImportantQuests', 'configurationScript1' })
+					end
+					if Grail.capabilities.usesInvasionQuests then
+						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.INVASION, 'showsInvasionQuests', 'configurationScript1' })
+					end
+					if Grail.capabilities.usesAccountQuests then
+						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.ACCOUNT, 'showsAccountWideQuests', 'configurationScript1' })
+					end
+					if Grail.capabilities.usesWarbandQuests then
+						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, 		{ ACCOUNT_QUEST_LABEL, 'showsWarbandCompletedQuests', 'configurationScript1' })	-- "Warband"
+					end
+					
 					if Grail.capabilities.usesFlightPoints then
 						tinsert(Wholly.configuration[S.WORLD_MAP], { S.HIDE_WORLD_MAP_FLIGHT_POINTS, 'hidesWorldMapFlightPoints', 'configurationScript19' })
 					end
@@ -1553,10 +1579,9 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 		--	This will set the text for the preference
 		_ColorUpdatePreferenceText = function(self, configIndex, panelName)
 			local button = self.preferenceButtons[self.configuration[panelName][configIndex][2]]
-			local colorCode
 			if nil ~= button then
 				local colorStart, colorEnd = "", ""
-				colorCode = self.configuration[panelName][configIndex][6]
+				local colorCode = self.configuration[panelName][configIndex][6]
 				if nil ~= colorCode then
 					colorStart = "|c" .. WhollyDatabase.color[colorCode]
 					colorEnd = "|r"
@@ -6092,10 +6117,12 @@ end
 	S['CALLING'] = QUEST_CLASSIFICATION_CALLING							-- "Calling"
 	S['CAMPAIGN'] = QUEST_CLASSIFICATION_CAMPAIGN						-- "Campaign"
 	S['IMPORTANT'] = QUEST_CLASSIFICATION_IMPORTANT						-- "Important"
-	S['LEGENDARY'] = QUEST_CLASSIFICATION_LEGENDARY						-- "Legendary"
+	S['LEGENDARY'] = QUEST_CLASSIFICATION_LEGENDARY					-- "Legendary"
 	S['META'] = QUEST_CLASSIFICATION_META								-- "Meta"
 	S['STORYLINE'] = QUEST_CLASSIFICATION_QUESTLINE						-- "Storyline"
-	S['REPEATABLE'] = QUEST_CLASSIFICATION_RECURRING					-- "Repeatable"
+	if QUEST_CLASSIFICATION_RECURRING then								-- does not exist in Classic
+		S['REPEATABLE'] = QUEST_CLASSIFICATION_RECURRING				-- "Repeatable"
+	end
 
 	local C = Wholly.color
 	Wholly.configuration = {}
@@ -6117,16 +6144,8 @@ end
 		{ S.BONUS_OBJECTIVE, 'showsBonusObjectiveQuests', 'configurationScript1' },
 		{ S.RARE_MOBS, 'showsRareMobQuests', 'configurationScript1' },
 		{ S.TREASURE, 'showsTreasureQuests', 'configurationScript1' },
-		{ S.LEGENDARY, 'showsLegendaryQuests', 'configurationScript1', nil, nil, 'Y' },
-		{ S.PET_BATTLES, 'showsPetBattleQuests', 'configurationScript1' },
-		{ S.PVP, 'showsPVPQuests', 'configurationScript1' },
-		{ S.WORLD_QUEST, 'showsWorldQuests', 'configurationScript1', nil, nil, 'O' },
-		{ S.CALLING, 'showsCallingQuests', 'configurationScript1' },
-		{ S.IMPORTANT, 'showsImportantQuests', 'configurationScript1' },
-		{ S.INVASION, 'showsInvasionQuests', 'configurationScript1' },
-		{ S.ACCOUNT, 'showsAccountWideQuests', 'configurationScript1' },
-		{ ACCOUNT_QUEST_LABEL, 'showsWarbandCompletedQuests', 'configurationScript1' },	-- "Warband"
 		}
+	
 	Wholly.configuration[S.TITLE_APPEARANCE] = {
 		{ S.TITLE_APPEARANCE },
 		{ S.PREPEND_LEVEL, 'prependsQuestLevel', 'configurationScript1' },
