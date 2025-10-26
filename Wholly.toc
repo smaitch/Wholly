@@ -1,4 +1,4 @@
-## Interface: 11505, 40401, 110002, 110005, 110007
+## Interface: 11507, 11508, 20504, 30405, 40400, 50500, 50502, 110205, 110207
 ## Title: Wholly
 ## Author: Scott M Harrison
 ## Notes: Shows quest database and map pins
