@@ -2,7 +2,7 @@
 ## Title: Wholly
 ## Author: Scott M Harrison
 ## Notes: Shows quest database and map pins
-## Version: 092
+## Version: 093
 ## Dependencies: Grail
 ## OptionalDeps: LibStub, LibDataBroker, TomTom, Gatherer, Questie, Immersion
 ## SavedVariablesPerCharacter: WhollyDatabase
@@ -10,4 +10,5 @@
 ## IconTexture: Interface\Icons\achievement_quests_completed_06
 
 Wholly.lua
+ImmersionIntegration.lua
 Wholly.xml

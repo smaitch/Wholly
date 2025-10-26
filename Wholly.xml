@@ -47,7 +47,7 @@
 						<AbsDimension x="10" y="0" />
 					</Offset>
 				</Anchor>
-			</Anchors> 
+			</Anchors>
 		</ButtonText>
 		<NormalFont style="GameFontNormalLeft"/>
 		<HighlightFont style="GameFontHighlightLeft"/>
@@ -96,7 +96,7 @@
 						<AbsDimension x="20" y="0" />
 					</Offset>
 				</Anchor>
-			</Anchors> 
+			</Anchors>
 		</ButtonText>
 		<NormalFont style="GameFontNormalLeft"/>
 		<HighlightFont style="GameFontHighlightLeft"/>
@@ -218,6 +218,14 @@
 	</Frame>
 
 	<Frame name="com_mithrandir_whollyWidePanelConfigFrame">
+		<Scripts>
+			<OnShow>
+				Wholly:ConfigFrame_OnShow(self)
+			</OnShow>
+		</Scripts>
+	</Frame>
+
+	<Frame name="com_mithrandir_whollyImmersionIntegrationConfigFrame">
 		<Scripts>
 			<OnShow>
 				Wholly:ConfigFrame_OnShow(self)
