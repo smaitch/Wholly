@@ -2392,15 +2392,17 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				tinsert(t, t1)
 			elseif which <= -100 then		-- Reputation Changes
 				local mapAreas = Grail.reputationExpansionMapping[which * -1 - 99]
-				for i = 1, #mapAreas do
-					local t1 = {}
-					local mapID = Grail.mapAreaBaseReputationChange + mapAreas[i]
-					local factionId = Grail:_HexValue(mapAreas[i], 3)
-					t1.sortName = Grail.reputationMapping[factionId]
-					t1.displayName = t1.sortName
-					t1.mapID = mapID
-					if nil ~= Grail.indexedQuests[mapID] and 0 ~= #(Grail.indexedQuests[mapID]) then
-						tinsert(t, t1)
+				if nil ~= mapAreas then
+					for i = 1, #mapAreas do
+						local t1 = {}
+						local mapID = Grail.mapAreaBaseReputationChange + mapAreas[i]
+						local factionId = Grail:_HexValue(mapAreas[i], 3)
+						t1.sortName = Grail.reputationMapping[factionId]
+						t1.displayName = t1.sortName
+						t1.mapID = mapID
+						if nil ~= Grail.indexedQuests[mapID] and 0 ~= #(Grail.indexedQuests[mapID]) then
+							tinsert(t, t1)
+						end
 					end
 				end
 			elseif -5 == which then		-- Followers
