@@ -4163,8 +4163,8 @@ end
 			if nil == com_mithrandir_whollyQuestInfoFrame then
 				local frame = CreateFrame("Frame", "com_mithrandir_whollyQuestInfoFrame", QuestFrame)
 				frame:EnableMouse(true)
-				frame:SetSize(60, 14)
-				local xOffset, yOffset = -15, -35
+				frame:SetSize(160, 14)
+				local xOffset, yOffset = -235, -35
 				if Grail.existsClassic then
 					xOffset, yOffset = -55, -55
 				end
@@ -4173,7 +4173,7 @@ end
 				frame:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
 				local fontString = frame:CreateFontString("com_mithrandir_whollyQuestInfoFrameText", "BACKGROUND", "GameFontNormal")
 				fontString:SetJustifyH("RIGHT")
-				fontString:SetSize(60, 20)
+				fontString:SetSize(160, 20)
 				fontString:SetPoint("CENTER")	-- needed to add this even though it worked without this in XML
 				fontString:SetText("None")
 				self.configurationScript24()	-- hides the frame based on preferences
