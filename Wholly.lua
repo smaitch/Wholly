@@ -445,6 +445,7 @@
 --			Switches TOC to have a single Interface that lists all supported versions.
 --		092	Adds support to indicate a quest was completed by someone else in the account (warband).
 --			Adds some new filters based on Grail support for different quest types.
+--		093 Changes the way ColorPickerFrame is used to match new Blizzard API.
 --
 --	Known Issues
 --
@@ -1616,24 +1617,47 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 		_ColorWell_OnClick = function(frame)
 			HideUIPanel(ColorPickerFrame)
 			ColorPickerFrame:SetFrameStrata("FULLSCREEN_DIALOG")
-			ColorPickerFrame.func = function()
-				local r, g, b = ColorPickerFrame:GetColorRGB()
-				local a = 1 - OpacitySliderFrame:GetValue()
-				Wholly:_ColorWell_Callback(frame, r, g, b, a)
-			end
-			ColorPickerFrame.hasOpacity = true
-			ColorPickerFrame.opacityFunc = function()
-				local r, g, b = ColorPickerFrame:GetColorRGB()
-				local a = 1 - OpacitySliderFrame:GetValue()
-				Wholly:_ColorWell_Callback(frame, r, g, b, a, true)
-			end
 			local r, g, b, a = Wholly:_ColorInfoFromCode(Wholly.configuration.Wholly[frame.configIndex][6])
-			ColorPickerFrame.opacity = 1 - a
-			ColorPickerFrame:SetColorRGB(r, g, b)
-			ColorPickerFrame.cancelFunc = function()
-				Wholly:_ColorWell_Callback(frame, r, g, b, a, true)
+			-- Blizzard has removed the following in modern code so we check to see whether we have to use the new API.
+			if ColorPickerFrame.SetColorRGB then
+				ColorPickerFrame.func = function()
+					local r, g, b = ColorPickerFrame:GetColorRGB()
+					local a = 1 - OpacitySliderFrame:GetValue()
+					Wholly:_ColorWell_Callback(frame, r, g, b, a)
+				end
+				ColorPickerFrame.hasOpacity = true
+				ColorPickerFrame.opacityFunc = function()
+					local r, g, b = ColorPickerFrame:GetColorRGB()
+					local a = 1 - OpacitySliderFrame:GetValue()
+					Wholly:_ColorWell_Callback(frame, r, g, b, a, true)
+				end
+				ColorPickerFrame.opacity = 1 - a
+				ColorPickerFrame:SetColorRGB(r, g, b)
+				ColorPickerFrame.cancelFunc = function()
+					Wholly:_ColorWell_Callback(frame, r, g, b, a, true)
+				end
+				ShowUIPanel(ColorPickerFrame)
+			else
+				local function OnColorChanged()
+					local r, g, b = ColorPickerFrame:GetColorRGB()
+					local a = ColorPickerFrame:GetColorAlpha()
+					Wholly:_ColorWell_Callback(frame, r, g, b, a)
+				end
+				local function OnCancel()
+					Wholly:_ColorWell_Callback(frame, r, g, b, a)
+				end
+				local options = {
+					swatchFunc = OnColorChanged,
+					opacityFunc = OnColorChanged,
+					cancelFunc = OnCancel,
+					hasOpacity = true,
+					opacity = a,
+					r = r,
+					g = g,
+					b = b,
+					}
+				ColorPickerFrame:SetupColorPickerAndShow(options)
 			end
-			ShowUIPanel(ColorPickerFrame)
 		end,
 
 		ConfigFrame_OnLoad = function(self, panel, panelName, panelParentName)
