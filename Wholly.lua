@@ -694,6 +694,31 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 										com_mithrandir_whollyQuestInfoFrame:Show()
 									end
 								end,
+		configurationScript25 = function(self)
+									-- Update Related Quests panel visibility in Immersion integration
+									if ImmersionRelatedQuests and ImmersionRelatedQuests.UpdateForCurrentQuest then
+										if WhollyDatabase.hidesImmersionRelatedQuests then
+											-- Hide the panel
+											local relationshipsFrame = _G["ImmersionRelatedQuestsFrame"]
+											if relationshipsFrame then
+												relationshipsFrame:Hide()
+											end
+										else
+											-- Show the panel if there's a current quest
+											ImmersionRelatedQuests.UpdateForCurrentQuest()
+										end
+									end
+								end,
+		configurationScript26 = function(self)
+									-- Update attribution visibility in Immersion integration
+									if ImmersionRelatedQuestsFrame and ImmersionRelatedQuestsFrame.Attribution then
+										if WhollyDatabase.hidesImmersionAttribution then
+											ImmersionRelatedQuestsFrame.Attribution:Hide()
+										else
+											ImmersionRelatedQuestsFrame.Attribution:Show()
+										end
+									end
+								end,
 		coordinates = nil,
 		currentFrame = nil,
 		currentMaximumTooltipLines = 50,
@@ -793,13 +818,6 @@ self.currentFrame = com_mithrandir_whollyFrame
 					self:_SetupTooltip()
 					self:_SetupWorldMapWhollyButton()
 
-
-if ImmersionContentFrame then
-	QuestFrame = ImmersionContentFrame
-	com_mithrandir_whollyQuestInfoBuggedFrame:SetParent(QuestFrame)
-	com_mithrandir_whollyBreadcrumbFrame:SetParent(QuestFrame)
-end
-
 -- if the UI panel disappears (maximized WorldMapFrame) we need to change parents
 UIParent:HookScript("OnHide", function()
 self.tooltip:SetParent(WorldMapFrame);
@@ -837,6 +855,9 @@ end
 
 com_mithrandir_whollyFrameSwitchZoneButton:SetText(self.s.MAP)
 com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
+
+					-- Integrate into Immersion, which replaces the quest frame
+					self:_SetupImmersionIntegration()
 
 					local Grail = Grail
 					local TomTom = TomTom
@@ -904,6 +925,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyTitleAppearanceConfigFrame, Wholly.s.TITLE_APPEARANCE, "Wholly")
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyWorldMapConfigFrame, Wholly.s.WORLD_MAP, "Wholly")
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyWidePanelConfigFrame, Wholly.s.WIDE_PANEL, "Wholly")
+					self:ConfigFrame_OnLoad(com_mithrandir_whollyImmersionIntegrationConfigFrame, Wholly.s.IMMERSION_INTEGRATION, "Wholly")
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyLoadDataConfigFrame, Wholly.s.LOAD_DATA, "Wholly")
 					self:ConfigFrame_OnLoad(com_mithrandir_whollyOtherConfigFrame, Wholly.s.OTHER_PREFERENCE, "Wholly")
 
@@ -1204,6 +1226,12 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			['HIDE_BLIZZARD_WORLD_MAP_CAMPAIGN_QUESTS'] = 'Hide Blizzard campaign quests',
 			['HIDE_BLIZZARD_WORLD_MAP_WORLD_QUESTS'] = 'Hide Blizzard world quests',
 			['HIDE_ID_ON_QUEST_FRAME'] = 'Hide quest ID on Quest Frame',
+			['IMMERSION_INTEGRATION'] = 'Integration with Immersion addon',
+			['HIDE_IMMERSION_RELATED_QUESTS'] = 'Hide Related Quests panel',
+			['HIDE_IMMERSION_ATTRIBUTION'] = 'Hide "Powered By" attribution',
+			['RELATED_QUESTS'] = 'Related Quests',
+			['RELATED_QUESTS_TOOLTIP'] = 'Hover over quest names for detailed information',
+			['WHOLLY_ATTRIBUTION'] = 'Powered by Wholly & Grail',
 			},
 		tooltip = nil,
 		updateDelay = 0.5,
@@ -2551,6 +2579,8 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			db.loadDateData = true
 			db.displaysMapPinsTurnin = true
 			db.displaysMapPinsTurninIncomplete = false
+			db.hidesImmersionRelatedQuests = false
+			db.hidesImmersionAttribution = false
 			db.version = Wholly.versionNumber
 			WhollyDatabase = db
 			return db
@@ -3981,6 +4011,10 @@ end
 				WDB.showsInvasionQuests = true
 				WDB.showsAccountWideQuests = true
 				WDB.showsWarbandCompletedQuests = true
+			end
+			if WDB.version < 94 then
+				WDB.hidesImmersionRelatedQuests = false
+				WDB.hidesImmersionAttribution = false
 			end
 			WDB.version = Wholly.versionNumber
 
@@ -6178,6 +6212,11 @@ end
 		{ S.APPEND_LEVEL, 'appendRequiredLevel', 'configurationScript1' },
 		{ S.REPEATABLE_COMPLETED, 'showsAnyPreviousRepeatableCompletions', 'configurationScript1' },
 		{ S.IN_LOG_STATUS, 'showsInLogQuestStatus', 'configurationScript7' },
+		}
+	Wholly.configuration[S.IMMERSION_INTEGRATION] = {
+		{ S.IMMERSION_INTEGRATION },
+		{ S.HIDE_IMMERSION_RELATED_QUESTS, 'hidesImmersionRelatedQuests', 'configurationScript25' },
+		{ S.HIDE_IMMERSION_ATTRIBUTION, 'hidesImmersionAttribution', 'configurationScript26' },
 		}
 	Wholly.configuration[S.WORLD_MAP] = {
 		{ S.WORLD_MAP },
