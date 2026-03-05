@@ -446,6 +446,10 @@
 --		092	Adds support to indicate a quest was completed by someone else in the account (warband).
 --			Adds some new filters based on Grail support for different quest types.
 --		093 Changes the way ColorPickerFrame is used to match new Blizzard API.
+--			Changes map pins generation to not be in a secure path.
+--			Changes how quest panel buttons are created to avoid taint.
+--			Enables proper preference support for the latest types of quests, especially important for warband quests.
+--			Corrects implementation of zone presentation to allow Eastern Kingdoms and The Shadowlands to be fully usable.
 --
 --	Known Issues
 --
@@ -972,29 +976,29 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					-- Add some options based on game capabilities (which basically means version (retail vs classic))
 					local S = Wholly.s
 					if Grail.capabilities.usesLegendaryQuests then
-						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.LEGENDARY, 'showsLegendaryQuests', 'configurationScript1', nil, nil, 'Y' })
+						tinsert(Wholly.configuration.Wholly, { S.LEGENDARY, 'showsLegendaryQuests', 'configurationScript1', nil, nil, 'Y' })
 					end
 					if Grail.capabilities.usesPetBattles then
-						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.PET_BATTLES, 'showsPetBattleQuests', 'configurationScript1' })
+						tinsert(Wholly.configuration.Wholly, { S.PET_BATTLES, 'showsPetBattleQuests', 'configurationScript1' })
 					end
-						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.PVP, 'showsPVPQuests', 'configurationScript1' })
+						tinsert(Wholly.configuration.Wholly, { S.PVP, 'showsPVPQuests', 'configurationScript1' })
 					if Grail.capabilities.usesWorldQuests then
-						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.WORLD_QUEST, 'showsWorldQuests', 'configurationScript1', nil, nil, 'O' })
+						tinsert(Wholly.configuration.Wholly, { S.WORLD_QUEST, 'showsWorldQuests', 'configurationScript1', nil, nil, 'O' })
 					end
 					if Grail.capabilities.usesCallingQuests then
-						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.CALLING, 'showsCallingQuests', 'configurationScript1' })
+						tinsert(Wholly.configuration.Wholly, { S.CALLING, 'showsCallingQuests', 'configurationScript1' })
 					end
 					if Grail.capabilities.usesImportantQuests then
-						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.IMPORTANT, 'showsImportantQuests', 'configurationScript1' })
+						tinsert(Wholly.configuration.Wholly, { S.IMPORTANT, 'showsImportantQuests', 'configurationScript1' })
 					end
 					if Grail.capabilities.usesInvasionQuests then
-						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.INVASION, 'showsInvasionQuests', 'configurationScript1' })
+						tinsert(Wholly.configuration.Wholly, { S.INVASION, 'showsInvasionQuests', 'configurationScript1' })
 					end
 					if Grail.capabilities.usesAccountQuests then
-						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, { S.ACCOUNT, 'showsAccountWideQuests', 'configurationScript1' })
+						tinsert(Wholly.configuration.Wholly, { S.ACCOUNT, 'showsAccountWideQuests', 'configurationScript1' })
 					end
 					if Grail.capabilities.usesWarbandQuests then
-						Wholly.configuration.Wholly = Grail:_TableAppend(Wholly.configuration.Wholly, 		{ ACCOUNT_QUEST_LABEL, 'showsWarbandCompletedQuests', 'configurationScript1' })	-- "Warband"
+						tinsert(Wholly.configuration.Wholly, { ACCOUNT_QUEST_LABEL, 'showsWarbandCompletedQuests', 'configurationScript1' })	-- "Warband"
 					end
 					
 					if Grail.capabilities.usesFlightPoints then
@@ -2283,15 +2287,18 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			local entries = {}
 			local t1
 			self.mapToContinentMapping = {}
+			self.cachedContinentAreas = {}		-- cache so _InitializeLevelTwoData uses the same zone list
 
 			--	Basic continents
 			t1 = { displayName = CONTINENT, header = 1, children = {} }
 			for mapId, continentTable in pairs(Grail.continents) do
 --				local numberEntries = math.floor((#(continentTable.zones) + #(continentTable.dungeons) + self.dropdownLimit - 1) / self.dropdownLimit)
-				local numberEntries = math.floor((#(self:_AreasOfInterestInContinent(continentTable)) + self.dropdownLimit - 1) / self.dropdownLimit)
+				local areas = self:_AreasOfInterestInContinent(continentTable)
+				self.cachedContinentAreas[mapId] = areas
+				local numberEntries = math.floor((#areas + self.dropdownLimit - 1) / self.dropdownLimit)
 				for counter = 1, numberEntries do
 					local addition = (numberEntries > 1) and (" "..counter) or ""
-					tinsert(t1.children, { displayName = continentTable.name .. addition, index = mapId + 3000 * (counter - 1) })
+					tinsert(t1.children, { displayName = continentTable.name .. addition, index = mapId + 3000 * (counter - 1), isContinent = true })
 				end
 			end
 			tablesort(t1.children, function(a, b) return a.displayName < b.displayName end)
@@ -2407,8 +2414,9 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			local t = {}
 			local which = self.levelOneCurrent and self.levelOneCurrent.index or nil
 			if nil == which then self.levelTwoData = t return end
-			if which >= 0 and which < 13000 then				-- Basic continent
-				t = self:_AreasOfInterestInContinent(Grail.continents[which % 3000])
+			if self.levelOneCurrent.isContinent then			-- Basic continent (any page)
+				local mapId = which % 3000
+				t = (self.cachedContinentAreas and self.cachedContinentAreas[mapId]) or self:_AreasOfInterestInContinent(Grail.continents[mapId])
 				--	Now we determine which part of this table we are going to keep based on whether we are offset
 				if #t > self.dropdownLimit then
 					local offset = math.floor(which / 3000)
@@ -2570,7 +2578,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 						tinsert(t, { sortName = i + 1, displayName = SEARCH .. ': ' .. WDB.searches[i], mapID = 0, selected = shouldSelect, f = function() Wholly.SearchForQuestNamesMatching(Wholly, WDB.searches[i]) Wholly.zoneInfo.panel.mapId = 0 Wholly._ForcePanelMapArea(Wholly, true) CloseDropDownMenus() end })
 					end
 					lastUsed = #(WDB.searches) + 2
-					tinsert(t, { sortName = lastUsed, displayName = Wholly.s.SEARCH_CLEAR, f = function() WDB.searches = nil CloseDropDownMenus() Wholly.zoneInfo.panel.mapId = nil Wholly._SetLevelTwoCurrent(Wholly, nil) Wholly._ForcePanelMapArea(Wholly,true) Wholly.ScrollFrameTwo_Update(Wholly) end })
+					tinsert(t, { sortName = lastUsed, displayName = Wholly.s.SEARCH_CLEAR, f = function() WDB.searches = {} CloseDropDownMenus() Wholly.zoneInfo.panel.mapId = nil Wholly._SetLevelTwoCurrent(Wholly, nil) Wholly._ForcePanelMapArea(Wholly,true) Wholly.ScrollFrameTwo_Update(Wholly) end })
 					self.justAddedSearch = nil
 				end
 				tinsert(t, { sortName = lastUsed + 1, displayName = Wholly.s.SEARCH_ALL_QUESTS, f = function() Wholly.SearchForAllQuests(Wholly) Wholly.zoneInfo.panel.mapId = 0 Wholly._ForcePanelMapArea(Wholly, true) CloseDropDownMenus() end })
@@ -2993,33 +3001,8 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				return format("|c%sPOI ERROR|r", colorCode)
 			else
 				questId = numeric
-				local typeString = ""
+				local typeString = Wholly.questCodeSuffixes[questCode] or ""
 				local WDB = WhollyDatabase
-				if questCode == 'B' then
-					typeString = format(" [%s]", self.s.IN_LOG)
-				elseif questCode == 'C' then
-					typeString = format(" [%s, %s]", self.s.IN_LOG, self.s.TURNED_IN)
-				elseif questCode == 'c' then
-					typeString = format(" ![%s, %s]", self.s.IN_LOG, self.s.TURNED_IN)
-				elseif questCode == 'D' then
-					typeString = format(" [%s]", self.s.COMPLETE)
-				elseif questCode == 'e' then
-					typeString = format(" ![%s, %s]", self.s.COMPLETE, self.s.TURNED_IN)
-				elseif questCode == 'E' then
-					typeString = format(" [%s, %s]", self.s.COMPLETE, self.s.TURNED_IN)
-				elseif questCode == 'H' then
-					typeString = format(" [%s]", self.s.EVER_COMPLETED)
-				elseif questCode == 'h' then
-					typeString = format(" ![%s]", self.s.EVER_COMPLETED)
-				elseif questCode == 'M' then
-					typeString = format(" [%s]", self.s.ABANDONED)
-				elseif questCode == 'm' then
-					typeString = format(" [%s]", self.s.NEVER_ABANDONED)
-				elseif questCode == 'O' then
-					typeString = format(" [%s]", self.s.ACCEPTED)
-				elseif questCode == 'X' then
-					typeString = format(" ![%s]", self.s.TURNED_IN)
-				end
 				local statusCode = GRAIL:StatusCode(questId)
 				local questLevel = GRAIL:QuestLevelString(questId)
 				local questLevelString = WDB.prependsQuestLevel and questLevel ~= "" and format("[%s] ", questLevel or "??") or ""
@@ -3877,10 +3860,8 @@ end
 
 			if searchText and "" ~= searchText then
 				if com_mithrandir_whollySearchFrame.processingTags then
-					WhollyDatabase.tags = WhollyDatabase.tags or {}
 					WhollyDatabase.tags[searchText] = WhollyDatabase.tags[searchText] or {}
 				else
-					if nil == WhollyDatabase.searches then WhollyDatabase.searches = {} end
 					tinsert(WhollyDatabase.searches, searchText)
 					if #(WhollyDatabase.searches) > self.maximumSearchHistory then
 						tremove(WhollyDatabase.searches, 1)
@@ -4022,6 +4003,8 @@ end
 			if nil == WDB.ignoredQuests then
 				WDB.ignoredQuests = {}
 			end
+			WDB.searches = WDB.searches or {}
+			WDB.tags = WDB.tags or {}
 			-- Setup the colors, only setting those that do not already exist
 			WDB.color = WDB.color or {}
 			for code, colorCode in pairs(self.color) do
@@ -4132,49 +4115,16 @@ end
 				self:RemoveAllData()
 				if WhollyDatabase.displaysMapPins then
 					local uiMapID = self:GetMap():GetMapID()
-					Wholly.zoneInfo.pins.mapId = uiMapID
 					if not uiMapID then return end
-					Wholly.cachedPinQuests = Wholly:_ClassifyQuestsInMap(uiMapID) or {}
-					Wholly:_FilterPinQuests()
-					local questsInMap = Wholly.filteredPinQuests
-					local codeMapping = { ['?'] = 0, ['G'] = 1, ['W'] = 2, ['D'] = 3, ['R'] = 4, ['K'] = 5, ['H'] = 6, ['Y'] = 7, ['P'] = 8, ['L'] = 9, ['O'] = 10, ['U'] = 11, ['*'] = 12, ['!'] = 13 }
-					for i = 1, #questsInMap do
-						local id = questsInMap[i][1]
-						local code = questsInMap[i][2]
-						if 'D' == code and Grail:IsRepeatable(id) then code = 'R' end
-						if 'I' == code then
-							local _, completed = Grail:IsQuestInQuestLog(id)
-							completed = completed or 0
-							if completed > 0 then
-								code = '?'
-							elseif completed < 0 then
-								code = '!'
-							else
-								code = '*'
-							end
+					Wholly.zoneInfo.pins.mapId = uiMapID
+					local pinMap = self:GetMap()
+					Wholly.pendingPinRefreshSeq = (Wholly.pendingPinRefreshSeq or 0) + 1
+					local seq = Wholly.pendingPinRefreshSeq
+					C_Timer.After(0, function()
+						if Wholly.pendingPinRefreshSeq == seq then
+							Wholly:_DoPlaceMapPins(pinMap, uiMapID)
 						end
-						local codeValue = codeMapping[code]
-						local locations = ('?' == code or '*' == code or '!' == code) and Grail:QuestLocationsTurnin(id, true, false, true, uiMapID) or Grail:QuestLocationsAccept(id, false, false, true, uiMapID, true)
-						if nil ~= locations then
-							for _, npc in pairs(locations) do
-								local xcoord, ycoord, npcName, npcId = npc.x, npc.y, npc.name, npc.id
-								if nil ~= xcoord then
-									-- Either find an existing pin to see whether we need to change its texture type or create
-									-- a new pin.  We might need to change the texture depending on how many quests are going
-									-- to be displayed for the NPC.  We want the map to show one pin for the NPC and have its
-									-- texture be for the "best" quest type that NPC shows.
-									local possibleExistingPin = Wholly:RegisteredMapPin(xcoord, ycoord, npcId)
-									if nil ~= possibleExistingPin then
-										if codeValue < codeMapping[possibleExistingPin.texType] then
-											possibleExistingPin:SetType(code)
-										end
-									else
-										self:GetMap():AcquirePin(Wholly.mapPinsTemplateName, code, self:GetMap(), xcoord, ycoord, npcId)
-									end
-								end
-							end
-						end
-					end
+					end)
 				else
 					Wholly.mapCountLine = ""        -- do not display a tooltip for pins we are not showing
 				end
@@ -4712,49 +4662,26 @@ end
 		end,
 
 		SortingFunction = function(a, b)
-			local retval = false
-			if 1 == WhollyDatabase.currentSortingMode then
-				retval = Wholly:_QuestName(a[1]) < Wholly:_QuestName(b[1])
-			elseif 2 == WhollyDatabase.currentSortingMode then
-				local aLevel, bLevel = Grail:QuestLevel(a[1]) or 1, Grail:QuestLevel(b[1]) or 1
-				if aLevel == bLevel then
-					retval = Wholly:_QuestName(a[1]) < Wholly:_QuestName(b[1])
-				else
-					retval = aLevel < bLevel
-				end
-			elseif 3 == WhollyDatabase.currentSortingMode then
-				local aLevel, bLevel = Grail:QuestLevel(a[1]) or 1, Grail:QuestLevel(b[1]) or 1
-				if aLevel == bLevel then
-					local aCode, bCode = a[2], b[2]
-					if aCode == bCode then
-						retval = Wholly:_QuestName(a[1]) < Wholly:_QuestName(b[1])
-					else
-						retval = aCode < bCode
-					end
-				else
-					retval = aLevel < bLevel
-				end
-			elseif 4 == WhollyDatabase.currentSortingMode then
-				local aCode, bCode = a[2], b[2]
-				if aCode == bCode then
-					retval = Wholly:_QuestName(a[1]) < Wholly:_QuestName(b[1])
-				else
-					retval = aCode < bCode
-				end
-			elseif 5 == WhollyDatabase.currentSortingMode then
-				local aCode, bCode = a[2], b[2]
-				if aCode == bCode then
-					local aLevel, bLevel = Grail:QuestLevel(a[1]) or 1, Grail:QuestLevel(b[1]) or 1
-					if aLevel == bLevel then
-						retval = Wholly:_QuestName(a[1]) < Wholly:_QuestName(b[1])
-					else
-						retval = aLevel < bLevel
-					end
-				else
-					retval = aCode < bCode
-				end
+			local mode = WhollyDatabase.currentSortingMode
+			if 1 == mode then
+				return Wholly:_QuestName(a[1]) < Wholly:_QuestName(b[1])
 			end
-			return retval
+			local aLevel, bLevel = Grail:QuestLevel(a[1]) or 1, Grail:QuestLevel(b[1]) or 1
+			local aCode, bCode = a[2], b[2]
+			if 2 == mode then
+				if aLevel ~= bLevel then return aLevel < bLevel end
+			elseif 3 == mode then
+				if aLevel ~= bLevel then return aLevel < bLevel end
+				if aCode ~= bCode then return aCode < bCode end
+			elseif 4 == mode then
+				if aCode ~= bCode then return aCode < bCode end
+			elseif 5 == mode then
+				if aCode ~= bCode then return aCode < bCode end
+				if aLevel ~= bLevel then return aLevel < bLevel end
+			else
+				return false
+			end
+			return Wholly:_QuestName(a[1]) < Wholly:_QuestName(b[1])
 		end,
 
 		_TagDelete = function(self)
@@ -4900,6 +4827,53 @@ end
             	self.mapPinsProvider:RefreshAllData()
 			end
         end,
+
+		_DoPlaceMapPins = function(self, pinMap, uiMapID)
+			self.cachedPinQuests = self:_ClassifyQuestsInMap(uiMapID) or {}
+			self:_FilterPinQuests()
+			local questsInMap = self.filteredPinQuests
+			local codeMapping = { ['?'] = 0, ['G'] = 1, ['W'] = 2, ['D'] = 3, ['R'] = 4, ['K'] = 5, ['H'] = 6, ['Y'] = 7, ['P'] = 8, ['L'] = 9, ['O'] = 10, ['U'] = 11, ['*'] = 12, ['!'] = 13 }
+			for i = 1, #questsInMap do
+				local id = questsInMap[i][1]
+				local code = questsInMap[i][2]
+				if 'D' == code and Grail:IsRepeatable(id) then code = 'R' end
+				if 'I' == code then
+					local _, completed = Grail:IsQuestInQuestLog(id)
+					completed = completed or 0
+					if completed > 0 then
+						code = '?'
+					elseif completed < 0 then
+						code = '!'
+					else
+						code = '*'
+					end
+				end
+				local codeValue = codeMapping[code]
+				if nil ~= codeValue then
+					local locations = ('?' == code or '*' == code or '!' == code) and Grail:QuestLocationsTurnin(id, true, false, true, uiMapID) or Grail:QuestLocationsAccept(id, false, false, true, uiMapID, true)
+					if nil ~= locations then
+						for _, npc in pairs(locations) do
+							local xcoord, ycoord, npcName, npcId = npc.x, npc.y, npc.name, npc.id
+							if nil ~= xcoord then
+								-- Either find an existing pin to see whether we need to change its texture type or create
+								-- a new pin.  We might need to change the texture depending on how many quests are going
+								-- to be displayed for the NPC.  We want the map to show one pin for the NPC and have its
+								-- texture be for the "best" quest type that NPC shows.
+								local possibleExistingPin = self:RegisteredMapPin(xcoord, ycoord, npcId)
+								if nil ~= possibleExistingPin then
+									local existingValue = codeMapping[possibleExistingPin.texType]
+									if nil ~= existingValue and codeValue < existingValue then
+										possibleExistingPin:SetType(code)
+									end
+								else
+									pinMap:AcquirePin(Wholly.mapPinsTemplateName, code, pinMap, xcoord, ycoord, npcId)
+								end
+							end
+						end
+					end
+				end
+			end
+		end,
 
 		UpdateQuestCaches = function(self, forceUpdate, setPinMap, setPanelMap, useCurrentZone)
 			if not Grail:IsPrimed() then return end
@@ -6218,6 +6192,22 @@ end
 		{ S.ADD_ADVENTURE_GUIDE, 'shouldAddAdventureGuideQuests', 'configurationScript4' },
 		}
 
+	local s = Wholly.s
+	Wholly.questCodeSuffixes = {
+		B = format(" [%s]", s.IN_LOG),
+		C = format(" [%s, %s]", s.IN_LOG, s.TURNED_IN),
+		c = format(" ![%s, %s]", s.IN_LOG, s.TURNED_IN),
+		D = format(" [%s]", s.COMPLETE),
+		e = format(" ![%s, %s]", s.COMPLETE, s.TURNED_IN),
+		E = format(" [%s, %s]", s.COMPLETE, s.TURNED_IN),
+		H = format(" [%s]", s.EVER_COMPLETED),
+		h = format(" ![%s]", s.EVER_COMPLETED),
+		M = format(" [%s]", s.ABANDONED),
+		m = format(" [%s]", s.NEVER_ABANDONED),
+		O = format(" [%s]", s.ACCEPTED),
+		X = format(" ![%s]", s.TURNED_IN),
+	}
+
 	Wholly.poisToHide = {}
 	Wholly._HidePOIs = function(self)
 		if not InCombatLockdown() then
@@ -6294,12 +6284,14 @@ end
 
 Wholly.GetMapProvidersForMixin = function(mapCanvas, mixin)
 	local retval = {}
-    for provider in pairs(mapCanvas.dataProviders) do
-        if provider.RemoveAllData == mixin.RemoveAllData then
-			tinsert(retval, provider)
-        end
-    end
-    return retval
+	if mapCanvas and mapCanvas.dataProviders then
+		for provider in pairs(mapCanvas.dataProviders) do
+			if provider.RemoveAllData == mixin.RemoveAllData then
+				tinsert(retval, provider)
+			end
+		end
+	end
+	return retval
 end
 
 
