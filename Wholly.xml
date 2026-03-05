@@ -23,19 +23,17 @@
 		<Scripts>
 			<OnLoad>
 				self:RegisterForClicks("AnyUp", "AnyDown")
+				self:SetAttribute("alt-type1", "macro")
 			</OnLoad>
+			<OnClick>
+				Wholly:ButtonOnClick(self, button, down)
+			</OnClick>
 			<OnEnter>
 				Wholly:ButtonEnter(self)
 			</OnEnter>
 			<OnLeave>
 				GameTooltip:Hide()
 			</OnLeave>
-			<PostClick>
-				Wholly:ButtonPostClick(self)
-			</PostClick>
-			<PreClick>
-				Wholly:ButtonPreClick(self)
-			</PreClick>
 		</Scripts>
 		<ButtonText name="$parentNormalText" nonspacewrap="true" parentKey="normalText">
 			<Size>
@@ -118,135 +116,5 @@
 			</OnClick>
 		</Scripts>
 	</Button>
-
-	<Frame name="com_mithrandir_whollyQuestInfoBuggedFrame" parent="QuestFrame" enableMouse="true">
-		<Size>
-			<AbsDimension x="180" y="14" />
-		</Size>
-		<Anchors>
-			<Anchor point="TOPLEFT" relativePoint="TOPLEFT">
-				<Offset>
-					<AbsDimension x="100" y="-55" />
-				</Offset>
-			</Anchor>
-		</Anchors>
-		<Layers>
-			<Layer level="BACKGROUND">
-				<FontString name="$parentText" inherits="GameFontNormal" justifyH="LEFT" text="None">
-					<Size>
-						<AbsDimension x="180" y="20" />
-					</Size>
-				</FontString>
-			</Layer>
-		</Layers>
-	</Frame>
-
-	<Frame name="com_mithrandir_whollyBreadcrumbFrame" parent="QuestFrame" enableMouse="true" frameStrata="MEDIUM" hidden="true">
-		<Size>
-			<AbsDimension x="360" y="128" />
-		</Size>
-		<Scripts>
-			<OnMouseDown>
-				Wholly:BreadcrumbClick(self)
-			</OnMouseDown>
-			<OnEnter>
-				Wholly:BreadcrumbEnter(self)
-			</OnEnter>
-			<OnLeave>
-				GameTooltip:Hide()
-			</OnLeave>
-		</Scripts>
-		<Anchors>
-			<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT">
-				<Offset>
-					<AbsDimension x="16" y="70" />
-				</Offset>
-			</Anchor>
-		</Anchors>
-		<HitRectInsets>
-			<AbsInset left="0" right="0" top="0" bottom="0" />
-		</HitRectInsets>
-		<Layers>
-			<Layer level="ARTWORK">
-				<Texture file="Interface\TUTORIALFRAME\UI-TutorialFrame-QuestGiver">
-					<Anchors>
-						<Anchor point="BOTTOMLEFT">
-							<Offset>
-								<AbsDimension x="0" y="0" />
-							</Offset>
-						</Anchor>
-					</Anchors>
-				</Texture>
-				<FontString name="$parentMessage" inherits="GameFontHighlightMedium" justifyH="LEFT" text="Breadcrumb Quest Available">
-					<Size>
-						<AbsDimension x="300" y="22"/>
-					</Size>
-					<Anchors>
-						<Anchor point="BOTTOMLEFT">
-							<Offset>
-								<AbsDimension x="75" y="54"/>
-							</Offset>
-						</Anchor>
-					</Anchors>
-				</FontString>
-			</Layer>
-		</Layers>
-	</Frame>
-
-	<Frame name="com_mithrandir_whollyConfigFrame">
-		<Scripts>
-			<OnShow>
-				Wholly:ConfigFrame_OnShow(self)
-			</OnShow>
-		</Scripts>
-	</Frame>
-
-	<Frame name="com_mithrandir_whollyTitleAppearanceConfigFrame">
-		<Scripts>
-			<OnShow>
-				Wholly:ConfigFrame_OnShow(self)
-			</OnShow>
-		</Scripts>
-	</Frame>
-
-	<Frame name="com_mithrandir_whollyWorldMapConfigFrame">
-		<Scripts>
-			<OnShow>
-				Wholly:ConfigFrame_OnShow(self)
-			</OnShow>
-		</Scripts>
-	</Frame>
-
-	<Frame name="com_mithrandir_whollyWidePanelConfigFrame">
-		<Scripts>
-			<OnShow>
-				Wholly:ConfigFrame_OnShow(self)
-			</OnShow>
-		</Scripts>
-	</Frame>
-
-	<Frame name="com_mithrandir_whollyImmersionIntegrationConfigFrame">
-		<Scripts>
-			<OnShow>
-				Wholly:ConfigFrame_OnShow(self)
-			</OnShow>
-		</Scripts>
-	</Frame>
-
-	<Frame name="com_mithrandir_whollyLoadDataConfigFrame">
-		<Scripts>
-			<OnShow>
-				Wholly:ConfigFrame_OnShow(self)
-			</OnShow>
-		</Scripts>
-	</Frame>
-
-	<Frame name="com_mithrandir_whollyOtherConfigFrame">
-		<Scripts>
-			<OnShow>
-				Wholly:ConfigFrame_OnShow(self)
-			</OnShow>
-		</Scripts>
-	</Frame>
 
 </Ui>

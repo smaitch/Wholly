@@ -461,6 +461,21 @@ local bitband = bit.band
 local tablesort = table.sort
 local mathmax, mathmin, sqrt = math.max, math.min, math.sqrt
 
+local normalColor = "ffffd200"
+local redColor    = "ffff0000"
+local orangeColor = "ffff9900"
+local greenColor  = "ff00ff00"
+
+local function statusColor(statusCode, maskMain, maskAncestor)
+	if bitband(statusCode, maskMain) > 0 then return redColor
+	elseif bitband(statusCode, maskAncestor) > 0 then return orangeColor
+	else return normalColor end
+end
+
+local function colorize(colorCode, text)
+	return "|c" .. colorCode .. text .. "|r"
+end
+
 local CloseDropDownMenus					= CloseDropDownMenus
 local CreateFrame							= CreateFrame
 --local GetAchievementInfo					= GetAchievementInfo
@@ -534,6 +549,58 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 	end
 
 	WhollyDatabase = {}
+
+	local function _CreateQuestPanelFrame(frameName, width, height)
+		local frame = CreateFrame("Frame", frameName, UIParent)
+		frame:SetToplevel(true)
+		frame:EnableMouse(true)
+		frame:SetMovable(true)
+		frame:SetUserPlaced(true)
+		frame:Hide()
+		frame:SetSize(width, height)
+		local frameInfo = WhollyDatabase[frameName]
+		if frameInfo then
+			frame:SetPoint(frameInfo[1], UIParent, frameInfo[2], frameInfo[3], frameInfo[4])
+		else
+			frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
+		end
+		local bookTexture = frame:CreateTexture(nil, "BACKGROUND")
+		bookTexture:SetSize(64, 64)
+		bookTexture:SetPoint("TOPLEFT", 3, -4)
+		bookTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BookIcon")
+		local fontString = frame:CreateFontString(frameName.."TitleText", "ARTWORK", "GameFontNormal")
+		fontString:SetSize(300, 14)
+		fontString:SetPoint("TOP", 0, -15)
+		fontString:SetText(QUEST_LOG)
+		frame:SetScript("OnShow", function(self)
+			Wholly:OnShow(self)
+			PlaySound(PlaySoundKitID and "igCharacterInfoOpen" or 839)
+		end)
+		frame:SetScript("OnHide", function(self)
+			Wholly:OnHide(self)
+			PlaySound(PlaySoundKitID and "igCharacterInfoClose" or 840)
+			if self.isMoving then
+				self:StopMovingOrSizing()
+				self.isMoving = false
+			end
+		end)
+		frame:SetScript("OnMouseUp", function(self)
+			if self.isMoving then
+				self:StopMovingOrSizing()
+				self.isMoving = false
+				local p1, _, p2, p3, p4 = self:GetPoint()
+				WhollyDatabase[self:GetName()] = { p1, p2, p3, p4 }
+			end
+		end)
+		frame:SetScript("OnMouseDown", function(self, button)
+			if (not self.isLocked or self.isLocked == 0) and button == "LeftButton" then
+				self:StartMoving()
+				self.isMoving = true
+			end
+		end)
+		tinsert(UISpecialFrames, frameName)
+		return frame
+	end
 
 	Wholly = {
 
@@ -819,13 +886,17 @@ self.currentFrame = com_mithrandir_whollyFrame
 					self:_SetupWorldMapWhollyButton()
 
 -- if the UI panel disappears (maximized WorldMapFrame) we need to change parents
-UIParent:HookScript("OnHide", function()
-self.tooltip:SetParent(WorldMapFrame);
-self.tooltip:SetFrameStrata("TOOLTIP");
+WorldMapFrame:HookScript("OnShow", function()
+	if self.tooltip then
+		self.tooltip:SetParent(WorldMapFrame)
+		self.tooltip:SetFrameStrata("TOOLTIP")
+	end
 end)
-UIParent:HookScript("OnShow", function()
-self.tooltip:SetParent(UIParent);
-self.tooltip:SetFrameStrata("TOOLTIP");
+WorldMapFrame:HookScript("OnHide", function()
+	if self.tooltip then
+		self.tooltip:SetParent(UIParent)
+		self.tooltip:SetFrameStrata("TOOLTIP")
+	end
 end)
 
 -- Dragonflight introduces new tool tip processing
@@ -837,6 +908,37 @@ end
 
 					self:_SetupBlizzardQuestLogSupport()
 					self:_SetupQuestInfoFrame()
+
+				-- Create the bugged quest info frame (moved from Wholly.xml)
+				do
+					local f = CreateFrame("Frame", "com_mithrandir_whollyQuestInfoBuggedFrame", QuestFrame)
+					f:SetSize(180, 14)
+					f:EnableMouse(true)
+					local fs = f:CreateFontString("com_mithrandir_whollyQuestInfoBuggedFrameText", "BACKGROUND", "GameFontNormal")
+					fs:SetSize(180, 20)
+					fs:SetJustifyH("LEFT")
+					fs:SetText("None")
+				end
+
+				-- Create the breadcrumb frame (moved from Wholly.xml)
+				do
+					local f = CreateFrame("Frame", "com_mithrandir_whollyBreadcrumbFrame", QuestFrame)
+					f:SetSize(360, 128)
+					f:EnableMouse(true)
+					f:SetFrameStrata("MEDIUM")
+					f:Hide()
+					f:SetScript("OnMouseDown", function(self) Wholly:BreadcrumbClick(self) end)
+					f:SetScript("OnEnter", function(self) Wholly:BreadcrumbEnter(self) end)
+					f:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+					local tex = f:CreateTexture(nil, "ARTWORK")
+					tex:SetTexture("Interface\\TUTORIALFRAME\\UI-TutorialFrame-QuestGiver")
+					tex:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
+					local msg = f:CreateFontString("com_mithrandir_whollyBreadcrumbFrameMessage", "ARTWORK", "GameFontHighlightMedium")
+					msg:SetSize(300, 22)
+					msg:SetJustifyH("LEFT")
+					msg:SetText("Breadcrumb Quest Available")
+					msg:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 75, 54)
+				end
 
 -- Our frame positions are wrong for MoP, so we change them here.
 com_mithrandir_whollyQuestInfoBuggedFrame:SetPoint("TOPLEFT", QuestFrame, "TOPLEFT", 100, -35)
@@ -908,26 +1010,19 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 						tinsert(Wholly.configuration[S.WORLD_MAP], { S.HIDE_BLIZZARD_WORLD_MAP_WORLD_QUESTS, 'hidesBlizzardWorldMapWorldQuests', 'configurationScript22' })
 					end
 
-					-- Setup the preferences
---					local com_mithrandir_whollyConfigFrame = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer)
---					com_mithrandir_whollyConfigFrame:SetScript("OnShow", function(self) Wholly:ConfigFrame_OnShow(self) end)
---					local com_mithrandir_whollyTitleAppearanceConfigFrame = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer)
---					com_mithrandir_whollyTitleAppearanceConfigFrame:SetScript("OnShow", function(self) Wholly:ConfigFrame_OnShow(self) end)
---					local com_mithrandir_whollyWorldMapConfigFrame = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer)
---					com_mithrandir_whollyWorldMapConfigFrame:SetScript("OnShow", function(self) Wholly:ConfigFrame_OnShow(self) end)
---					local com_mithrandir_whollyWidePanelConfigFrame = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer)
---					com_mithrandir_whollyWidePanelConfigFrame:SetScript("OnShow", function(self) Wholly:ConfigFrame_OnShow(self) end)
---					local com_mithrandir_whollyLoadDataConfigFrame = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer)
---					com_mithrandir_whollyLoadDataConfigFrame:SetScript("OnShow", function(self) Wholly:ConfigFrame_OnShow(self) end)
---					local com_mithrandir_whollyOtherConfigFrame = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer)
---					com_mithrandir_whollyOtherConfigFrame:SetScript("OnShow", function(self) Wholly:ConfigFrame_OnShow(self) end)
-					self:ConfigFrame_OnLoad(com_mithrandir_whollyConfigFrame, "Wholly")
-					self:ConfigFrame_OnLoad(com_mithrandir_whollyTitleAppearanceConfigFrame, Wholly.s.TITLE_APPEARANCE, "Wholly")
-					self:ConfigFrame_OnLoad(com_mithrandir_whollyWorldMapConfigFrame, Wholly.s.WORLD_MAP, "Wholly")
-					self:ConfigFrame_OnLoad(com_mithrandir_whollyWidePanelConfigFrame, Wholly.s.WIDE_PANEL, "Wholly")
-					self:ConfigFrame_OnLoad(com_mithrandir_whollyImmersionIntegrationConfigFrame, Wholly.s.IMMERSION_INTEGRATION, "Wholly")
-					self:ConfigFrame_OnLoad(com_mithrandir_whollyLoadDataConfigFrame, Wholly.s.LOAD_DATA, "Wholly")
-					self:ConfigFrame_OnLoad(com_mithrandir_whollyOtherConfigFrame, Wholly.s.OTHER_PREFERENCE, "Wholly")
+					-- Setup the preferences (config frames moved from Wholly.xml)
+					local function makeConfigFrame(name)
+						local f = CreateFrame("Frame", name)
+						f:SetScript("OnShow", function(self) Wholly:ConfigFrame_OnShow(self) end)
+						return f
+					end
+					self:ConfigFrame_OnLoad(makeConfigFrame("com_mithrandir_whollyConfigFrame"), "Wholly")
+					self:ConfigFrame_OnLoad(makeConfigFrame("com_mithrandir_whollyTitleAppearanceConfigFrame"), Wholly.s.TITLE_APPEARANCE, "Wholly")
+					self:ConfigFrame_OnLoad(makeConfigFrame("com_mithrandir_whollyWorldMapConfigFrame"), Wholly.s.WORLD_MAP, "Wholly")
+					self:ConfigFrame_OnLoad(makeConfigFrame("com_mithrandir_whollyWidePanelConfigFrame"), Wholly.s.WIDE_PANEL, "Wholly")
+					self:ConfigFrame_OnLoad(makeConfigFrame("com_mithrandir_whollyImmersionIntegrationConfigFrame"), Wholly.s.IMMERSION_INTEGRATION, "Wholly")
+					self:ConfigFrame_OnLoad(makeConfigFrame("com_mithrandir_whollyLoadDataConfigFrame"), Wholly.s.LOAD_DATA, "Wholly")
+					self:ConfigFrame_OnLoad(makeConfigFrame("com_mithrandir_whollyOtherConfigFrame"), Wholly.s.OTHER_PREFERENCE, "Wholly")
 
 					self:_SetupMapPinsProvider()
 					self:_SetupMapPinsProviderPin()
@@ -1296,7 +1391,9 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 							--	local point = { uiMapID = npc.mapArea, position = CreateVector2D(npc.x/100, npc.y/100) }
 								local point = UiMapPoint.CreateFromCoordinates(npc.mapArea, npc.x/100, npc.y/100)
 								C_Map.SetUserWaypoint(point)	-- this just puts a point on the map
-								C_SuperTrack.SetSuperTrackedUserWaypoint(true)	-- this makes it appear in the UI
+								if not InCombatLockdown() then
+									C_SuperTrack.SetSuperTrackedUserWaypoint(true)	-- this makes it appear in the UI
+								end
 								-- ObjectiveTracker_Update(OBJECTIVE_TRACKER_UPDATE_QUEST_ADDED, questID) -- does not seem to do anything we want
 							end
 						end
@@ -1403,20 +1500,6 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			local questIdToUse = aliasQuestId or button.questId
 			self:_PopulateTooltipForQuest(button, questIdToUse, (questIdToUse ~= button.questId) and button.questId or nil)
 
-			if not button.secureProcessed and not InCombatLockdown() then
-				button:SetAttribute("type1", "click")
-				button:SetAttribute("clickbutton", Wholly)
-				button:SetAttribute("type2", "click")
-				button:SetAttribute("shift-type1", "click")
-				button:SetAttribute("ctrl-type1", "click")
-				button:SetAttribute("ctrl-shift-type1", "click")
-				button:SetAttribute("shift-type2", "click")
-				button:SetAttribute("alt-type1", "macro")
-				button.secureProcessed = true
-			else
-				-- TODO: Should attempt a delayed setting of this if not button.secureProcessed and InCombatLockdown()
-			end
-
 			if 'P' == button.statusCode then
 				local controlTable = { ["result"] = {}, ["preq"] = nil, ["lastIndexUsed"] = 0, ["doMath"] = true }
 				local lastIndexUsed = Grail._PreparePrerequisiteInfo(Grail:QuestPrerequisites(button.questId, true), controlTable)
@@ -1453,14 +1536,6 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			end
 		end,
 
-		ButtonPostClick = function(self, button)
-			if button ~= self.clickingButton then print("Post click not from the same Pre click") end
-			self.clickingButton = nil
-		end,
-
-		ButtonPreClick = function(self, button)
-			self.clickingButton = button
-		end,
 
 		_CallbackHandler = function(type, questId)
 			local WDB = WhollyDatabase
@@ -1479,7 +1554,8 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 		_CheckNPCTooltip = function(tooltip)
 			if (not UnitIsPlayer("mouseover") or true) then
 				-- check if this npc drops a quest item
-				local id = Grail:GetNPCId(false, true)	-- only "mouseover" will be used
+				local ok, id = pcall(Grail.GetNPCId, Grail, false, true)	-- only "mouseover" will be used
+				if not ok then return end
 				local qs = id and Wholly.npcs[tonumber(id)] or nil
 				if nil ~= qs then
 					for _, questId in pairs(qs) do
@@ -1541,40 +1617,40 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 		--	Control click		:	Directional arrows for all quests in "map area"
 		--	Right-click			:	Directional arrows for questgivers for first in prerequisites, or directional arrows to turn-in NPCs if no prerequisites
 		--	Left-click			:	Directional arrows for questgivers
-		-- This is named this way with this function signature because it is called from the SecureActionButtonTemplate exactly like this.
-		Click = function(self, leftOrRight)
+		ButtonOnClick = function(self, button, leftOrRight, down)
+			-- alt+left is handled securely by the macro attribute; skip it here
+			if IsAltKeyDown() and "LeftButton" == leftOrRight then return end
 			if IsShiftKeyDown() and "RightButton" == leftOrRight then
-				self:_TagProcess(self.clickingButton.questId)
+				Wholly:_TagProcess(button.questId)
 				return
 			end
 			if IsShiftKeyDown() and IsControlKeyDown() then
-				self:ToggleIgnoredQuest()
-				self.configurationScript1()
+				Wholly:ToggleIgnoredQuest(button.questId)
+				Wholly.configurationScript1()
 				return
 			end
 			if IsShiftKeyDown() then
-				if LightHeaded then self:ToggleLightHeaded() end
+				if LightHeaded then Wholly:ToggleLightHeaded(button.questId) end
 				return
 			end
 			if IsControlKeyDown() then
-				local questsInMap = self.filteredPanelQuests
+				local questsInMap = Wholly.filteredPanelQuests
 				local numEntries = #questsInMap
 				for i = 1, numEntries do
-					self:_AddDirectionalArrows({questsInMap[i][1]}, 'A')
+					Wholly:_AddDirectionalArrows({questsInMap[i][1]}, 'A')
 				end
 				return
 			end
-			local button = self.clickingButton
 			local questsToUse = {button.questId}
 			local npcType = 'A'
 			if "RightButton" == leftOrRight then
-				if nil ~= self.lastPrerequisites then
-					questsToUse = self.lastPrerequisites
+				if nil ~= Wholly.lastPrerequisites then
+					questsToUse = Wholly.lastPrerequisites
 				else
 					npcType = 'T'
 				end
 			end
-			self:_AddDirectionalArrows(questsToUse, npcType)
+			Wholly:_AddDirectionalArrows(questsToUse, npcType)
 		end,
 
 		_ColorCodeFromInfo = function(self, colorCode, r, g, b, a)
@@ -2478,7 +2554,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				end
 				local mapAreaID = Grail.mapAreaBaseDaily
 				local mapName = Grail:MapAreaName(mapAreaID) or "UNKNOWN"
-				tinsert(t, { sortName = mapName, displayName = "|c" .. WhollyDatabase.color['D'] .. mapName .. "|r", mapID = mapAreaID })
+				tinsert(t, { sortName = mapName, displayName = colorize(WhollyDatabase.color['D'], mapName), mapID = mapAreaID })
 				mapAreaID = Grail.mapAreaBaseOther
 				mapName = Wholly.s.OTHER
 				tinsert(t, { sortName = mapName, displayName = mapName, mapID = mapAreaID })
@@ -2630,7 +2706,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 						if nil ~= comment then
 							self:_AddLine(" ", comment)
 						end
-						if meetsCriteria then
+						if meetsCriteria and not self.onlyAddingTooltipToGameTooltip then
 							local desiredMacroValue = self.s.SLASH_TARGET .. ' ' .. rawNameToUse
 							if button:GetAttribute("macrotext") ~= desiredMacroValue and not InCombatLockdown() then
 								button:SetAttribute("macrotext", desiredMacroValue)
@@ -2766,7 +2842,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				if forMap and not WhollyDatabase.displaysMapPins then
 					displayStart, displayEnd = "|cffff0000", "|r"
 				end
-				retval = retval .. "|c" .. WDB.color[lastCode] .. totals[lastCode] .. "|r"
+				retval = retval .. colorize(WDB.color[lastCode], totals[lastCode])
 				if not abbreviated then
 					retval = retval .. "  [" .. displayStart .. displayedCount .. displayEnd .. "/" .. #questTable .."]"
 				end
@@ -2879,17 +2955,17 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			elseif questCode == '@' then
 				return format("|c%s%s %s %d|r", colorCode, GRAIL:NPCName(100000000 + subcode), self.s.LEVEL, numeric)
 			elseif questCode == '#' then
-				return format(GARRISON_MISSION_TIME, format("|c%s%s|r", colorCode, GRAIL:MissionName(numeric) or numeric))
+				return format(GARRISON_MISSION_TIME, colorize(colorCode, GRAIL:MissionName(numeric) or numeric))
 --				return format("Mission Needed: |c%s%s|r", colorCode, GRAIL:MissionName(numeric))	-- GARRISON_MISSION_TIME
 			elseif questCode == '&' then
 				local message = format(REQUIRES_AZERITE_LEVEL_TOOLTIP, numeric)
-				return format("|c%s%s|r", colorCode, message)
+				return colorize(colorCode, message)
 			elseif questCode == '$' or questCode == '*' then
 				local covenantNameToDisplay = (0 == subcode) and "" or C_Covenants.GetCovenantData(subcode).name or "???"
 				local comparisonToDisplay = (questCode == '*') and " <" or ""
 				return format("|c%s%s - %s%s|r", colorCode, LANDING_PAGE_RENOWN_LABEL, covenantNameToDisplay, comparisonToDisplay, numeric)
 			elseif questCode == '%' then
-				return format("|c%s%s|r", colorCode, self:_QuestName(400000 + numeric))
+				return colorize(colorCode, self:_QuestName(400000 + numeric))
 			elseif questCode == '(' then
 				local todayResetDate = C_DateAndTime.AdjustTimeByMinutes(C_DateAndTime.GetCurrentCalendarTime(), (C_DateAndTime.GetSecondsUntilDailyReset() - (86400 * 1)) / 60)
 				local presentableDate = strformat("%4d-%02d-%02d %02d:%02d", todayResetDate.year, todayResetDate.monthDay, todayResetDate.day, todayResetDate.hour, todayResetDate.minute)
@@ -2897,7 +2973,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				return format("|c%s%s |r|c%s< %s|r", completedColorCode, self:_QuestName(numeric), colorCode, presentableDate)
 			elseif questCode == ')' then
 				local currencyName, currentAmount = GRAIL:GetCurrencyInfo(subcode)
-				return format("|c%s%s|r", colorCode, currencyName)
+				return colorize(colorCode, currencyName)
 			elseif questCode == '_' or questCode == '~' then
 				local extra = questCode == '~' and " [" .. Grail.accountUnlock .. "]" or ""
 				return format("|c%s%s%s - %s|r", colorCode, LANDING_PAGE_RENOWN_LABEL, extra, GRAIL.reputationMapping[subcode])
@@ -3043,16 +3119,13 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			local _, _, requiredLevel, notToExceedLevel = Grail:MeetsRequirementLevel(questId)
 			local questType = self:_QuestTypeString(questId)
 			local statusCode = Grail:StatusCode(questId)
-			local normalColor, redColor, orangeColor, greenColor = "ffffd200", "ffff0000", "ffff9900", "ff00ff00"
-			local colorCode
 
 			self:_AddLine(" ")
 			if questLevel ~= "" then
 				self:_AddLine(LEVEL, questLevel)
 			end
 			self:_AddLine(self.s.REQUIRED_LEVEL, requiredLevel)
-			if bitband(statusCode, Grail.bitMaskLevelTooHigh) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorLevelTooHigh) > 0 then colorCode = orangeColor else colorCode = normalColor end
-			self:_AddLine("|c"..colorCode..self.s.MAX_LEVEL.."|r", (notToExceedLevel * Grail.bitMaskQuestMaxLevelOffset == Grail.bitMaskQuestMaxLevel) and self.s.MAXIMUM_LEVEL_NONE or notToExceedLevel)
+			self:_AddLine("|c"..statusColor(statusCode, Grail.bitMaskLevelTooHigh, Grail.bitMaskAncestorLevelTooHigh)..self.s.MAX_LEVEL.."|r", (notToExceedLevel * Grail.bitMaskQuestMaxLevelOffset == Grail.bitMaskQuestMaxLevel) and self.s.MAXIMUM_LEVEL_NONE or notToExceedLevel)
 
 			if "" == questType then questType = self.s.QUEST_TYPE_NORMAL end
 			self:_AddLine(TYPE, trim(questType))
@@ -3071,8 +3144,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			elseif 0 < bitband(obtainersCode, Grail.bitMaskFactionHorde) then
 				factionString = self.s.HORDE
 			end
-			if bitband(statusCode, Grail.bitMaskFaction) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorFaction) > 0 then colorCode = orangeColor else colorCode = normalColor end
-			self:_AddLine("|c"..colorCode..self.s.FACTION.."|r", factionString)
+			self:_AddLine("|c"..statusColor(statusCode, Grail.bitMaskFaction, Grail.bitMaskAncestorFaction)..self.s.FACTION.."|r", factionString)
 
 			local classString
 			if 0 == bitband(obtainersCode, Grail.bitMaskClassAll) then
@@ -3095,8 +3167,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				classString = self:_StringFromTable(t, ", ")
 				classString = trim(classString)
 			end
-			if bitband(statusCode, Grail.bitMaskClass) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorClass) > 0 then colorCode = orangeColor else colorCode = normalColor end
-			self:_AddLine("|c"..colorCode..CLASS.."|r", classString)
+			self:_AddLine("|c"..statusColor(statusCode, Grail.bitMaskClass, Grail.bitMaskAncestorClass)..CLASS.."|r", classString)
 
 			local genderString = self.s.GENDER_NONE
 			if Grail.bitMaskGenderAll == bitband(obtainersCode, Grail.bitMaskGenderAll) then
@@ -3106,8 +3177,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			elseif 0 < bitband(obtainersCode, Grail.bitMaskGenderFemale) then
 				genderString = self.s.FEMALE
 			end
-			if bitband(statusCode, Grail.bitMaskGender) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorGender) > 0 then colorCode = orangeColor else colorCode = normalColor end
-			self:_AddLine("|c"..colorCode..self.s.GENDER .."|r", genderString)
+			self:_AddLine("|c"..statusColor(statusCode, Grail.bitMaskGender, Grail.bitMaskAncestorGender)..self.s.GENDER.."|r", genderString)
 
 			-- Note that race can show races of any faction, especially if the quest is marked just to exclude a specific race
 			local raceString
@@ -3130,13 +3200,11 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				raceString = self:_StringFromTable(t, ", ")
 				raceString = trim(raceString)
 			end
-			if bitband(statusCode, Grail.bitMaskRace) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorRace) > 0 then colorCode = orangeColor else colorCode = normalColor end
-			self:_AddLine("|c"..colorCode..RACES.."|r", raceString)
+			self:_AddLine("|c"..statusColor(statusCode, Grail.bitMaskRace, Grail.bitMaskAncestorRace)..RACES.."|r", raceString)
 
 			if 0 ~= holidayCode then
 				self:_AddLine(" ")
-				if bitband(statusCode, Grail.bitMaskHoliday) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorHoliday) > 0 then colorCode = orangeColor else colorCode = normalColor end
-				self:_AddLine("|c"..colorCode..self.s.HOLIDAYS_ONLY.."|r")
+				self:_AddLine("|c"..statusColor(statusCode, Grail.bitMaskHoliday, Grail.bitMaskAncestorHoliday)..self.s.HOLIDAYS_ONLY.."|r")
 				for letterCode, bitValue in pairs(Grail.holidayToBitMapping) do
 					if 0 < bitband(holidayCode, bitValue) then
 						self:_AddLine(Grail.holidayMapping[letterCode])
@@ -3151,8 +3219,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 
 			if nil ~= questId and nil ~= Grail.quests[questId] and nil ~= Grail.quests[questId]['rep'] then
 				self:_AddLine(" ")
-				if bitband(statusCode, Grail.bitMaskReputation) > 0 then colorCode = redColor elseif bitband(statusCode, Grail.bitMaskAncestorReputation) > 0 then colorCode = orangeColor else colorCode = normalColor end
-				self:_AddLine("|c"..colorCode..self.s.REPUTATION_REQUIRED.."|r")
+				self:_AddLine("|c"..statusColor(statusCode, Grail.bitMaskReputation, Grail.bitMaskAncestorReputation)..self.s.REPUTATION_REQUIRED.."|r")
 				for reputationIndex, repTable in pairs(Grail.quests[questId]['rep']) do
 					-- repTable can have 'min' and/or 'max'
 					local repValue = repTable['min']
@@ -3180,18 +3247,13 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			-- Just give an indication that there is a Professions failure, but the user will need to look at prerequisites to see which professions.
 			if bitband(statusCode, Grail.bitMaskProfession + Grail.bitMaskAncestorProfession) > 0 then
 				self:_AddLine(" ")
-				if bitband(statusCode, Grail.bitMaskProfession) > 0 then
-					colorCode = redColor
-				else
-					colorCode = orangeColor
-				end
-				self:_AddLine("|c"..colorCode..self.s.PROFESSIONS..':'.."|r")
+				self:_AddLine(colorize(bitband(statusCode, Grail.bitMaskProfession) > 0 and redColor or orangeColor, self.s.PROFESSIONS..':'))
 			end
 
 			self:_QuestInfoSection(self.s.BREADCRUMB, Grail:QuestBreadcrumbs(questId))
 
 --	At the moment the UI will show both invalidated and breadcrumb invalidated ancestors as orange.
-			local breadcrumbColorCode
+			local colorCode, breadcrumbColorCode
 			if bitband(statusCode, Grail.bitMaskInvalidated) > 0 then
 				if Grail:IsInvalidated(questId, true) then	-- still invalid ignoring breadcrumbs
 					colorCode = redColor
@@ -3207,8 +3269,8 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				breadcrumbColorCode = normalColor
 				colorCode = normalColor
 			end
-			self:_QuestInfoSection("|c"..breadcrumbColorCode..self.s.IS_BREADCRUMB.."|r", Grail:QuestBreadcrumbsFor(questId))
-			self:_QuestInfoSection("|c"..colorCode..self.s.INVALIDATE.."|r", Grail:QuestInvalidates(questId))
+			self:_QuestInfoSection(colorize(breadcrumbColorCode, self.s.IS_BREADCRUMB), Grail:QuestBreadcrumbsFor(questId))
+			self:_QuestInfoSection(colorize(colorCode, self.s.INVALIDATE), Grail:QuestInvalidates(questId))
 
 			local lastIndexUsed = 0
 			if Grail.DisplayableQuestPrerequisites then
@@ -3247,7 +3309,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 						value = -1 * value
 					end
 					if WhollyDatabase.showsAllFactionReputations or Grail:FactionAvailable(index) then
-						self:_AddLine(Grail.reputationMapping[index], "|c"..colorCode..value.."|r")
+						self:_AddLine(Grail.reputationMapping[index], colorize(colorCode, value))
 					end
 				end
 			end
@@ -3406,13 +3468,13 @@ end
 				if 't' == code then
 					reputationLevelName = "< " .. reputationLevelName
 				end
-				numeric = format("|c%s%s|r", WDB.color[classification], reputationLevelName)
+				numeric = colorize(WDB.color[classification], reputationLevelName)
 			elseif 'U' == code or 'u' == code then
 				local reputationName, reputationLevelName = Grail:FriendshipReputationNameAndLevelName(subcode, numeric)
 				if 'u' == code then
 					reputationLevelName = "< " .. reputationLevelName
 				end
-				numeric = format("|c%s%s|r", WDB.color[classification], reputationLevelName)
+				numeric = colorize(WDB.color[classification], reputationLevelName)
 			elseif ('G' == code or 'z' == code) and Grail.GarrisonBuildingLevelString then
 				numeric = Grail:GarrisonBuildingLevelString(numeric)
 			elseif ('K' == code or 'k' == code) then
@@ -4300,23 +4362,7 @@ end
 		_SetupWhollyQuestPanel = function(self)
 			if nil == com_mithrandir_whollyFrame then
 				local frameName = "com_mithrandir_whollyFrame"
-				local frame = CreateFrame("Frame", frameName, UIParent)
-				frame:SetToplevel(true)
-				frame:EnableMouse(true)
-				frame:SetMovable(true)
-				frame:SetUserPlaced(true)
-				frame:Hide()
-				if Grail.existsClassic then
-					frame:SetSize(348, 445)
-				else
-					frame:SetSize(384, 512)
-				end
-				local frameInfo = WhollyDatabase[frame:GetName()]
-				if frameInfo then
-					frame:SetPoint(frameInfo[1], UIParent, frameInfo[2], frameInfo[3], frameInfo[4])
-				else
-					frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
-				end
+				local frame = _CreateQuestPanelFrame(frameName, Grail.existsClassic and 348 or 384, Grail.existsClassic and 445 or 512)
 
 				local topLeftTexture = frame:CreateTexture(nil, "BORDER")
 				topLeftTexture:SetPoint("TOPLEFT")
@@ -4353,16 +4399,6 @@ end
 					bottomRightTexture:SetPoint("BOTTOMRIGHT")
 					bottomRightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BotRight")
 				end
-
-				local bookTexture = frame:CreateTexture(nil, "BACKGROUND")
-				bookTexture:SetSize(64, 64)
-				bookTexture:SetPoint("TOPLEFT", 3, -4)
-				bookTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BookIcon")
-
-				local fontString = frame:CreateFontString(frameName.."TitleText", "ARTWORK", "GameFontNormal")
-				fontString:SetSize(300, 14)
-				fontString:SetPoint("TOP", 0, -15)
-				fontString:SetText(QUEST_LOG)
 
 				local offsetX, offsetY = 0, 0
 				if Grail.existsClassic then
@@ -4402,57 +4438,11 @@ end
 				local scrollFrame = self:_SetupScrollFrame(frameName.."ScrollFrame", frame, 305, 335, 19, -75)
 				scrollFrame:SetScript("OnLoad", function(self) Wholly:ScrollFrame_OnLoad(self) end)
 
-				frame:SetScript("OnShow", function(self)
-					Wholly:OnShow(self)
-					PlaySound(PlaySoundKitID and "igCharacterInfoOpen" or 839)
-				end)
-				frame:SetScript("OnHide", function(self)
-					Wholly:OnHide(self)
-					PlaySound(PlaySoundKitID and "igCharacterInfoClose" or 840)
-					if self.isMoving then
-						self:StopMovingOrSizing()
-						self.isMoving = false
-					end
-				end)
-				frame:SetScript("OnMouseUp", function(self)
-					if self.isMoving then
-						self:StopMovingOrSizing()
-						self.isMoving = false
-						local p1, _, p2, p3, p4 = self:GetPoint()
-						WhollyDatabase[self:GetName()] = { p1, p2, p3, p4 }
-					end
-				end)
-				frame:SetScript("OnMouseDown", function(self, button)
-					if (not self.isLocked or self.isLocked == 0) and button == "LeftButton" then
-						self:StartMoving()
-						self.isMoving = true
-					end
-				end)
-
-				Wholly:OnLoad(frame)	-- no need to do this, as it does nothing
-				tinsert(UISpecialFrames, frame:GetName())
 				Wholly:ScrollFrame_OnLoad(scrollFrame)
 			end
 			if nil == com_mithrandir_whollyFrameWide then
 				local frameName = "com_mithrandir_whollyFrameWide"
-				local frame = CreateFrame("Frame", frameName, UIParent)
-				frame:SetToplevel(true)
-				frame:EnableMouse(true)
-				frame:SetMovable(true)
-				frame:SetUserPlaced(true)
-				frame:Hide()
-				frame:SetSize(682, 447)
-				local frameInfo = WhollyDatabase[frame:GetName()]
-				if frameInfo then
-					frame:SetPoint(frameInfo[1], UIParent, frameInfo[2], frameInfo[3], frameInfo[4])
-				else
-					frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
-				end
-
-				local bookTexture = frame:CreateTexture(nil, "BACKGROUND")
-				bookTexture:SetSize(64, 64)
-				bookTexture:SetPoint("TOPLEFT", 3, -4)
-				bookTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLog-BookIcon")
+				local frame = _CreateQuestPanelFrame(frameName, 682, 447)
 
 				local topLeftTexture = frame:CreateTexture(nil, "BACKGROUND")
 				topLeftTexture:SetPoint("TOPLEFT")
@@ -4470,11 +4460,6 @@ end
 				topRightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLogDualPane-Right")
 				topRightTexture:SetTexCoord(0, desiredX / originalTextureX, 0, desiredY / originalTextureY)
 
-				local fontString = frame:CreateFontString(frameName.."TitleText", "ARTWORK", "GameFontNormal")
-				fontString:SetSize(300, 14)
-				fontString:SetPoint("TOP", 0, -15)
-				fontString:SetText(QUEST_LOG)
-				
 				local bottomRightInnerTexture = frame:CreateTexture(nil, "BORDER")
 				bottomRightInnerTexture:SetPoint("BOTTOMRIGHT", -80, 2)
 				bottomRightInnerTexture:SetSize(80, 34)
@@ -4544,34 +4529,6 @@ end
 				local scrollTwoFrame = self:_SetupScrollFrame(frameName.."ScrollTwoFrame", frame, 305, 180, 19, -224)
 				scrollTwoFrame:SetScript("OnLoad", function(self) Wholly:ScrollFrameTwo_OnLoad(self) end)
 
-				frame:SetScript("OnShow", function(self)
-					Wholly:OnShow(self)
-					PlaySound(PlaySoundKitID and "igCharacterInfoOpen" or 839)
-				end)
-				frame:SetScript("OnHide", function(self)
-					Wholly:OnHide(self)
-					PlaySound(PlaySoundKitID and "igCharacterInfoClose" or 840)
-					if self.isMoving then
-						self:StopMovingOrSizing()
-						self.isMoving = false
-					end
-				end)
-				frame:SetScript("OnMouseUp", function(self)
-					if self.isMoving then
-						self:StopMovingOrSizing()
-						self.isMoving = false
-						local p1, _, p2, p3, p4 = self:GetPoint()
-						WhollyDatabase[self:GetName()] = { p1, p2, p3, p4 }
-					end
-				end)
-				frame:SetScript("OnMouseDown", function(self, button)
-					if (not self.isLocked or self.isLocked == 0) and button == "LeftButton" then
-						self:StartMoving()
-						self.isMoving = true
-					end
-				end)
-
-				tinsert(UISpecialFrames, frame:GetName())
 				Wholly:ScrollFrameOne_OnLoad(scrollOneFrame)
 				Wholly:ScrollFrameTwo_OnLoad(scrollTwoFrame)
 			end
@@ -4699,7 +4656,7 @@ end
 					local leftStr = self:_PrettyQuestString(qt)
 					local q = qt[1]
 					local rightStr = self:_QuestTypeString(q)
-					if strlen(rightStr) > 0 then rightStr = format("|c%s%s|r", WDB.color[qt[2]], rightStr) end
+					if strlen(rightStr) > 0 then rightStr = colorize(WDB.color[qt[2]], rightStr) end
 
 					-- check if already printed - this is for spam quests like the human starting area that haven't been labeled correctly
 					if not questName or not listedQuests[questName] then
@@ -4865,13 +4822,12 @@ end
 			self.easyMenuFrame:SetPoint("LEFT", self.currentFrame, "RIGHT")
 		end,
 
-		ToggleIgnoredQuest = function(self)
-			local desiredQuestId = self.clickingButton.questId
-			Grail:_MarkQuestInDatabase(desiredQuestId, WhollyDatabase.ignoredQuests, self:_IsIgnoredQuest(desiredQuestId))
+		ToggleIgnoredQuest = function(self, questId)
+			Grail:_MarkQuestInDatabase(questId, WhollyDatabase.ignoredQuests, self:_IsIgnoredQuest(questId))
 		end,
 
-		ToggleLightHeaded = function(self)
-			local desiredQuestId = self.clickingButton.questId
+		ToggleLightHeaded = function(self, questId)
+			local desiredQuestId = questId
 			if LightHeadedFrame:IsVisible() and LightHeadedFrameSub.qid == desiredQuestId then LightHeadedFrame:Hide() return end
 			LightHeadedFrame:ClearAllPoints()
 			LightHeadedFrame:SetParent(self.currentFrame)
