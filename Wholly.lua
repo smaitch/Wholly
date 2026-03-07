@@ -822,6 +822,8 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			--	is properly removed.
 			['QUEST_ACCEPTED'] = function(self, frame)
 				self:BreadcrumbUpdate(frame)
+				self:_RefreshPrereqVerifyActive()
+				if Wholly.prereqModule then Wholly.prereqModule:MarkDirty() end
 			end,
 			['QUEST_COMPLETE'] = function(self, frame)
 				self:BreadcrumbUpdate(frame, true)
@@ -849,6 +851,11 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 			end,
 			['QUEST_PROGRESS'] = function(self, frame)
 				self:BreadcrumbUpdate(frame, true)
+				self:_CheckPrereqVerifyOutOfOrder()
+			end,
+			['QUEST_TURNED_IN'] = function(self, frame, questId, ...)
+				self:_RefreshPrereqVerifyActive()
+				if Wholly.prereqModule then Wholly.prereqModule:MarkDirty() end
 			end,
 			['PLAYER_LOGIN'] = function(self, frame, arg1)
 --				if "Wholly" == arg1 then	-- this is a remnant from when this was ADDON_LOADED and not PLAYER_LOGIN
@@ -1051,6 +1058,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					frame:RegisterEvent("QUEST_GREETING")			-- to clear the breadcrumb frame
 					frame:RegisterEvent("QUEST_LOG_UPDATE")			-- just to be able update tooltips after reload UI
 					frame:RegisterEvent("QUEST_PROGRESS")
+					frame:RegisterEvent("QUEST_TURNED_IN")			-- for prereq verify tracker module
 					frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")	-- this is for the panel
 					self:UpdateBreadcrumb()							-- sets up registration of events for breadcrumbs based on user preferences
 					if not WDB.shouldNotRestoreDirectionalArrows then
@@ -1123,6 +1131,14 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			['PLAYER_ENTERING_WORLD'] = function(self, frame)
 				self.zoneInfo.zone.mapId = Grail.GetCurrentMapAreaID()
 				self:UpdateCoordinateSystem()
+				self:_RefreshPrereqVerifyActive()
+				if Wholly.prereqModule then
+					Wholly.prereqModule:MarkDirty()
+				else
+					-- Defer one tick so ObjectiveTrackerManager.Init() runs first
+					-- (it also defers via ContinueAfterAllEvents on PLAYER_ENTERING_WORLD)
+					C_Timer.After(0, function() Wholly:_SetupPrereqVerifyModule() end)
+				end
 			end,
 			['ZONE_CHANGED_NEW_AREA'] = function(self, frame)
 				local WDB = WhollyDatabase
@@ -3256,11 +3272,13 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			self:_QuestInfoSection(colorize(colorCode, self.s.INVALIDATE), Grail:QuestInvalidates(questId))
 
 			local lastIndexUsed = 0
+			self.currentPrerequisiteQuestId = questId	-- set so _QuestInfoSectionSupport can decorate unverified prereqs
 			if Grail.DisplayableQuestPrerequisites then
 				lastIndexUsed = self:_QuestInfoSection(self.s.PREREQUISITES, Grail:DisplayableQuestPrerequisites(questId, true), lastIndexUsed)
 			else
 				lastIndexUsed = self:_QuestInfoSection(self.s.PREREQUISITES, Grail:QuestPrerequisites(questId, true), lastIndexUsed)
 			end
+			self.currentPrerequisiteQuestId = nil
 
 			self:_QuestInfoSection(self.s.OAC, Grail:QuestOnAcceptCompletes(questId))
 			self:_QuestInfoSection(self.s.OCC, Grail:QuestOnCompletionCompletes(questId))
@@ -3462,6 +3480,22 @@ end
 				numeric = Grail:GarrisonBuildingLevelString(numeric)
 			elseif ('K' == code or 'k' == code) then
 				if numeric > 100000000 then numeric = numeric - 100000000 end
+			end
+			-- If this is a bare numeric prereq quest ID and the target quest has unverified prereqs,
+			-- prefix the quest ID on the right with a green check (verified) or red ? (unverified).
+			if '' == code and nil ~= Wholly.currentPrerequisiteQuestId then
+				local unverified = Grail.questUnverifiedPrereqs[Wholly.currentPrerequisiteQuestId]
+				if nil ~= unverified then
+					local isUnverified = false
+					for _, uid in ipairs(unverified) do
+						if uid == numeric then isUnverified = true; break end
+					end
+					if isUnverified then
+						numeric = "|cffff0000?|r " .. numeric
+					else
+						numeric = "|TInterface\\RaidFrame\\ReadyCheck-Ready:0|t " .. numeric
+					end
+				end
 			end
 			self:_AddLine(indentation..orString..pipeString..self:_PrettyQuestString({ innorItem, classification }), numeric)
 			if wSpecial then
@@ -4624,7 +4658,82 @@ end
 		end,
 
 		SlashCommand = function(self, frame, msg)
-			self:ToggleUI()
+			local cmd, rest = msg:match("^(%S+)%s*(.*)")
+			if cmd == "verify" then
+				-- /wholly verify <questId>  -- inject quest into active verification for UI testing
+				-- /wholly verify clear      -- reset to computed list
+				-- /wholly verify debug      -- print diagnostic state
+				if rest == "debug" then
+					print("|cff00ff00Wholly verify debug:|r")
+					print("  ObjectiveTrackerManager exists: " .. tostring(ObjectiveTrackerManager ~= nil))
+					print("  ObjectiveTrackerFrame exists: " .. tostring(ObjectiveTrackerFrame ~= nil))
+					print("  Wholly.prereqModule: " .. tostring(Wholly.prereqModule ~= nil))
+					print("  prereqVerifyActive count: " .. #self.prereqVerifyActive)
+					print("  Grail.questVerifyAllPrereqs entries: " .. (function()
+						local n = 0
+						if Grail.questVerifyAllPrereqs then
+							for _ in pairs(Grail.questVerifyAllPrereqs) do n = n + 1 end
+						end
+						return n
+					end)())
+					print("  Grail.questUnverifiedPrereqs entries: " .. (function()
+						local n = 0
+						if Grail.questUnverifiedPrereqs then
+							for _ in pairs(Grail.questUnverifiedPrereqs) do n = n + 1 end
+						end
+						return n
+					end)())
+					if Wholly.prereqModule then
+						print("  Calling module:MarkDirty()...")
+						local ok, err = pcall(function() Wholly.prereqModule:MarkDirty() end)
+						print("  MarkDirty() result: " .. (ok and "ok" or tostring(err)))
+					else
+						print("  prereqModule is nil -- trying forced setup now:")
+						local ok, err = pcall(function() Wholly:_SetupPrereqVerifyModule() end)
+						print("  Setup result: " .. (ok and "ok" or tostring(err)))
+						print("  prereqModule now: " .. tostring(Wholly.prereqModule ~= nil))
+					end
+				elseif rest == "clear" then
+					self:_RefreshPrereqVerifyActive()
+					if Wholly.prereqModule then Wholly.prereqModule:MarkDirty() end
+					print("|cff00ff00Wholly:|r Prereq verify list reset to computed state (" ..
+						#self.prereqVerifyActive .. " active)")
+				else
+					local questId = tonumber(rest)
+					if questId then
+						-- Force-add this quest to the active list so the tracker module shows it.
+						-- The quest must exist in questVerifyAllPrereqs; if not, synthesize minimal data
+						-- from the database so the module has something to display.
+						if not Grail.questVerifyAllPrereqs[questId] then
+							-- No ? prereqs on record for this quest — inject a stub so the module
+							-- renders the block. This lets you test the display with any quest.
+							Grail._CodeAllFixed(Grail, questId)   -- ensure code is parsed first
+						end
+						local found = false
+						for _, id in ipairs(self.prereqVerifyActive) do
+							if id == questId then found = true; break end
+						end
+						if not found then
+							tinsert(self.prereqVerifyActive, questId)
+						end
+						if Wholly.prereqModule then Wholly.prereqModule:MarkDirty() end
+						local qname = GRAIL and GRAIL:QuestName(questId) or tostring(questId)
+						print("|cff00ff00Wholly:|r Injected quest " .. questId .. " (" .. qname ..
+							") into verify tracker. Use '/wholly verify clear' to reset.")
+					else
+						print("|cff00ff00Wholly verify:|r Usage:")
+						print("  /wholly verify <questId>  -- show quest in tracker (test)")
+						print("  /wholly verify clear      -- reset to computed list")
+						print("Currently active: " .. #self.prereqVerifyActive .. " quest(s)")
+						for _, id in ipairs(self.prereqVerifyActive) do
+							local qname = GRAIL and GRAIL:QuestName(id) or tostring(id)
+							print("  " .. id .. " " .. qname)
+						end
+					end
+				end
+			else
+				self:ToggleUI()
+			end
 		end,
 
 		Sort = function(self, frame)
@@ -6292,6 +6401,158 @@ Wholly.GetMapProvidersForMixin = function(mapCanvas, mixin)
 		end
 	end
 	return retval
+end
+
+-- prereqModule holds the Objective Tracker module object once initialized (nil until then).
+Wholly.prereqModule = nil
+
+-- prereqVerifyActive: list of questIds where all P: prereqs are done and the quest is
+-- not yet flagged complete or in the log. Populated by _RefreshPrereqVerifyActive.
+Wholly.prereqVerifyActive = {}
+
+---
+--  Rebuild the list of verification-active quests: quests that have at least one ? prereq,
+--  whose entire P: prereq list is now complete, and which are not yet accepted or turned in.
+Wholly._RefreshPrereqVerifyActive = function(self)
+	self.prereqVerifyActive = {}
+	if not Grail or not Grail.questVerifyAllPrereqs then return end
+	for questId, allPrereqs in pairs(Grail.questVerifyAllPrereqs) do
+		if not Grail:IsQuestFlaggedCompleted(questId) and
+		   not (C_QuestLog and C_QuestLog.IsOnQuest and C_QuestLog.IsOnQuest(questId)) then
+			local allDone = true
+			for _, prereqId in ipairs(allPrereqs) do
+				if prereqId ~= 0 and not Grail:IsQuestFlaggedCompleted(prereqId) then
+					allDone = false
+					break
+				end
+			end
+			if allDone then
+				tinsert(self.prereqVerifyActive, questId)
+			end
+		end
+	end
+end
+
+---
+--  Called from QUEST_PROGRESS: warn if the player is about to turn in a ?-marked prereq
+--  for a quest that still has confirmed (non-?) prereqs not yet done.
+Wholly._CheckPrereqVerifyOutOfOrder = function(self)
+	if not Grail or not Grail.verifyWatchedBy then return end
+	local turningInQuestId = GetQuestID()
+	if not turningInQuestId then return end
+	local targetQuests = Grail.verifyWatchedBy[turningInQuestId]
+	if not targetQuests then return end
+	for _, targetQuestId in ipairs(targetQuests) do
+		local unverified = Grail.questUnverifiedPrereqs and Grail.questUnverifiedPrereqs[targetQuestId]
+		if unverified then
+			-- Is the quest being turned in one of the ?-marked prereqs for targetQuestId?
+			local isUnverifiedPrereq = false
+			for _, uid in ipairs(unverified) do
+				if uid == turningInQuestId then isUnverifiedPrereq = true; break end
+			end
+			if isUnverifiedPrereq then
+				-- Check whether any CONFIRMED prereq for targetQuestId is still not done.
+				local allPrereqs = Grail.questVerifyAllPrereqs and Grail.questVerifyAllPrereqs[targetQuestId]
+				if allPrereqs then
+					for _, prereqId in ipairs(allPrereqs) do
+						if prereqId ~= 0 then
+							local isUnverifiedId = false
+							for _, uid in ipairs(unverified) do
+								if uid == prereqId then isUnverifiedId = true; break end
+							end
+							if not isUnverifiedId and not Grail:IsQuestFlaggedCompleted(prereqId) then
+								local targetName = GRAIL and GRAIL:QuestName(targetQuestId) or tostring(targetQuestId)
+								local confirmedName = GRAIL and GRAIL:QuestName(prereqId) or tostring(prereqId)
+								UIErrorsFrame:AddMessage(
+									"|cffff8800Wholly Verify:|r Turn in |cffffffff" .. confirmedName ..
+									"|r first to verify |cffffffff" .. targetName .. "|r",
+									1, 0.53, 0)
+								return
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
+---
+--  Called once, deferred one tick after PLAYER_ENTERING_WORLD so that
+--  ObjectiveTrackerManager.Init() (which also defers via ContinueAfterAllEvents) has run.
+--  Creates and registers the Wholly prereq-verify module using the TWW mixin-based API.
+Wholly._SetupPrereqVerifyModule = function(self)
+	if Wholly.prereqModule then return end
+	if not ObjectiveTrackerManager then return end
+
+	local module = CreateFrame("Frame", "WhollyPrereqTrackerModule",
+		ObjectiveTrackerFrame, "ObjectiveTrackerModuleTemplate")
+
+	-- Place this module first (Blizzard modules use uiOrder 1-11)
+	module.uiOrder = 0
+
+	-- Set the module header text
+	module.headerText = "Wholly"
+	if module.Header and module.Header.Text then
+		module.Header.Text:SetText("Wholly")
+	end
+
+	-- Override LayoutContents to populate blocks for each verification-active quest
+	function module:LayoutContents()
+		local active = Wholly.prereqVerifyActive or {}
+		for _, targetQuestId in ipairs(active) do
+			local block = self:GetBlock(targetQuestId)
+			local questName = Grail:QuestName(targetQuestId) or C_QuestLog.GetTitleForQuestID(targetQuestId) or tostring(targetQuestId)
+			block:SetHeader(questName)
+
+			local allPrereqs = Grail.questVerifyAllPrereqs and Grail.questVerifyAllPrereqs[targetQuestId] or {}
+			local unverified = Grail.questUnverifiedPrereqs and Grail.questUnverifiedPrereqs[targetQuestId] or {}
+			local unverifiedSet = {}
+			for _, uid in ipairs(unverified) do unverifiedSet[uid] = true end
+
+			-- Verified (known required) prereqs first, then unverified ones
+			local verified, uncertain = {}, {}
+			for _, prereqId in ipairs(allPrereqs) do
+				if prereqId ~= 0 then
+					if unverifiedSet[prereqId] then
+						tinsert(uncertain, prereqId)
+					else
+						tinsert(verified, prereqId)
+					end
+				end
+			end
+
+			local lineId = 1
+			local function addPrereqLine(prereqId, isUncertain)
+				local done = Grail:IsQuestFlaggedCompleted(prereqId)
+				local prereqName = Grail:QuestName(prereqId) or C_QuestLog.GetTitleForQuestID(prereqId) or tostring(prereqId)
+				local label
+				if done then
+					label = prereqName
+				elseif isUncertain then
+					label = "|cffaaaaaa->|r " .. prereqName  -- -> in grey for uncertain
+				else
+					label = "-> " .. prereqName  -- -> for confirmed-required
+				end
+				local color = done and OBJECTIVE_TRACKER_COLOR["Complete"] or OBJECTIVE_TRACKER_COLOR["Normal"]
+				block:AddObjective(lineId, label, nil, true, OBJECTIVE_DASH_STYLE_HIDE, color)
+				lineId = lineId + 1
+			end
+
+			for _, prereqId in ipairs(verified) do addPrereqLine(prereqId, false) end
+			for _, prereqId in ipairs(uncertain) do addPrereqLine(prereqId, true) end
+
+			block:AddObjective(lineId, "|cff00ff00Check quest NPC to confirm|r",
+				nil, true, OBJECTIVE_DASH_STYLE_HIDE, OBJECTIVE_TRACKER_COLOR["Normal"])
+
+			if not self:LayoutBlock(block) then break end
+		end
+	end
+
+	ObjectiveTrackerManager:SetModuleContainer(module, ObjectiveTrackerFrame)
+	Wholly.prereqModule = module
+	self:_RefreshPrereqVerifyActive()
+	module:MarkDirty()
 end
 
 
