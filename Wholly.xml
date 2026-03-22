@@ -32,7 +32,7 @@
 				Wholly:ButtonEnter(self)
 			</OnEnter>
 			<OnLeave>
-				GameTooltip:Hide()
+				Wholly.tooltip:Hide()
 			</OnLeave>
 		</Scripts>
 		<ButtonText name="$parentNormalText" nonspacewrap="true" parentKey="normalText">

@@ -450,6 +450,11 @@
 --			Changes how quest panel buttons are created to avoid taint.
 --			Enables proper preference support for the latest types of quests, especially important for warband quests.
 --			Corrects implementation of zone presentation to allow Eastern Kingdoms and The Shadowlands to be fully usable.
+--			Shows a check mark or question mark in the quest detail view for each prerequisite quest depending on whether it is verified.
+--			Adds a UI panel that presents quests needing to be turned in for prerequisite feedback in the correct order.
+--			Optimizes quest sorting and caches zone data to prevent hitting display limits.
+--			Adds integration with the Immersion addon.
+--			Corrects highlighting for selected zones in wide panel.
 --
 --	Known Issues
 --
@@ -523,7 +528,7 @@ local GetAddOnMetadata_API = GetAddOnMetadata or C_AddOns.GetAddOnMetadata
 local versionFromToc = GetAddOnMetadata_API(directoryName, "Version")
 local _, _, versionValueFromToc = strfind(versionFromToc, "(%d+)")
 local Wholly_File_Version = tonumber(versionValueFromToc)
-local requiredGrailVersion = 124
+local requiredGrailVersion = 125
 
 --	Set up the bindings to use the localized name Blizzard supplies.  Note that the Bindings.xml file cannot
 --	just contain the TOGGLEQUESTLOG because then the entry for Wholly does not show up.  So, we use a version
@@ -940,7 +945,7 @@ end
 					f:Hide()
 					f:SetScript("OnMouseDown", function(self) Wholly:BreadcrumbClick(self) end)
 					f:SetScript("OnEnter", function(self) Wholly:BreadcrumbEnter(self) end)
-					f:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+					f:SetScript("OnLeave", function(self) Wholly.tooltip:Hide() end)
 					local tex = f:CreateTexture(nil, "ARTWORK")
 					tex:SetTexture("Interface\\TUTORIALFRAME\\UI-TutorialFrame-QuestGiver")
 					tex:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
@@ -1160,10 +1165,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 
 				-- Now update open tooltips showing our quest count data
 				if GameTooltip:IsVisible() then
-					if GameTooltip:GetOwner() == com_mithrandir_whollyFrameSwitchZoneButton then
-						GameTooltip:ClearLines()
-						GameTooltip:AddLine(Wholly.panelCountLine)
-					elseif GameTooltip:GetOwner() == self.ldbTooltipOwner then -- LibDataBroker tooltip
+					if GameTooltip:GetOwner() == self.ldbTooltipOwner then -- LibDataBroker tooltip
 						GameTooltip:ClearLines()
 						GameTooltip:AddLine("Wholly - " .. Wholly:_Dropdown_GetText() )
 						GameTooltip:AddLine(Wholly.panelCountLine)
@@ -1174,7 +1176,10 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 						GameTooltip:AddLine(strformat("%d %s", mapAreaId, mapAreaName))
 					end
 				elseif self.tooltip:IsVisible() then
-					if self.tooltip:GetOwner() == self.mapFrame then
+					if self.tooltip:GetOwner() == com_mithrandir_whollyFrameSwitchZoneButton then
+						self.tooltip:ClearLines()
+						self.tooltip:AddLine(Wholly.panelCountLine)
+					elseif self.tooltip:GetOwner() == self.mapFrame then
 						self.tooltip:ClearLines()
 						self.tooltip:AddLine(Wholly.mapCountLine)
 					end
@@ -1477,16 +1482,16 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 
 		BreadcrumbEnter = function(self, frame)
 			local Grail = Grail
-			GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")
-			GameTooltip:ClearLines()
+			self.tooltip:SetOwner(frame, "ANCHOR_RIGHT")
+			self.tooltip:ClearLines()
 			local questId = self:_BreadcrumbQuestId()
 			local breadcrumbs = Grail:AvailableBreadcrumbs(questId)
 			if nil ~= breadcrumbs then
-				GameTooltip:AddLine(self.s.BREADCRUMB)
+				self.tooltip:AddLine(self.s.BREADCRUMB)
 				for i = 1, #breadcrumbs do
-					GameTooltip:AddLine(self:_PrettyQuestString({ breadcrumbs[i], Grail:ClassificationOfQuestCode(breadcrumbs[i], nil, WhollyDatabase.buggedQuestsConsideredUnobtainable) }))
+					self.tooltip:AddLine(self:_PrettyQuestString({ breadcrumbs[i], Grail:ClassificationOfQuestCode(breadcrumbs[i], nil, WhollyDatabase.buggedQuestsConsideredUnobtainable) }))
 				end
-				GameTooltip:Show()
+				self.tooltip:Show()
 			end
 		end,
 
@@ -2708,7 +2713,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 						local rawNameToUse = Grail:NPCName(npc.id) or "**"
 						local nameToUse = rawNameToUse
 						if npc.dropId then
-							nameToUse = nameToUse .. " (" .. Grail:NPCName(npc.dropId) .. ')'
+							nameToUse = nameToUse .. " (" .. (Grail:NPCName(npc.dropId) or "**") .. ')'
 						end
 						local prettiness = self:_PrettyNPCString(nameToUse, npc.kill, npc.realArea)
 						-- Check to ensure the NPC is available for this player
@@ -2798,8 +2803,17 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			if WhollyDatabase.showsInLogQuestStatus then
 				self:ScrollFrame_Update_WithCombatCheck()
 			end
-			self:ScrollFrameOne_Update()
-			self:ScrollFrameTwo_Update()
+			if self.currentFrame == com_mithrandir_whollyFrameWide then
+				--	Sync to the player's current zone each time the wide panel opens so the
+				--	continent and zone lists are highlighted and scrolled to show the current location.
+				self.zoneInfo.panel.mapId = self.zoneInfo.zone.mapId
+				self:_ForcePanelMapArea(false)
+				self:_ScrollToSelected(self.levelOneData, com_mithrandir_whollyFrameWideScrollOneFrame)
+				self:_ScrollToSelected(self.levelTwoData, com_mithrandir_whollyFrameWideScrollTwoFrame)
+			else
+				self:ScrollFrameOne_Update()
+				self:ScrollFrameTwo_Update()
+			end
 		end,
 
 		_OnUpdate = function(self, frame, elapsed)
@@ -3720,6 +3734,40 @@ end
 			self:ScrollFrameGeneral_Update(self.levelTwoData, com_mithrandir_whollyFrameWideScrollTwoFrame)
 		end,
 
+		--	Scrolls a level-one or level-two scroll frame so the currently selected item is visible.
+		--	Traverses items the same way ScrollFrameGeneral_Update does so the position is accurate.
+		_ScrollToSelected = function(self, items, frame)
+			if not items or not frame or not frame.buttons or #frame.buttons == 0 then return end
+			local buttonHeight = frame.buttons[1]:GetHeight()
+			if buttonHeight == 0 then return end
+			local shownEntry = 0
+			for i = 1, #items do
+				local item = items[i]
+				if item.header then
+					shownEntry = shownEntry + 1
+					if item.selected then
+						frame.scrollBar:SetValue((shownEntry - 1) * buttonHeight)
+						return
+					end
+					if not WhollyDatabase.closedHeaders[item.header] then
+						for j = 1, #item.children do
+							shownEntry = shownEntry + 1
+							if item.children[j].selected then
+								frame.scrollBar:SetValue((shownEntry - 1) * buttonHeight)
+								return
+							end
+						end
+					end
+				else
+					shownEntry = shownEntry + 1
+					if item.selected then
+						frame.scrollBar:SetValue((shownEntry - 1) * buttonHeight)
+						return
+					end
+				end
+			end
+		end,
+
 		_SearchFrameShow = function(self, reallyTags)
 			com_mithrandir_whollySearchFrame.processingTags = reallyTags
 			local titleToUse = reallyTags and self.s.TAGS_NEW or SEARCH
@@ -3729,7 +3777,6 @@ end
 
 		SetupScrollFrameButton = function(self, buttonIndex, numButtons, buttons, shownEntries, scrollOffset, item, isHeader, indent, scrollFrame)
 			local highlight = (scrollFrame == com_mithrandir_whollyFrameWideScrollOneFrame) and com_mithrandir_whollyFrameWideScrollOneFrameLogHighlightFrame or com_mithrandir_whollyFrameWideScrollTwoFrameLogHighlightFrame
-			highlight:Hide()
 			if shownEntries > scrollOffset and buttonIndex <= numButtons then
 				local button = buttons[buttonIndex]
 				local indentation = indent and "    " or ""
@@ -3767,6 +3814,10 @@ end
 		--	This is done because some of our data may be closed, and in any case any of the headings
 		--	that are open need to be processed differently.
 		ScrollFrameGeneral_Update = function(self, items, frame)
+			--	Hide the highlight once before rendering; SetupScrollFrameButton will show it
+			--	on whichever button carries the selected item.
+			local highlight = (frame == com_mithrandir_whollyFrameWideScrollOneFrame) and com_mithrandir_whollyFrameWideScrollOneFrameLogHighlightFrame or com_mithrandir_whollyFrameWideScrollTwoFrameLogHighlightFrame
+			highlight:Hide()
 			local numEntries = items and #items or 0
 			local shownEntries = 0
 			local buttons = frame.buttons
@@ -4250,7 +4301,7 @@ end
 				end
 				frame:SetPoint("TOPRIGHT", QuestFrame, "TOPRIGHT", xOffset, yOffset)
 				frame:SetScript("OnEnter", function(self) Wholly:QuestInfoEnter(self) end)
-				frame:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+				frame:SetScript("OnLeave", function(self) Wholly.tooltip:Hide() end)
 				local fontString = frame:CreateFontString("com_mithrandir_whollyQuestInfoFrameText", "BACKGROUND", "GameFontNormal")
 				fontString:SetJustifyH("RIGHT")
 				fontString:SetSize(160, 20)
@@ -4310,7 +4361,7 @@ end
 				local txt = rightText and "Right" or "Left"
 				_G[format("com_mithrandir_WhollyTooltipText%s%d", txt, self:NumLines())]:SetFont(fontObj:GetFont())
 			end
-			self.tt = { [1] = GameTooltip }
+			self.tt = { [1] = self.tooltip }
 		end,
 
 		_SetupScrollFrame = function(self, scrollFrameName, frame, sizeX, sizeY, offsetX, offsetY)
@@ -4339,6 +4390,7 @@ end
 			local highlightTexture = highlightFrame:CreateTexture(highlightName.."LogSkillHighlight", "ARTWORK")
 			highlightTexture:SetTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
 			highlightTexture:SetBlendMode("ADD")
+			highlightTexture:SetAllPoints(highlightFrame)
 --			highlightFrame:SetScript("OnLoad", function(self) self:SetParent(nil) end)
 			return scrollFrame
 		end,
@@ -4417,7 +4469,7 @@ end
 				mapButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -259 + offsetX, 80 + offsetY)
 				mapButton:SetScript("OnClick", function(self) Wholly:SetCurrentMapToPanel(self) end)
 				mapButton:SetScript("OnEnter", function(self) Wholly:ZoneButtonEnter(self) end)
-				mapButton:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+				mapButton:SetScript("OnLeave", function(self) Wholly.tooltip:Hide() end)
 
 				local scrollFrame = self:_SetupScrollFrame(frameName.."ScrollFrame", frame, 305, 335, 19, -75)
 				scrollFrame:SetScript("OnLoad", function(self) Wholly:ScrollFrame_OnLoad(self) end)
@@ -4483,7 +4535,7 @@ end
 				switchZoneButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 18 + offsetX, 15 + offsetY)
 				switchZoneButton:SetScript("OnClick", function(self) Wholly:SetCurrentMapToPanel(self) end)
 				switchZoneButton:SetScript("OnEnter", function(self) Wholly:ZoneButtonEnter(self) end)
-				switchZoneButton:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+				switchZoneButton:SetScript("OnLeave", function(self) Wholly.tooltip:Hide() end)
 				
 				local reallySwitchZoneButton = CreateFrame("Button", frameName.."ReallySwitchZoneButton", frame, "UIPanelButtonTemplate")
 				reallySwitchZoneButton:SetText(ZONE)
@@ -4491,7 +4543,7 @@ end
 				reallySwitchZoneButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 129 + offsetX, 15 + offsetY)
 				reallySwitchZoneButton:SetScript("OnClick", function(self) Wholly:SetCurrentZoneToPanel(self) end)
 				reallySwitchZoneButton:SetScript("OnEnter", function(self) Wholly:ZoneButtonEnter(self) end)
-				reallySwitchZoneButton:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+				reallySwitchZoneButton:SetScript("OnLeave", function(self) Wholly.tooltip:Hide() end)
 
 				local preferencesButton = CreateFrame("Button", frameName.."PreferencesButton", frame, "UIPanelButtonTemplate")
 				preferencesButton:SetText(PREFERENCES)
@@ -4618,7 +4670,7 @@ end
 									npcList[npc.id] = {}
 									local nameToUse = Grail:NPCName(npc.id) or "??"
 									if npc.dropid then
-										nameToUse = nameToUse .. " (" .. Grail:NPCName(npc.dropId) .. ')'
+										nameToUse = nameToUse .. " (" .. (Grail:NPCName(npc.dropId) or "**") .. ')'
 									end
 									npcNames[npc.id] = self:_PrettyNPCString(nameToUse, npc.kill, npc.realArea)
 								end
@@ -4759,15 +4811,15 @@ end
 				[4] = self.s.TYPE..", "..self.s.ALPHABETICAL,
 				[5] = self.s.TYPE..", "..self.s.LEVEL..", "..self.s.ALPHABETICAL,
 				}
-			GameTooltip:ClearAllPoints()
-			GameTooltip:ClearLines()
-			GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")
-			GameTooltip:AddLine(sortModes[WhollyDatabase.currentSortingMode])
-			GameTooltip:Show()
+			self.tooltip:ClearAllPoints()
+			self.tooltip:ClearLines()
+			self.tooltip:SetOwner(frame, "ANCHOR_RIGHT")
+			self.tooltip:AddLine(sortModes[WhollyDatabase.currentSortingMode])
+			self.tooltip:Show()
 		end,
 
 		SortButtonLeave = function(self, frame)
-			GameTooltip:Hide()
+			self.tooltip:Hide()
 		end,
 
 		SortingFunction = function(a, b)
@@ -4996,11 +5048,11 @@ end
 		end,
 
 		ZoneButtonEnter = function(self, frame)
-			GameTooltip:ClearAllPoints()
-			GameTooltip:ClearLines()
-			GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")
-			GameTooltip:AddLine(Wholly.panelCountLine)
-			GameTooltip:Show()
+			self.tooltip:ClearAllPoints()
+			self.tooltip:ClearLines()
+			self.tooltip:SetOwner(frame, "ANCHOR_RIGHT")
+			self.tooltip:AddLine(Wholly.panelCountLine)
+			self.tooltip:Show()
 		end,
 
 		}
