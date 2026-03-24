@@ -901,19 +901,25 @@ self.currentFrame = com_mithrandir_whollyFrame
 					self:_SetupTooltip()
 					self:_SetupWorldMapWhollyButton()
 
--- if the UI panel disappears (maximized WorldMapFrame) we need to change parents
-WorldMapFrame:HookScript("OnShow", function()
-	if self.tooltip then
-		self.tooltip:SetParent(WorldMapFrame)
-		self.tooltip:SetFrameStrata("TOOLTIP")
-	end
-end)
-WorldMapFrame:HookScript("OnHide", function()
-	if self.tooltip then
-		self.tooltip:SetParent(UIParent)
-		self.tooltip:SetFrameStrata("TOOLTIP")
-	end
-end)
+-- On Classic, reparent the tooltip to WorldMapFrame so it is visible when the
+-- full-screen map is open (UIParent is hidden behind it).  On retail the TOOLTIP
+-- frame strata always renders above WorldMapFrame's FULLSCREEN strata, so no
+-- reparenting is needed — and reparenting taints WorldMapFrame's layout tree,
+-- which breaks LayoutFrame comparisons in Blizzard's AreaPOI tooltip code.
+if Grail.existsClassic then
+	WorldMapFrame:HookScript("OnShow", function()
+		if self.tooltip then
+			self.tooltip:SetParent(WorldMapFrame)
+			self.tooltip:SetFrameStrata("TOOLTIP")
+		end
+	end)
+	WorldMapFrame:HookScript("OnHide", function()
+		if self.tooltip then
+			self.tooltip:SetParent(UIParent)
+			self.tooltip:SetFrameStrata("TOOLTIP")
+		end
+	end)
+end
 
 -- Dragonflight introduces new tool tip processing
 if TooltipDataProcessor then
