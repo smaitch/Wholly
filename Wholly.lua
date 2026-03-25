@@ -2761,6 +2761,10 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 		end,
 
 		_OnEnterBlizzardQuestButton = function(blizzardQuestButton)
+			-- On retail, augmenting GameTooltip from addon code taints its dimensions,
+			-- causing numeric conversion errors in QuestMapFrame layout code.  Wholly's
+			-- full quest info is available from the Wholly panel tooltip instead.
+			if not Grail.existsClassic then return end
 			if WhollyDatabase.displaysBlizzardQuestTooltips then
 				local frame = blizzardQuestButton
 				local questId = blizzardQuestButton.questID
@@ -2777,10 +2781,13 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					frame = not isHeader and blizzardQuestButton or nil
 				end
 				if nil ~= frame then
-					Wholly.onlyAddingTooltipToGameTooltip = not Grail.existsClassic
+					-- On retail: use Wholly's own tooltip anchored to the button.
+					-- Writing to GameTooltip from addon code taints its dimensions,
+					-- which causes QuestMapFrame layout errors (tainted numeric conversion).
 					Wholly:_PopulateTooltipForQuest(frame, questId)
-					Wholly.onlyAddingTooltipToGameTooltip = false
-					GameTooltip:Show()
+					if Grail.existsClassic then
+						GameTooltip:Show()
+					end
 				end
 			end
 		end,
@@ -4065,6 +4072,7 @@ end
 			-- Make it so the Blizzard quest log can display our tooltips
 			if not Grail.existsClassic then
 				hooksecurefunc("QuestMapLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
+				hooksecurefunc("QuestMapLogTitleButton_OnLeave", function() Wholly.tooltip:Hide() end)
 				-- Now since the Blizzard UI has probably created a quest frame before I get
 				-- the chance to hook the function I need to go through all the quest frames
 				-- and hook them too.
@@ -4072,6 +4080,7 @@ end
 					local titles = QuestMapFrame.QuestsFrame.Contents.Titles
 					for i = 1, #(titles) do
 						titles[i]:HookScript("OnEnter", Wholly._OnEnterBlizzardQuestButton)
+						titles[i]:HookScript("OnLeave", function() Wholly.tooltip:Hide() end)
 					end
 				end
 			else
