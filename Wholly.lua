@@ -1215,6 +1215,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 		maximumSearchHistory = 10,
 		npcs = {},
 		onlyAddingTooltipToGameTooltip = false,
+		briefQuestTooltip = false,		-- true when showing tooltip for a Blizzard quest log button: skip SetHyperlink to keep everything in one frame
 		pairedConfigurationButton = nil,-- configuration panel button that does the same thing as the world map button
 		pairedCoordinatesButton = nil,	-- configuration panel button that does the same thing as the LDB coordinate button
 		panelCountLine = "",
@@ -2761,10 +2762,6 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 		end,
 
 		_OnEnterBlizzardQuestButton = function(blizzardQuestButton)
-			-- On retail, augmenting GameTooltip from addon code taints its dimensions,
-			-- causing numeric conversion errors in QuestMapFrame layout code.  Wholly's
-			-- full quest info is available from the Wholly panel tooltip instead.
-			if not Grail.existsClassic then return end
 			if WhollyDatabase.displaysBlizzardQuestTooltips then
 				local frame = blizzardQuestButton
 				local questId = blizzardQuestButton.questID
@@ -2781,12 +2778,22 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					frame = not isHeader and blizzardQuestButton or nil
 				end
 				if nil ~= frame then
-					-- On retail: use Wholly's own tooltip anchored to the button.
-					-- Writing to GameTooltip from addon code taints its dimensions,
-					-- which causes QuestMapFrame layout errors (tainted numeric conversion).
-					Wholly:_PopulateTooltipForQuest(frame, questId)
 					if Grail.existsClassic then
+						Wholly:_PopulateTooltipForQuest(frame, questId)
 						GameTooltip:Show()
+					else
+						-- On retail, writing to GameTooltip from addon code taints its
+						-- dimensions, causing QuestMapFrame layout errors.  Instead, hide
+						-- GameTooltip (map highlighting is unaffected — it ran before our
+						-- hook in Blizzard's own OnEnter) and show Wholly's tooltip only.
+						-- briefQuestTooltip skips SetHyperlink so everything fits in one
+						-- frame (SetHyperlink fills tt[1] causing overflow into tt[2]).
+						GameTooltip:Hide()
+						Wholly.tooltip:SetOwner(UIParent, "ANCHOR_CURSOR_RIGHT")
+						Wholly.briefQuestTooltip = true
+						Wholly:_PopulateTooltipForQuest(frame, questId)
+						Wholly.briefQuestTooltip = false
+						Wholly.tooltip:Show()
 					end
 				end
 			end
@@ -3072,12 +3079,14 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			self.currentTt = 1
 			questId = tonumber(questId)
 			if not self.onlyAddingTooltipToGameTooltip then
-				self.tt[1]:SetOwner(frame, "ANCHOR_RIGHT")
+				if not self.briefQuestTooltip then
+					self.tt[1]:SetOwner(frame, "ANCHOR_RIGHT")
+				end
 				self.tt[1]:ClearLines()
 			end
 			if nil == questId then return end
 			if not self.onlyAddingTooltipToGameTooltip then
-				if not Grail.existsClassic then
+				if not Grail.existsClassic and not self.briefQuestTooltip then
 					self.tt[1]:SetHyperlink(format("quest:%d", questId))
 				else
 					self:_AddLine(self:_QuestName(questId))
