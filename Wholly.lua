@@ -1169,19 +1169,13 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
                     self:_RecordTooltipNPCs(newMapId)
                 end
 
-				-- Now update open tooltips showing our quest count data
-				if GameTooltip:IsVisible() then
-					if GameTooltip:GetOwner() == self.ldbTooltipOwner then -- LibDataBroker tooltip
-						GameTooltip:ClearLines()
-						GameTooltip:AddLine("Wholly - " .. Wholly:_Dropdown_GetText() )
-						GameTooltip:AddLine(Wholly.panelCountLine)
-					elseif GameTooltip:GetOwner() == self.ldbCoordinatesTooltipOwner then -- LibDataBroker coordinates tooltip
-						GameTooltip:ClearLines()
-						local mapAreaId = Wholly.zoneInfo.zone.mapId
-						local mapAreaName = Grail:MapAreaName(mapAreaId) or "UNKNOWN"
-						GameTooltip:AddLine(strformat("%d %s", mapAreaId, mapAreaName))
-					end
-				elseif self.tooltip:IsVisible() then
+				-- Update open Wholly tooltips showing quest count / zone data.
+				-- Note: we intentionally do NOT write to GameTooltip here even when the LDB
+				-- broker tooltip is showing through it.  Writing to GameTooltip from addon
+				-- code taints GameTooltipTextLeft1 (and derived widths), which causes errors
+				-- in Blizzard quest-log and map-pin tooltip code on subsequent hovers.
+				-- The LDB tooltip will show slightly stale data until re-hovered.
+				if self.tooltip:IsVisible() then
 					if self.tooltip:GetOwner() == com_mithrandir_whollyFrameSwitchZoneButton then
 						self.tooltip:ClearLines()
 						self.tooltip:AddLine(Wholly.panelCountLine)
@@ -1583,6 +1577,10 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			end
 		end,
 
+		-- On retail this is called via TooltipDataProcessor.AddTooltipPostCall (secure
+		-- context), so tooltip:AddLine() here does not taint GameTooltip.
+		-- On classic it fires via HookScript("OnTooltipSetUnit") — classic lacks the
+		-- Blizzard code that fails on tainted GameTooltip dimensions.
 		_CheckNPCTooltip = function(tooltip)
 			if (not UnitIsPlayer("mouseover") or true) then
 				-- check if this npc drops a quest item
@@ -1605,11 +1603,11 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 									end
 									if nil ~= tooltipMessage then
 										local leftStr = format("|TInterface\\MINIMAP\\ObjectIcons:0:0:0:0:128:128:16:32:16:32|t %s", tooltipMessage)
-										tooltip:AddLine(leftStr);
+										tooltip:AddLine(leftStr)
 									end
 								end
 							end
-							tooltip:Show();
+							tooltip:Show()
 						end
 					end
 				end
@@ -2782,13 +2780,13 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 						Wholly:_PopulateTooltipForQuest(frame, questId)
 						GameTooltip:Show()
 					else
-						-- On retail, writing to GameTooltip from addon code taints its
-						-- dimensions, causing QuestMapFrame layout errors.  Instead, hide
-						-- GameTooltip (map highlighting is unaffected — it ran before our
-						-- hook in Blizzard's own OnEnter) and show Wholly's tooltip only.
+						-- On retail, any write to GameTooltip from addon code (including
+						-- Hide()) taints GameTooltipTextLeft1, which Blizzard reads at
+						-- QuestMapFrame.lua:2123 via GetStringWidth().  Leave GameTooltip
+						-- alone so Blizzard's title tooltip shows unmodified.  Show
+						-- Wholly's own tooltip alongside it at the cursor.
 						-- briefQuestTooltip skips SetHyperlink so everything fits in one
 						-- frame (SetHyperlink fills tt[1] causing overflow into tt[2]).
-						GameTooltip:Hide()
 						Wholly.tooltip:SetOwner(UIParent, "ANCHOR_CURSOR_RIGHT")
 						Wholly.briefQuestTooltip = true
 						Wholly:_PopulateTooltipForQuest(frame, questId)
