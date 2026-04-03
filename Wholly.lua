@@ -1832,7 +1832,15 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 
 			for i = 1, #self.configuration[panel.name] do
 				if self.configuration[panel.name][i][2] then
-					button = CreateFrame("CheckButton", parent.."Button"..i, panel, "InterfaceOptionsCheckButtonTemplate")
+					button = CreateFrame("CheckButton", parent.."Button"..i, panel)
+					button:SetSize(26, 26)
+					button:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Up")
+					button:SetPushedTexture("Interface\\Buttons\\UI-CheckBox-Down")
+					button:SetHighlightTexture("Interface\\Buttons\\UI-CheckBox-Highlight", "ADD")
+					button:SetCheckedTexture("Interface\\Buttons\\UI-CheckBox-Check")
+					button:SetDisabledCheckedTexture("Interface\\Buttons\\UI-CheckBox-Check-Disabled")
+					local buttonText = button:CreateFontString(parent.."Button"..i.."Text", "ARTWORK", "GameFontHighlight")
+					buttonText:SetPoint("LEFT", button, "RIGHT", 0, 1)
 					offset = 0
 				else
 					button = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -3715,21 +3723,101 @@ end
 		end,
 
 		ScrollFrame_OnLoad = function(self, frame)
-			HybridScrollFrame_OnLoad(frame)
-			frame.update = Wholly.ScrollFrame_Update_WithCombatCheck
-			HybridScrollFrame_CreateButtons(frame, "com_mithrandir_whollyButtonTemplate")
+			if frame.useScrollBox then
+				-- ScrollBox path: element factory creates buttons on demand; wire the
+				-- per-element initializer so each visible row is populated correctly.
+				frame.scrollBoxView:SetElementInitializer("com_mithrandir_whollyButtonTemplate", function(button, elementData)
+					Wholly:_ScrollBoxInitQuestButton(button, elementData)
+				end)
+			else
+				HybridScrollFrame_OnLoad(frame)
+				frame.update = Wholly.ScrollFrame_Update_WithCombatCheck
+				HybridScrollFrame_CreateButtons(frame, "com_mithrandir_whollyButtonTemplate")
+			end
 		end,
 
 		ScrollFrameOne_OnLoad = function(self, frame)
-			HybridScrollFrame_OnLoad(frame)
-			frame.update = Wholly.ScrollFrameOne_Update
-			HybridScrollFrame_CreateButtons(frame, "com_mithrandir_whollyButtonOneTemplate")
+			if frame.useScrollBox then
+				frame.scrollBoxView:SetElementInitializer("com_mithrandir_whollyButtonOneTemplate", function(button, elementData)
+					Wholly:_ScrollBoxInitGeneralButton(button, elementData, frame)
+				end)
+			else
+				HybridScrollFrame_OnLoad(frame)
+				frame.update = Wholly.ScrollFrameOne_Update
+				HybridScrollFrame_CreateButtons(frame, "com_mithrandir_whollyButtonOneTemplate")
+			end
 		end,
 
 		ScrollFrameTwo_OnLoad = function(self, frame)
-			HybridScrollFrame_OnLoad(frame)
-			frame.update = Wholly.ScrollFrameTwo_Update
-			HybridScrollFrame_CreateButtons(frame, "com_mithrandir_whollyButtonTwoTemplate")
+			if frame.useScrollBox then
+				frame.scrollBoxView:SetElementInitializer("com_mithrandir_whollyButtonTwoTemplate", function(button, elementData)
+					Wholly:_ScrollBoxInitGeneralButton(button, elementData, frame)
+				end)
+			else
+				HybridScrollFrame_OnLoad(frame)
+				frame.update = Wholly.ScrollFrameTwo_Update
+				HybridScrollFrame_CreateButtons(frame, "com_mithrandir_whollyButtonTwoTemplate")
+			end
+		end,
+
+		--	ScrollBox element initializer for the main quest list.
+		--	elementData is a table { questId, filterCode, prettyString } stored in the data provider.
+		_ScrollBoxInitQuestButton = function(self, button, elementData)
+			button.normalText:SetText(elementData.prettyString)
+			local shouldShowTag = false
+			local questId = elementData.questId
+			local filterCode = elementData.filterCode
+			if 'I' == filterCode and WhollyDatabase.showsInLogQuestStatus and WhollyDatabase.showsQuestsInLog then
+				local questStatus = Grail:StatusCode(questId)
+				shouldShowTag = true
+				if bitband(questStatus, Grail.bitMaskInLogComplete) > 0 then
+					button.tag:SetText("(" .. self.s.COMPLETE .. ")")
+				elseif bitband(questStatus, Grail.bitMaskInLogFailed) > 0 then
+					button.tag:SetText("(" .. self.s.FAILED .. ")")
+				else
+					shouldShowTag = false
+				end
+			end
+			if not shouldShowTag and self:_IsIgnoredQuest(questId) then
+				button.tag:SetText("[" .. self.s.IGNORED .. "]")
+				shouldShowTag = true
+			end
+			if shouldShowTag then button.tag:Show() else button.tag:Hide() end
+			button.questId = questId
+			button.statusCode = filterCode
+		end,
+
+		--	ScrollBox element initializer for the level-one and level-two lists.
+		--	elementData is the item table (same objects stored in levelOneData / levelTwoData).
+		_ScrollBoxInitGeneralButton = function(self, button, elementData, scrollFrame)
+			local highlight = (scrollFrame == com_mithrandir_whollyFrameWideScrollOneFrame) and com_mithrandir_whollyFrameWideScrollOneFrameLogHighlightFrame or com_mithrandir_whollyFrameWideScrollTwoFrameLogHighlightFrame
+			local indentation = elementData.isChild and "    " or ""
+			button.normalText:SetText(indentation .. elementData.displayName)
+			button.tag:SetText(self.cachedMapCounts[elementData.mapID])
+			if WhollyDatabase.showQuestCounts then
+				button.tag:Show()
+			else
+				button.tag:Hide()
+			end
+			if elementData.header and not elementData.isChild then
+				if WhollyDatabase.closedHeaders[elementData.header] then
+					button:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up")
+				else
+					button:SetNormalTexture("Interface\\Buttons\\UI-MinusButton-Up")
+				end
+			else
+				button:SetNormalTexture("Interface\\Addons\\Wholly\\blank")
+			end
+			button.item = elementData
+			if elementData.selected then
+				highlight:ClearAllPoints()
+				highlight:SetParent(button)
+				highlight:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)
+				highlight:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 0, 0)
+				highlight:Show()
+			elseif highlight:GetParent() == button then
+				highlight:Hide()
+			end
 		end,
 
 		ScrollFrame_Update_WithCombatCheck = function(self)
@@ -3757,10 +3845,42 @@ end
 		--	Scrolls a level-one or level-two scroll frame so the currently selected item is visible.
 		--	Traverses items the same way ScrollFrameGeneral_Update does so the position is accurate.
 		_ScrollToSelected = function(self, items, frame)
-			if not items or not frame or not frame.buttons or #frame.buttons == 0 then return end
+			if not items or not frame then return end
+			local shownEntry = 0
+
+			if frame.useScrollBox then
+				--	With ScrollBox, scroll by flat index into the data provider.
+				for i = 1, #items do
+					local item = items[i]
+					if item.header then
+						shownEntry = shownEntry + 1
+						if item.selected then
+							frame.scrollBox:ScrollToElementDataIndex(shownEntry)
+							return
+						end
+						if not WhollyDatabase.closedHeaders[item.header] then
+							for j = 1, #item.children do
+								shownEntry = shownEntry + 1
+								if item.children[j].selected then
+									frame.scrollBox:ScrollToElementDataIndex(shownEntry)
+									return
+								end
+							end
+						end
+					else
+						shownEntry = shownEntry + 1
+						if item.selected then
+							frame.scrollBox:ScrollToElementDataIndex(shownEntry)
+							return
+						end
+					end
+				end
+				return
+			end
+
+			if not frame.buttons or #frame.buttons == 0 then return end
 			local buttonHeight = frame.buttons[1]:GetHeight()
 			if buttonHeight == 0 then return end
-			local shownEntry = 0
 			for i = 1, #items do
 				local item = items[i]
 				if item.header then
@@ -3839,6 +3959,42 @@ end
 			local highlight = (frame == com_mithrandir_whollyFrameWideScrollOneFrame) and com_mithrandir_whollyFrameWideScrollOneFrameLogHighlightFrame or com_mithrandir_whollyFrameWideScrollTwoFrameLogHighlightFrame
 			highlight:Hide()
 			local numEntries = items and #items or 0
+
+			if frame.useScrollBox then
+				--	ScrollBox path: flatten the visible items into a data provider and let the
+				--	ScrollBox handle virtual scrolling.  The element initializer (_ScrollBoxInitGeneralButton)
+				--	populates each recycled button row as it scrolls into view.
+				local flatList = {}
+				for i = 1, numEntries do
+					if items[i].header then
+						local headerEntry = items[i]
+						-- Copy header fields; mark as the header row (not a child)
+						local entry = {}
+						for k, v in pairs(headerEntry) do entry[k] = v end
+						entry.isChild = false
+						tinsert(flatList, entry)
+						if not WhollyDatabase.closedHeaders[headerEntry.header] then
+							for j = 1, #(headerEntry.children) do
+								local childEntry = {}
+								for k, v in pairs(headerEntry.children[j]) do childEntry[k] = v end
+								childEntry.isChild = true
+								-- Preserve header key so click handler can check item.header on parent
+								childEntry.header = nil
+								tinsert(flatList, childEntry)
+							end
+						end
+					else
+						local entry = {}
+						for k, v in pairs(items[i]) do entry[k] = v end
+						entry.isChild = false
+						tinsert(flatList, entry)
+					end
+				end
+				local provider = CreateDataProvider(flatList)
+				frame.scrollBox:SetDataProvider(provider)
+				return
+			end
+
 			local shownEntries = 0
 			local buttons = frame.buttons
 			local numButtons = #buttons
@@ -3863,7 +4019,7 @@ end
 					shownEntries = shownEntries + 1
 					buttonIndex = self:SetupScrollFrameButton(buttonIndex, numButtons, buttons, shownEntries, scrollOffset, items[i], false, false, frame)
 				end
-				
+
 			end
 
 			--	Now any remaining buttons in the UI should be hidden
@@ -3880,14 +4036,35 @@ end
 			self:_FilterPanelQuests()
 			local questsInMap = self.filteredPanelQuests
 			local numEntries = #questsInMap
-			local buttons = com_mithrandir_whollyFrameScrollFrame.buttons
-			local numButtons = #buttons
-			local scrollOffset = HybridScrollFrame_GetOffset(com_mithrandir_whollyFrameScrollFrame)
-			local buttonHeight = buttons[1]:GetHeight();
-			local button, questIndex, questId, questLevelString, requiredLevelString, colorCode, questLevel, filterCode, repeatableCompletedString
-			local shouldShowTag
+			local mainScrollFrame = com_mithrandir_whollyFrameScrollFrame
 
 			tablesort(questsInMap, Wholly.SortingFunction)
+
+			if mainScrollFrame.useScrollBox then
+				--	ScrollBox path: build a data provider from the sorted quest list and hand it
+				--	to the ScrollBox.  The element initializer (_ScrollBoxInitQuestButton) will
+				--	populate each visible row as it scrolls into view.
+				local flatList = {}
+				for i = 1, numEntries do
+					local entry = questsInMap[i]
+					tinsert(flatList, {
+						questId     = entry[1],
+						filterCode  = entry[2],
+						prettyString = self:_PrettyQuestString(entry),
+					})
+				end
+				local provider = CreateDataProvider(flatList)
+				mainScrollFrame.scrollBox:SetDataProvider(provider)
+				return
+			end
+
+			local buttons = mainScrollFrame.buttons
+			local numButtons = #buttons
+			local scrollOffset = HybridScrollFrame_GetOffset(mainScrollFrame)
+			local buttonHeight = buttons[1]:GetHeight();
+			local button, questIndex, questId, filterCode
+			local shouldShowTag
+
 			for i = 1, numButtons do
 				button = buttons[i]
 				questIndex = i + scrollOffset
@@ -3920,7 +4097,7 @@ end
 					button:Hide()
 				end
 			end
-			HybridScrollFrame_Update(com_mithrandir_whollyFrameScrollFrame, numEntries * buttonHeight, numButtons * buttonHeight)
+			HybridScrollFrame_Update(mainScrollFrame, numEntries * buttonHeight, numButtons * buttonHeight)
 		end,
 
 		ScrollOneClick = function(self, button)
@@ -4387,22 +4564,62 @@ end
 		end,
 
 		_SetupScrollFrame = function(self, scrollFrameName, frame, sizeX, sizeY, offsetX, offsetY)
-			local scrollFrame = CreateFrame("ScrollFrame", scrollFrameName, frame, "HybridScrollFrameTemplate")
-			scrollFrame:SetSize(sizeX, sizeY)
-			scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", offsetX, offsetY)
-			
-			local slider = CreateFrame("Slider", scrollFrameName.."ScrollBar", scrollFrame, "HybridScrollBarTemplate")
-			slider:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 0, -13)
-			slider:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 0, 14)
-			slider:SetScript("OnLoad", function(self)
-				local name = self:GetName()
-				_G[name.."BG"]:Hide()
-				_G[name.."Top"]:Hide()
-				_G[name.."Bottom"]:Hide()
-				_G[name.."Middle"]:Hide()
-				self.doNotHide = true
-			end)
-			scrollFrame.scrollBar = slider	-- hopefully this is parentKey="scrollBar"
+			local scrollFrame
+
+			if ScrollUtil and ScrollUtil.InitScrollBoxListWithScrollBar then
+				--	Modern Retail path: use the ScrollBox / ScrollBar API introduced in Dragonflight.
+				--	A named frame is still created so that global references (e.g.
+				--	com_mithrandir_whollyFrameScrollFrame) resolve correctly.
+				scrollFrame = CreateFrame("Frame", scrollFrameName, frame)
+				scrollFrame:SetSize(sizeX, sizeY)
+				scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", offsetX, offsetY)
+
+				local scrollBox = CreateFrame("Frame", scrollFrameName.."ScrollBox", scrollFrame, "WowScrollBoxList")
+				scrollBox:SetAllPoints(scrollFrame)
+
+				--	Dark band that covers the old texture scrollbar-track artwork and gives the
+				--	MinimalScrollBar a proper background, matching the Blizzard quest-panel style.
+				local scrollBarBg = CreateFrame("Frame", nil, scrollFrame)
+				scrollBarBg:SetPoint("TOPLEFT",    scrollFrame, "TOPRIGHT",    0, 0)
+				scrollBarBg:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 0, 0)
+				scrollBarBg:SetWidth(18)
+				local scrollBarBgTex = scrollBarBg:CreateTexture(nil, "BACKGROUND")
+				scrollBarBgTex:SetAllPoints()
+				scrollBarBgTex:SetColorTexture(0.06, 0.06, 0.06, 1.0)
+
+				local scrollBar = CreateFrame("EventFrame", scrollFrameName.."ScrollBar", scrollBarBg, "MinimalScrollBar")
+				scrollBar:SetPoint("TOPLEFT",     scrollBarBg, "TOPLEFT",     0, -4)
+				scrollBar:SetPoint("BOTTOMRIGHT", scrollBarBg, "BOTTOMRIGHT", 0,  4)
+
+				local view = CreateScrollBoxListLinearView()
+				view:SetElementExtent(16)		-- button height matches the XML template
+
+				ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
+
+				scrollFrame.scrollBox     = scrollBox
+				scrollFrame.scrollBoxView = view
+				scrollFrame.scrollBar     = scrollBar
+				scrollFrame.buttons       = {}		-- kept for guards elsewhere (always empty in this path)
+				scrollFrame.useScrollBox  = true
+			else
+				--	Classic fallback: use the legacy HybridScrollFrame API.
+				scrollFrame = CreateFrame("ScrollFrame", scrollFrameName, frame, "HybridScrollFrameTemplate")
+				scrollFrame:SetSize(sizeX, sizeY)
+				scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", offsetX, offsetY)
+
+				local slider = CreateFrame("Slider", scrollFrameName.."ScrollBar", scrollFrame, "HybridScrollBarTemplate")
+				slider:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 0, -13)
+				slider:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 0, 14)
+				slider:SetScript("OnLoad", function(self)
+					local name = self:GetName()
+					_G[name.."BG"]:Hide()
+					_G[name.."Top"]:Hide()
+					_G[name.."Bottom"]:Hide()
+					_G[name.."Middle"]:Hide()
+					self.doNotHide = true
+				end)
+				scrollFrame.scrollBar = slider	-- hopefully this is parentKey="scrollBar"
+			end
 
 			local highlightName = scrollFrameName.."LogHighlightFrame"
 			local highlightFrame = CreateFrame("Frame", highlightName, frame)
