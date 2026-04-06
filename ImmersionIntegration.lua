@@ -68,7 +68,7 @@ Wholly._HookQuestFrameReferences = function(self)
 			end
 			frame:SetPoint("TOPRIGHT", ImmersionFrame.TalkBox, "TOPRIGHT", xOffset, yOffset)
 			frame:SetScript("OnEnter", function(self) Wholly:QuestInfoEnter(self) end)
-			frame:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+			frame:SetScript("OnLeave", function(self) Wholly.tooltip:Hide() end)
 			local fontString = frame:CreateFontString("com_mithrandir_whollyQuestInfoFrameText", "BACKGROUND", "GameFontNormal")
 			fontString:SetJustifyH("RIGHT")
 			fontString:SetSize(60, 20)
@@ -213,13 +213,14 @@ Wholly._SetupImmersionRelatedQuestsFrame = function(self)
 	title:SetTextColor(1, 0.82, 0)
 		title:EnableMouse(true)
 	title:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText(Wholly.s.RELATED_QUESTS)
-		GameTooltip:AddLine(Wholly.s.RELATED_QUESTS_TOOLTIP, 0.7, 0.7, 0.7, true)
-		GameTooltip:Show()
+		Wholly.tooltip:SetOwner(self, "ANCHOR_TOP")
+		Wholly.tooltip:SetText(Wholly.s.RELATED_QUESTS)
+		Wholly.tooltip:AddLine(Wholly.s.RELATED_QUESTS_TOOLTIP, 0.7, 0.7, 0.7, true)
+		Wholly.tooltip:Show()
 	end)
 	title:SetScript("OnLeave", function(self)
-		GameTooltip:Hide()	end)
+		Wholly.tooltip:Hide()
+	end)
 	frame.Title = title
 
 	local attribution = frame:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")	attribution:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -24, 12)
@@ -324,19 +325,19 @@ ImmersionRelatedQuests.AddLine = function(self, frame, text, color, indent, ques
 	if questId and tonumber(questId) then
 		fs:EnableMouse(true)
 		fs:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
-			Wholly.onlyAddingTooltipToGameTooltip = true
+			Wholly.tooltip:SetOwner(self, "ANCHOR_TOPLEFT")
+			Wholly.briefQuestTooltip = true
 			local dummyFrame = {
 				statusCode = "P",
 				GetAttribute = function() return nil end,
 				SetAttribute = function() end
 			}
 			Wholly:_PopulateTooltipForQuest(dummyFrame, tonumber(questId))
-			Wholly.onlyAddingTooltipToGameTooltip = false
-			GameTooltip:Show()
+			Wholly.briefQuestTooltip = false
+			Wholly.tooltip:Show()
 		end)
 		fs:SetScript("OnLeave", function()
-			GameTooltip:Hide()
+			Wholly.tooltip:Hide()
 		end)
 	else
 		fs:EnableMouse(false)
@@ -453,18 +454,18 @@ ImmersionRelatedQuests.AddEnhancedQuestLine = function(self, frame, questId)
 
 	fs:EnableMouse(true)
 	fs:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-		Wholly.onlyAddingTooltipToGameTooltip = true
+		Wholly.tooltip:SetOwner(self, "ANCHOR_LEFT")
+		Wholly.briefQuestTooltip = true
 		local dummyFrame = {
 			statusCode = "P",
 			GetAttribute = function() return nil end,
 			SetAttribute = function() end
 		}
 		Wholly:_PopulateTooltipForQuest(dummyFrame, questId)
-		Wholly.onlyAddingTooltipToGameTooltip = false
-		GameTooltip:Show()
+		Wholly.briefQuestTooltip = false
+		Wholly.tooltip:Show()
 	end)
-	fs:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	fs:SetScript("OnLeave", function() Wholly.tooltip:Hide() end)
 
 	frame.LastFontString = fs
 	return fs

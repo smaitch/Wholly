@@ -488,7 +488,7 @@ end
 local CloseDropDownMenus					= CloseDropDownMenus
 local CreateFrame							= CreateFrame
 --local GetAchievementInfo					= GetAchievementInfo
-local GetAddOnMetadata						= GetAddOnMetadata
+local GetAddOnMetadata						= GetAddOnMetadata or C_AddOns.GetAddOnMetadata
 local GetBuildInfo							= GetBuildInfo
 local GetCoinTextureString					= GetCoinTextureString or C_CurrencyInfo.GetCoinTextureString
 local GetCursorPosition						= GetCursorPosition
@@ -524,8 +524,7 @@ local WorldMapFrame = WorldMapFrame
 local GRAIL = nil	-- will be set in PLAYER_LOGIN
 
 local directoryName, _ = ...
-local GetAddOnMetadata_API = GetAddOnMetadata or C_AddOns.GetAddOnMetadata
-local versionFromToc = GetAddOnMetadata_API(directoryName, "Version")
+local versionFromToc = GetAddOnMetadata(directoryName, "Version")
 local _, _, versionValueFromToc = strfind(versionFromToc, "(%d+)")
 local Wholly_File_Version = tonumber(versionValueFromToc)
 local requiredGrailVersion = 125
@@ -583,11 +582,11 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		fontString:SetText(QUEST_LOG)
 		frame:SetScript("OnShow", function(self)
 			Wholly:OnShow(self)
-			PlaySound(PlaySoundKitID and "igCharacterInfoOpen" or 839)
+			PlaySound(839)
 		end)
 		frame:SetScript("OnHide", function(self)
 			Wholly:OnHide(self)
-			PlaySound(PlaySoundKitID and "igCharacterInfoClose" or 840)
+			PlaySound(840)
 			if self.isMoving then
 				self:StopMovingOrSizing()
 				self.isMoving = false
@@ -924,6 +923,7 @@ end
 -- Dragonflight introduces new tool tip processing
 if TooltipDataProcessor then
 	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, Wholly._CheckNPCTooltip)
+	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Quest, Wholly._CheckQuestTooltip)
 else
 	GameTooltip:HookScript("OnTooltipSetUnit", Wholly._CheckNPCTooltip)
 end
@@ -1118,8 +1118,10 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 						end
 					end
 
-					self.easyMenuFrame = CreateFrame("Frame", "com_mithrandir_whollyEasyMenu", self.currentFrame, "UIDropDownMenuTemplate")
-					self.easyMenuFrame:Hide()
+					if not MenuUtil then
+						self.easyMenuFrame = CreateFrame("Frame", "com_mithrandir_whollyEasyMenu", self.currentFrame, "UIDropDownMenuTemplate")
+						self.easyMenuFrame:Hide()
+					end
 					StaticPopupDialogs["com_mithrandir_whollyTagDelete"] = {
 						text = CONFIRM_COMPACT_UNIT_FRAME_PROFILE_DELETION,
 						button1 = ACCEPT,
@@ -1452,7 +1454,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					self.currentTt = self.currentTt + 1
 					tt = self.tt[self.currentTt]
 					if nil == tt then
-						tt = CreateFrame("GameTooltip", "com_mithrandir_WhollyOtherTooltip"..self.currentTt, GameTooltip, "GameTooltipTemplate")
+						tt = CreateFrame("GameTooltip", "com_mithrandir_WhollyOtherTooltip"..self.currentTt, UIParent, "GameTooltipTemplate")
 						self.tt[self.currentTt] = tt
 					end
 					tt:SetOwner(previousTt, "ANCHOR_RIGHT")
@@ -1607,11 +1609,34 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 									end
 								end
 							end
-							tooltip:Show()
+							-- Do NOT call tooltip:Show() here.  TooltipDataProcessor shows
+							-- the tooltip after all post-call callbacks complete.  Calling
+							-- Show() explicitly from addon code triggers MoneyFrame layout
+							-- recalculation and can taint silverWidth / frameWidth.
 						end
 					end
 				end
 			end
+		end,
+
+		-- Called by TooltipDataProcessor.AddTooltipPostCall for Enum.TooltipDataType.Quest on
+		-- retail.  Appends Wholly's status and requirement info to the GameTooltip that Blizzard
+		-- is already showing for the quest, giving one combined tooltip instead of two.
+		-- Runs inside securecallfunction so tooltip:AddLine() is taint-safe.
+		_CheckQuestTooltip = function(tooltip, tooltipData)
+			if not WhollyDatabase.displaysBlizzardQuestTooltips then return end
+			local questId = tooltipData and tooltipData.id
+			if not questId then return end
+			-- Build a minimal frame stand-in so _PopulateTooltipForQuest can read statusCode
+			-- at the NPC-section calls without crashing.
+			local filterCode = Grail:ClassificationOfQuestCode(questId, nil, WhollyDatabase.buggedQuestsConsideredUnobtainable)
+			local dummyFrame = { statusCode = filterCode }
+			-- onlyAddingTooltipToGameTooltip=true routes every _AddLine call to GameTooltip
+			-- and suppresses SetOwner / ClearLines / SetHyperlink / quest-name header so we
+			-- only append Wholly's unique content below what Blizzard already showed.
+			Wholly.onlyAddingTooltipToGameTooltip = true
+			Wholly:_PopulateTooltipForQuest(dummyFrame, questId)
+			Wholly.onlyAddingTooltipToGameTooltip = false
 		end,
 
 		---
@@ -1651,7 +1676,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			-- alt+left is handled securely by the macro attribute; skip it here
 			if IsAltKeyDown() and "LeftButton" == leftOrRight then return end
 			if IsShiftKeyDown() and "RightButton" == leftOrRight then
-				Wholly:_TagProcess(button.questId)
+				Wholly:_TagProcess(button.questId, button)
 				return
 			end
 			if IsShiftKeyDown() and IsControlKeyDown() then
@@ -1928,16 +1953,35 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 
 		_Dropdown_Create = function(self)
 			local f = com_mithrandir_whollyFrame
-			self.dropdown = CreateFrame("Button", f:GetName().."ZoneButton", f, "UIDropDownMenuTemplate")
-			UIDropDownMenu_Initialize(self.dropdown, self.Dropdown_Initialize) -- took away "MENU" because no show with it
-			self.dropdown:SetPoint("TOPLEFT", f, "TOPLEFT", 60, -40)
-			UIDropDownMenu_SetWidth(self.dropdown, 240, 0)
-			UIDropDownMenu_JustifyText(self.dropdown, "LEFT")
-			-- By default, the dropdown has it clicking work with the little button on the right.  This makes it work for the whole button:
-			self.dropdown:SetScript("OnClick", function(self) ToggleDropDownMenu(nil, nil, Wholly.dropdown) PlaySound(PlaySoundKitID and "igMainMenuOptionCheckBoxOn" or 856) end)
+			if MenuUtil then
+				self.dropdownText = self.dropdownText or ""
+				self.dropdown = CreateFrame("Button", f:GetName().."ZoneButton", f, "UIPanelButtonTemplate")
+				self.dropdown:SetSize(270, 22)
+				self.dropdown:SetPoint("TOPLEFT", f, "TOPLEFT", 60, -40)
+				self.dropdown:GetFontString():SetJustifyH("LEFT")
+				self.dropdown:GetFontString():SetPoint("LEFT", self.dropdown, "LEFT", 8, 0)
+				self.dropdown:SetText(self.dropdownText)
+				self.dropdown:SetScript("OnClick", function(btn)
+					MenuUtil.CreateContextMenu(btn, function(owner, rootDescription)
+						Wholly:_MenuUtil_BuildZoneMenu(rootDescription)
+					end)
+					PlaySound(856)
+				end)
+			else
+				self.dropdown = CreateFrame("Button", f:GetName().."ZoneButton", f, "UIDropDownMenuTemplate")
+				UIDropDownMenu_Initialize(self.dropdown, self.Dropdown_Initialize) -- took away "MENU" because no show with it
+				self.dropdown:SetPoint("TOPLEFT", f, "TOPLEFT", 60, -40)
+				UIDropDownMenu_SetWidth(self.dropdown, 240, 0)
+				UIDropDownMenu_JustifyText(self.dropdown, "LEFT")
+				-- By default, the dropdown has it clicking work with the little button on the right.  This makes it work for the whole button:
+				self.dropdown:SetScript("OnClick", function(self) ToggleDropDownMenu(nil, nil, Wholly.dropdown) PlaySound(856) end)
+			end
 		end,
 
 		_Dropdown_GetText = function(self)
+			if MenuUtil then
+				return (self.dropdown and self.dropdown:GetText()) or self.dropdownText or ""
+			end
 			if nil ~= self.dropdown then
 				self.dropdownText = UIDropDownMenu_GetText(self.dropdown)
 			end
@@ -1973,9 +2017,75 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			end
 		end,
 
+		_MenuUtil_BuildZoneMenu = function(self, rootDescription)
+			-- Build the zone selection menu for the MenuUtil (retail) path.
+			-- Eagerly enumerates levelOneData and, for each continent, calls
+			-- _InitializeLevelTwoData to get zone list.  Saves/restores levelOneCurrent.
+			local savedLevelOneCurrent = self.levelOneCurrent
+			for k, v in ipairs(self.levelOneData) do
+				local item = v
+				if item.children then
+					-- Continent with sub-region children
+					local continentBtn = rootDescription:CreateButton(item.displayName)
+					for ck, cv in ipairs(item.children) do
+						local child = cv
+						if child.children then
+							-- Another intermediate level
+							local regionBtn = continentBtn:CreateButton(child.displayName)
+							self:_SetLevelOneCurrent(child)
+							self:_InitializeLevelTwoData()
+							for _, zv in ipairs(self.levelTwoData) do
+								local zoneName, zoneMapID, zoneF = zv.displayName, zv.mapID, zv.f
+								regionBtn:CreateButton(zoneName, function()
+									if zoneF then zoneF()
+									else
+										Wholly.zoneInfo.panel.mapId = zoneMapID
+										Wholly._ForcePanelMapArea(Wholly)
+									end
+								end)
+							end
+						else
+							-- Child is a leaf or direct zone selector
+							local childName, childMapID, childF = child.displayName, child.mapID, child.f
+							if childF then
+								continentBtn:CreateButton(childName, childF)
+							else
+								continentBtn:CreateButton(childName, function()
+									Wholly.zoneInfo.panel.mapId = childMapID
+									Wholly._ForcePanelMapArea(Wholly)
+								end)
+							end
+						end
+					end
+				elseif item.f then
+					-- Direct action item (e.g. special entries like searches/tags)
+					rootDescription:CreateButton(item.displayName, item.f)
+				else
+					-- Continent/group: show level-two zones as submenu
+					local continentBtn = rootDescription:CreateButton(item.displayName)
+					self:_SetLevelOneCurrent(item)
+					self:_InitializeLevelTwoData()
+					for _, zv in ipairs(self.levelTwoData) do
+						local zoneName, zoneMapID, zoneF = zv.displayName, zv.mapID, zv.f
+						continentBtn:CreateButton(zoneName, function()
+							if zoneF then zoneF()
+							else
+								Wholly.zoneInfo.panel.mapId = zoneMapID
+								Wholly._ForcePanelMapArea(Wholly)
+							end
+						end)
+					end
+				end
+			end
+			self.levelOneCurrent = savedLevelOneCurrent
+			self:_InitializeLevelTwoData()
+		end,
+
 		_Dropdown_SetText = function(self, newTitle)
 			self.dropdownText = newTitle
-			if nil ~= self.dropdown then
+			if MenuUtil then
+				if self.dropdown then self.dropdown:SetText(self.dropdownText) end
+			elseif nil ~= self.dropdown then
 				UIDropDownMenu_SetText(self.dropdown, self.dropdownText)
 			end
 		end,
@@ -1999,8 +2109,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 		end,
 
 		_FilterQuests = function(self, forPanel)
-			local f = forPanel and self.filteredPanelQuests or self.filteredPinQuests
-			f = {}
+			local f = {}
 			local questsInMap = forPanel and self.cachedPanelQuests or self.cachedPinQuests
 			local shouldAdd, statusCode, status
 
@@ -2785,20 +2894,21 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				end
 				if nil ~= frame then
 					if Grail.existsClassic then
+						-- Classic: write directly to GameTooltip (no taint issues there).
 						Wholly:_PopulateTooltipForQuest(frame, questId)
 						GameTooltip:Show()
 					else
-						-- On retail, any write to GameTooltip from addon code (including
-						-- Hide()) taints GameTooltipTextLeft1, which Blizzard reads at
-						-- QuestMapFrame.lua:2123 via GetStringWidth().  Leave GameTooltip
-						-- alone so Blizzard's title tooltip shows unmodified.  Show
-						-- Wholly's own tooltip alongside it at the cursor.
-						-- briefQuestTooltip skips SetHyperlink so everything fits in one
-						-- frame (SetHyperlink fills tt[1] causing overflow into tt[2]).
-						Wholly.tooltip:SetOwner(UIParent, "ANCHOR_CURSOR_RIGHT")
+						-- Retail: QuestMapLogTitleButton_OnEnter builds the GameTooltip via
+						-- SetText/AddLine (not SetHyperlink), so TooltipDataType.Quest never
+						-- fires and _CheckQuestTooltip is never called for the quest log.
+						-- Show Wholly's tooltip anchored immediately below GameTooltip so
+						-- the two appear as one seamless combined tooltip.
+						Wholly.tooltip:SetOwner(UIParent, "ANCHOR_NONE")
 						Wholly.briefQuestTooltip = true
 						Wholly:_PopulateTooltipForQuest(frame, questId)
 						Wholly.briefQuestTooltip = false
+						Wholly.tooltip:ClearAllPoints()
+						Wholly.tooltip:SetPoint("TOP", GameTooltip, "BOTTOM", 0, 0)
 						Wholly.tooltip:Show()
 					end
 				end
@@ -3830,13 +3940,11 @@ end
 		end,
 
 		ScrollFrameOne_Update = function(self)
---			self = self or Wholly
 			self = Wholly
 			self:ScrollFrameGeneral_Update(self.levelOneData, com_mithrandir_whollyFrameWideScrollOneFrame)
 		end,
 
 		ScrollFrameTwo_Update = function(self)
---			self = self or Wholly
 			self = Wholly
 			self:_InitializeLevelTwoData()
 			self:ScrollFrameGeneral_Update(self.levelTwoData, com_mithrandir_whollyFrameWideScrollTwoFrame)
@@ -4032,7 +4140,7 @@ end
 		end,
 
 		ScrollFrame_Update = function(self)
-			self = self or Wholly
+			self = Wholly
 			self:_FilterPanelQuests()
 			local questsInMap = self.filteredPanelQuests
 			local numEntries = #questsInMap
@@ -4172,13 +4280,13 @@ end
 				if terms[i] ~= "" then
 					if not started then
 						for qid, questName in pairs(Grail.quest.name) do
-							if strfind(questName, terms[i]) then tinsert(results, qid) end
+							if strfind(questName, terms[i], 1, true) then tinsert(results, qid) end
 						end
 						started = true
 					else
 						local newResults = {}
 						for _, q in pairs(results) do
-							if strfind(Grail.quest.name[q], terms[i]) then tinsert(newResults, q) end
+							if strfind(Grail.quest.name[q], terms[i], 1, true) then tinsert(newResults, q) end
 						end
 						results = newResults
 					end
@@ -4255,20 +4363,27 @@ end
 		_SetupBlizzardQuestLogSupport = function(self)
 			-- Make it so the Blizzard quest log can display our tooltips
 			if not Grail.existsClassic then
-				hooksecurefunc("QuestMapLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
-				hooksecurefunc("QuestMapLogTitleButton_OnLeave", function() Wholly.tooltip:Hide() end)
+				if QuestMapLogTitleButton_OnEnter then
+					hooksecurefunc("QuestMapLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
+					hooksecurefunc("QuestMapLogTitleButton_OnLeave", function() Wholly.tooltip:Hide() end)
+				end
 				-- Now since the Blizzard UI has probably created a quest frame before I get
 				-- the chance to hook the function I need to go through all the quest frames
 				-- and hook them too.
-				if not Grail.battleForAzeroth then
-					local titles = QuestMapFrame.QuestsFrame.Contents.Titles
+				local titles = QuestMapFrame and
+				               QuestMapFrame.QuestsFrame and
+				               QuestMapFrame.QuestsFrame.Contents and
+				               QuestMapFrame.QuestsFrame.Contents.Titles
+				if titles then
 					for i = 1, #(titles) do
 						titles[i]:HookScript("OnEnter", Wholly._OnEnterBlizzardQuestButton)
 						titles[i]:HookScript("OnLeave", function() Wholly.tooltip:Hide() end)
 					end
 				end
 			else
-				hooksecurefunc("QuestLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
+				if QuestLogTitleButton_OnEnter then
+					hooksecurefunc("QuestLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
+				end
 			end
 		end,
 
@@ -4463,6 +4578,10 @@ end
 																		end
 																	end,
 																	OnTooltipShow = function(tooltip)
+																		-- LibDBIcon and some other LDB display addons pass the global
+																		-- GameTooltip here.  Writing to it from addon code taints layout
+																		-- dimensions (silverWidth / frameWidth).  Skip if that is the case.
+																		if tooltip == GameTooltip then return end
 																		Wholly:_ProcessInitialUpdate()
 																		Wholly.ldbTooltipOwner = tooltip:GetOwner()
 																		local dropdownValue = Wholly:_Dropdown_GetText()
@@ -4478,6 +4597,10 @@ end
 																						Wholly.pairedCoordinatesButton:Click()
 																					end,
 																					OnTooltipShow = function(tooltip)
+																						-- LibDBIcon and some other LDB display addons pass the global
+																						-- GameTooltip here.  Writing to it from addon code taints layout
+																						-- dimensions (silverWidth / frameWidth).  Skip if that is the case.
+																						if tooltip == GameTooltip then return end
 																						Wholly.ldbCoordinatesTooltipOwner = tooltip:GetOwner()
 																						local mapAreaId = Wholly.zoneInfo.zone.mapId
 																						local mapAreaName = Grail:MapAreaName(mapAreaId) or "UNKNOWN"
@@ -4557,8 +4680,12 @@ end
 			self.tooltip.large = com_mithrandir_WhollyTooltipTextLeft1:GetFontObject();
 			self.tooltip.small = com_mithrandir_WhollyTooltipTextLeft2:GetFontObject();
 			self.tooltip.SetLastFont = function(self, fontObj, rightText)
+				if not fontObj then return end
 				local txt = rightText and "Right" or "Left"
-				_G[format("com_mithrandir_WhollyTooltipText%s%d", txt, self:NumLines())]:SetFont(fontObj:GetFont())
+				local fontString = _G[format("com_mithrandir_WhollyTooltipText%s%d", txt, self:NumLines())]
+				if fontString then
+					fontString:SetFontObject(fontObj)
+				end
 			end
 			self.tt = { [1] = self.tooltip }
 		end,
@@ -5085,18 +5212,37 @@ end
 		end,
 
 		_TagDelete = function(self)
-			local menu = {}
-			local menuItem
-			if WhollyDatabase.tags then
-				for tagName, questTable in pairs(WhollyDatabase.tags) do
-					menuItem = { text = tagName, isNotRadio = true }
-					menuItem.func = function(self, arg1, arg2, checked) Wholly:_TagDeleteConfirm(tagName) end
-					tinsert(menu, menuItem)
+			if MenuUtil then
+				local sortedTags = {}
+				if WhollyDatabase.tags then
+					for tagName, _ in pairs(WhollyDatabase.tags) do
+						tinsert(sortedTags, tagName)
+					end
 				end
+				tablesort(sortedTags, function(a, b) return a < b end)
+				MenuUtil.CreateContextMenu(self.currentFrame, function(owner, rootDescription)
+					rootDescription:CreateTitle(Wholly.s.TAGS_DELETE)
+					for _, tagName in ipairs(sortedTags) do
+						local tn = tagName
+						rootDescription:CreateButton(tn, function()
+							Wholly:_TagDeleteConfirm(tn)
+						end)
+					end
+				end)
+			else
+				local menu = {}
+				local menuItem
+				if WhollyDatabase.tags then
+					for tagName, questTable in pairs(WhollyDatabase.tags) do
+						menuItem = { text = tagName, isNotRadio = true }
+						menuItem.func = function(self, arg1, arg2, checked) Wholly:_TagDeleteConfirm(tagName) end
+						tinsert(menu, menuItem)
+					end
+				end
+				tablesort(menu, function(a, b) return a.text < b.text end)
+				tinsert(menu, 1, { text = Wholly.s.TAGS_DELETE, isTitle = true })
+				EasyMenu(menu, self.easyMenuFrame, self.easyMenuFrame, 0, 0, "MENU")
 			end
- 			tablesort(menu, function(a, b) return a.text < b.text end)
-			tinsert(menu, 1, { text = Wholly.s.TAGS_DELETE, isTitle = true })
-			EasyMenu(menu, self.easyMenuFrame, self.easyMenuFrame, 0, 0, "MENU")
 		end,
 
 		_TagDeleteConfirm = function(self, tagName)
@@ -5104,20 +5250,48 @@ end
 			if dialog then dialog.data = tagName end
 		end,
 
-		_TagProcess = function(self, questId)
-			local menu = {}
-			local menuItem
-			if WhollyDatabase.tags then
-				for tagName, questTable in pairs(WhollyDatabase.tags) do
-					menuItem = { text = tagName, isNotRadio = true }
-					menuItem.checked = Grail:_IsQuestMarkedInDatabase(questId, questTable)
-					menuItem.func = function(self, arg1, arg2, checked) Grail:_MarkQuestInDatabase(questId, WhollyDatabase.tags[tagName], checked) if Wholly.levelOneCurrent.index == 74 and Wholly.levelTwoCurrent.sortName == tagName then Wholly.SearchForQuestsWithTag(Wholly, tagName) Wholly.zoneInfo.panel.mapId = 0 Wholly._ForcePanelMapArea(Wholly, true) end end
-					tinsert(menu, menuItem)
+		_TagProcess = function(self, questId, anchorFrame)
+			if MenuUtil then
+				local sortedEntries = {}
+				if WhollyDatabase.tags then
+					for tagName, questTable in pairs(WhollyDatabase.tags) do
+						tinsert(sortedEntries, tagName)
+					end
 				end
+				tablesort(sortedEntries, function(a, b) return a < b end)
+				MenuUtil.CreateContextMenu(anchorFrame or self.currentFrame, function(owner, rootDescription)
+					rootDescription:CreateTitle(Wholly.s.TAGS .. ": " .. self:_QuestName(questId))
+					for _, tagName in ipairs(sortedEntries) do
+						local tn = tagName
+						rootDescription:CreateCheckbox(tn,
+							function()
+								return Grail:_IsQuestMarkedInDatabase(questId, WhollyDatabase.tags[tn])
+							end,
+							function(checked)
+								Grail:_MarkQuestInDatabase(questId, WhollyDatabase.tags[tn], checked)
+								if Wholly.levelOneCurrent.index == 74 and Wholly.levelTwoCurrent.sortName == tn then
+									Wholly.SearchForQuestsWithTag(Wholly, tn)
+									Wholly.zoneInfo.panel.mapId = 0
+									Wholly._ForcePanelMapArea(Wholly, true)
+								end
+							end)
+					end
+				end)
+			else
+				local menu = {}
+				local menuItem
+				if WhollyDatabase.tags then
+					for tagName, questTable in pairs(WhollyDatabase.tags) do
+						menuItem = { text = tagName, isNotRadio = true }
+						menuItem.checked = Grail:_IsQuestMarkedInDatabase(questId, questTable)
+						menuItem.func = function(self, arg1, arg2, checked) Grail:_MarkQuestInDatabase(questId, WhollyDatabase.tags[tagName], checked) if Wholly.levelOneCurrent.index == 74 and Wholly.levelTwoCurrent.sortName == tagName then Wholly.SearchForQuestsWithTag(Wholly, tagName) Wholly.zoneInfo.panel.mapId = 0 Wholly._ForcePanelMapArea(Wholly, true) end end
+						tinsert(menu, menuItem)
+					end
+				end
+				tablesort(menu, function(a, b) return a.text < b.text end)
+				tinsert(menu, 1, { text = Wholly.s.TAGS .. ": " .. self:_QuestName(questId), isTitle = true })
+				EasyMenu(menu, self.easyMenuFrame, self.easyMenuFrame, 0, 0, "MENU")
 			end
- 			tablesort(menu, function(a, b) return a.text < b.text end)
-			tinsert(menu, 1, { text = Wholly.s.TAGS .. ": " .. self:_QuestName(questId), isTitle = true })
-			EasyMenu(menu, self.easyMenuFrame, self.easyMenuFrame, 0, 0, "MENU")
 		end,
 
 		ToggleCurrentFrame = function(self)
@@ -5144,9 +5318,11 @@ end
 			com_mithrandir_whollySearchFrame:ClearAllPoints()
 			com_mithrandir_whollySearchFrame:SetParent(self.currentFrame)
 			com_mithrandir_whollySearchFrame:SetPoint("BOTTOMLEFT", self.currentFrame, "TOPLEFT", 64, -14)
-			self.easyMenuFrame:ClearAllPoints()
-			self.easyMenuFrame:SetParent(self.currentFrame)
-			self.easyMenuFrame:SetPoint("LEFT", self.currentFrame, "RIGHT")
+			if self.easyMenuFrame then
+				self.easyMenuFrame:ClearAllPoints()
+				self.easyMenuFrame:SetParent(self.currentFrame)
+				self.easyMenuFrame:SetPoint("LEFT", self.currentFrame, "RIGHT")
+			end
 		end,
 
 		ToggleIgnoredQuest = function(self, questId)
