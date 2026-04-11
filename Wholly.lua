@@ -2374,7 +2374,11 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 		end,
 
 		_HideTooltip = function(self)
-			self.tooltip:Hide()
+			for i = 1, #self.tt do
+				if self.tt[i]:IsShown() then
+					self.tt[i]:Hide()
+				end
+			end
 		end,
 
 		--	This will return a colored version of the holidayName if it is not celebrating the holiday currently.
@@ -2748,10 +2752,16 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				tablesort(t, function(a, b) return a.sortName < b.sortName end)
 			end
 
+			-- Clear any stale selection flags before re-applying the current selection.
+			-- levelTwoCurrent may be a bogus {mapID=…} object created by _ForcePanelMapArea;
+			-- if we don't clear first, the real zone object whose mapID matched that bogus entry
+			-- will keep selected=true even after the user moves to a different zone.
+			for _, v in pairs(t) do
+				v.selected = nil
+			end
 			-- We want to make sure we retain the proper selection
 			if nil ~= self.levelTwoCurrent then
 				for i, v in pairs(t) do
---					if v.displayName == self.levelTwoCurrent.displayName and v.mapID == self.levelTwoCurrent.mapID then
 					if v.mapID == self.levelTwoCurrent.mapID then
 						v.selected = true
 					end
@@ -3063,7 +3073,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				local negateString = (questCode == 'y') and "!" or ""
 				return format("|c%s%s|r %s[%s][%s]", colorCode, name, negateString, self.s.ACHIEVEMENTS, self.s.PLAYER)
 			elseif questCode == 'K' or questCode == 'k' then
-				local name = GRAIL:NPCName(numeric)
+				local name = GRAIL:NPCName(numeric) or tostring(numeric)
 				local itemString = (questCode == 'k') and self.s.ITEM_LACK or self.s.ITEM
 				local count = tonumber(subcode)
 				local countString = count and "("..count..") " or ""
@@ -3260,8 +3270,12 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			end
 
 			questId = aliasQuestId or questId	-- remap to the alias now that the Blizzard interaction is done
-			if GetQuestExpansion then
-				self:_AddLine(EXPANSION_FILTER_TEXT, Grail:_ExpansionName(GetQuestExpansion(questId)))
+			local expansionIndex = Grail:ExpansionForQuest(questId)
+			if expansionIndex == nil and GetQuestExpansion then
+				expansionIndex = GetQuestExpansion(questId)
+			end
+			if expansionIndex ~= nil then
+				self:_AddLine(EXPANSION_FILTER_TEXT, Grail:_ExpansionName(expansionIndex))
 			end
 			local obtainersCode = Grail:CodeObtainers(questId)
 			local obtainersRaceCode = Grail:CodeObtainersRace(questId)
@@ -3918,8 +3932,15 @@ end
 			else
 				button:SetNormalTexture("Interface\\Addons\\Wholly\\blank")
 			end
-			button.item = elementData
-			if elementData.selected then
+			button.item = elementData.__source or elementData
+			local shouldHighlight
+			if scrollFrame == com_mithrandir_whollyFrameWideScrollTwoFrame then
+				local targetMapID = self.levelTwoCurrent and self.levelTwoCurrent.mapID
+				shouldHighlight = targetMapID ~= nil and elementData.mapID == targetMapID
+			else
+				shouldHighlight = elementData.selected
+			end
+			if shouldHighlight then
 				highlight:ClearAllPoints()
 				highlight:SetParent(button)
 				highlight:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)
@@ -3939,15 +3960,15 @@ end
 			end
 		end,
 
-		ScrollFrameOne_Update = function(self)
+		ScrollFrameOne_Update = function(self, preserveScroll)
 			self = Wholly
-			self:ScrollFrameGeneral_Update(self.levelOneData, com_mithrandir_whollyFrameWideScrollOneFrame)
+			self:ScrollFrameGeneral_Update(self.levelOneData, com_mithrandir_whollyFrameWideScrollOneFrame, preserveScroll)
 		end,
 
-		ScrollFrameTwo_Update = function(self)
+		ScrollFrameTwo_Update = function(self, preserveScroll)
 			self = Wholly
 			self:_InitializeLevelTwoData()
-			self:ScrollFrameGeneral_Update(self.levelTwoData, com_mithrandir_whollyFrameWideScrollTwoFrame)
+			self:ScrollFrameGeneral_Update(self.levelTwoData, com_mithrandir_whollyFrameWideScrollTwoFrame, preserveScroll)
 		end,
 
 		--	Scrolls a level-one or level-two scroll frame so the currently selected item is visible.
@@ -4045,7 +4066,16 @@ end
 					button:SetNormalTexture("Interface\\Addons\\Wholly\\blank")
 				end
 				button.item = item
-				if item.selected then
+				local shouldHighlight
+				if scrollFrame == com_mithrandir_whollyFrameWideScrollTwoFrame then
+					--	For frame two, match by mapID against levelTwoCurrent rather than
+					--	item.selected, which can be stale when levelTwoCurrent is a bogus proxy.
+					local targetMapID = self.levelTwoCurrent and self.levelTwoCurrent.mapID
+					shouldHighlight = targetMapID and item.mapID == targetMapID
+				else
+					shouldHighlight = item.selected
+				end
+				if shouldHighlight then
 					highlight:ClearAllPoints()
 					highlight:SetParent(button)
 					highlight:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)
@@ -4061,11 +4091,8 @@ end
 		--	This technique uses marching through the data to update the buttons.
 		--	This is done because some of our data may be closed, and in any case any of the headings
 		--	that are open need to be processed differently.
-		ScrollFrameGeneral_Update = function(self, items, frame)
-			--	Hide the highlight once before rendering; SetupScrollFrameButton will show it
-			--	on whichever button carries the selected item.
+		ScrollFrameGeneral_Update = function(self, items, frame, preserveScroll)
 			local highlight = (frame == com_mithrandir_whollyFrameWideScrollOneFrame) and com_mithrandir_whollyFrameWideScrollOneFrameLogHighlightFrame or com_mithrandir_whollyFrameWideScrollTwoFrameLogHighlightFrame
-			highlight:Hide()
 			local numEntries = items and #items or 0
 
 			if frame.useScrollBox then
@@ -4080,6 +4107,7 @@ end
 						local entry = {}
 						for k, v in pairs(headerEntry) do entry[k] = v end
 						entry.isChild = false
+						entry.__source = headerEntry
 						tinsert(flatList, entry)
 						if not WhollyDatabase.closedHeaders[headerEntry.header] then
 							for j = 1, #(headerEntry.children) do
@@ -4088,6 +4116,7 @@ end
 								childEntry.isChild = true
 								-- Preserve header key so click handler can check item.header on parent
 								childEntry.header = nil
+								childEntry.__source = headerEntry.children[j]
 								tinsert(flatList, childEntry)
 							end
 						end
@@ -4095,12 +4124,30 @@ end
 						local entry = {}
 						for k, v in pairs(items[i]) do entry[k] = v end
 						entry.isChild = false
+						entry.__source = items[i]
 						tinsert(flatList, entry)
 					end
 				end
+				local scrollPct = (preserveScroll and frame.scrollBox.GetScrollPercentage) and frame.scrollBox:GetScrollPercentage() or nil
 				local provider = CreateDataProvider(flatList)
 				frame.scrollBox:SetDataProvider(provider)
+				if scrollPct and frame.scrollBox.SetScrollPercentage then
+					frame.scrollBox:SetScrollPercentage(scrollPct)
+				end
 				return
+			end
+
+			--	HybridScrollFrame path (Classic).
+			--	Clear the old highlight before re-rendering so a previously selected item that is
+			--	no longer selected does not keep its highlight.
+			highlight:Hide()
+
+			--	Save the current scrollbar value before rendering so we can restore it if the
+			--	caller asked us not to scroll (preserveScroll).  HybridScrollFrame_Update resets
+			--	the scrollbar to 0 whenever maxValue is 0.
+			local savedScrollValue
+			if preserveScroll and frame.scrollBar then
+				savedScrollValue = frame.scrollBar:GetValue()
 			end
 
 			local shownEntries = 0
@@ -4135,8 +4182,55 @@ end
 				buttons[i]:Hide()
 			end
 
-			--	How have the scroll frame update itself
+			--	Have the scroll frame update itself.
 			HybridScrollFrame_Update(frame, shownEntries * buttonHeight, numButtons * buttonHeight)
+
+			--	Restore the scroll position if HybridScrollFrame_Update reset it to 0.
+			--	This fires frame.update() which re-renders the buttons at the correct offset.
+			if savedScrollValue and savedScrollValue > 0 and frame.scrollBar then
+				local _, maxVal = frame.scrollBar:GetMinMaxValues()
+				if maxVal and maxVal > 0 then
+					frame.scrollBar:SetValue(math.min(savedScrollValue, maxVal))
+				end
+			end
+
+			--	Fix-up pass: after HybridScrollFrame_Update callbacks and scroll restoration,
+			--	scan the currently visible buttons and place the highlight on the selected one.
+			--	This ensures the highlight is correct regardless of what re-entrant renders
+			--	happened inside HybridScrollFrame_Update or the SetValue restore above.
+			--
+			--	For frame two we match by levelTwoCurrent.mapID rather than item.selected,
+			--	because levelTwoCurrent is the authoritative source of truth and item.selected
+			--	can be stale when levelTwoCurrent is a bogus proxy object.
+			highlight:Hide()
+			if frame == com_mithrandir_whollyFrameWideScrollTwoFrame then
+				local targetMapID = self.levelTwoCurrent and self.levelTwoCurrent.mapID
+				if targetMapID then
+					for i = 1, numButtons do
+						local btn = buttons[i]
+						if btn:IsShown() and btn.item and btn.item.mapID == targetMapID then
+							highlight:ClearAllPoints()
+							highlight:SetParent(btn)
+							highlight:SetPoint("TOPLEFT",     btn, "TOPLEFT",     0, 0)
+							highlight:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
+							highlight:Show()
+							break
+						end
+					end
+				end
+			else
+				for i = 1, numButtons do
+					local btn = buttons[i]
+					if btn:IsShown() and btn.item and btn.item.selected then
+						highlight:ClearAllPoints()
+						highlight:SetParent(btn)
+						highlight:SetPoint("TOPLEFT",     btn, "TOPLEFT",     0, 0)
+						highlight:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
+						highlight:Show()
+						break
+					end
+				end
+			end
 		end,
 
 		ScrollFrame_Update = function(self)
@@ -4224,8 +4318,8 @@ end
 					self:_ForcePanelMapArea(true)
 				end
 				self:_SetLevelOneCurrent(button.item)
-				self:ScrollFrameOne_Update()
-				self:ScrollFrameTwo_Update()
+				self:ScrollFrameOne_Update(true)	-- preserve scroll: user selected a continent, don't jump
+				self:ScrollFrameTwo_Update()		-- zone list changes, scroll reset is fine
 			end
 		end,
 
@@ -4233,11 +4327,12 @@ end
 			self:_SetLevelTwoCurrent(button.item)
 			if button.item.f then
 				button.item.f()
+				self:ScrollFrameTwo_Update()	-- to update selection (content changes, scroll reset is fine)
 			else
 				self.zoneInfo.panel.mapId = button.item.mapID
 				self:_ForcePanelMapArea(true)
+				self:ScrollFrameTwo_Update(true)	-- preserve scroll: user selected a zone, don't jump
 			end
-			self:ScrollFrameTwo_Update()	-- to update selection
 		end,
 
 		SearchEntered = function(self)
@@ -4338,6 +4433,16 @@ end
 			if self.levelTwoCurrent ~= newValue then
 				if self.levelTwoCurrent ~= nil then
 					self.levelTwoCurrent.selected = nil
+				end
+				--	Also clear selected on all real items in levelTwoData.
+				--	levelTwoCurrent may be a bogus proxy object (created by _ForcePanelMapArea)
+				--	whose selected flag doesn't correspond to any real item.  The real item
+				--	got selected=true via mapID matching in _InitializeLevelTwoData and must
+				--	be explicitly cleared here to avoid dual-selection.
+				if self.levelTwoData then
+					for _, v in ipairs(self.levelTwoData) do
+						v.selected = nil
+					end
 				end
 				self.levelTwoCurrent = newValue
 				if newValue ~= nil then
@@ -4594,7 +4699,12 @@ end
 																					icon="Interface\\Icons\\INV_Misc_Map02",
 																					text="",
 																					OnClick = function(theFrame, button)
-																						Wholly.pairedCoordinatesButton:Click()
+																						if Wholly.pairedCoordinatesButton then
+																							Wholly.pairedCoordinatesButton:Click()
+																						else
+																							WhollyDatabase.enablesPlayerCoordinates = not WhollyDatabase.enablesPlayerCoordinates
+																							Wholly:UpdateCoordinateSystem()
+																						end
 																					end,
 																					OnTooltipShow = function(tooltip)
 																						-- LibDBIcon and some other LDB display addons pass the global
@@ -4618,8 +4728,8 @@ end
 				frame:EnableMouse(true)
 				frame:SetSize(160, 14)
 				local xOffset, yOffset = -235, -35
-				if Grail.existsClassic then
-					xOffset, yOffset = -55, -55
+				if Grail.existsClassicEra then
+					xOffset, yOffset = -265, -55
 				end
 				frame:SetPoint("TOPRIGHT", QuestFrame, "TOPRIGHT", xOffset, yOffset)
 				frame:SetScript("OnEnter", function(self) Wholly:QuestInfoEnter(self) end)
@@ -4688,6 +4798,13 @@ end
 				end
 			end
 			self.tt = { [1] = self.tooltip }
+			self.tooltip:HookScript("OnHide", function()
+				for i = 2, #self.tt do
+					if self.tt[i]:IsShown() then
+						self.tt[i]:Hide()
+					end
+				end
+			end)
 		end,
 
 		_SetupScrollFrame = function(self, scrollFrameName, frame, sizeX, sizeY, offsetX, offsetY)
@@ -4978,7 +5095,7 @@ end
 				t:SetPoint("TOPLEFT", self, "BOTTOMRIGHT")
 			end)
 			f:SetScript("OnLeave", function(self) Wholly.tooltip:Hide() end)
-			f:SetScript("OnClick", function(self) Wholly.pairedConfigurationButton:Click() end)
+			f:SetScript("OnClick", function(self) if Wholly.pairedConfigurationButton then Wholly.pairedConfigurationButton:Click() end end)
 			f:Hide()
 			self.mapFrame = f
 		end,
