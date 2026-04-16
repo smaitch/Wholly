@@ -1211,7 +1211,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 		maximumSearchHistory = 10,
 		npcs = {},
 		onlyAddingTooltipToGameTooltip = false,
-		briefQuestTooltip = false,		-- true when showing tooltip for a Blizzard quest log button: skip SetHyperlink to keep everything in one frame
+		supplementalTooltip = nil,		-- when set, _AddLine routes here instead of GameTooltip (avoids tainting MoneyFrame layout)
 		pairedConfigurationButton = nil,-- configuration panel button that does the same thing as the world map button
 		pairedCoordinatesButton = nil,	-- configuration panel button that does the same thing as the LDB coordinate button
 		panelCountLine = "",
@@ -1461,7 +1461,10 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					tt:ClearLines()
 				end
 			else
-				tt = GameTooltip
+				-- supplementalTooltip redirects output to the custom tooltip instead of GameTooltip,
+				-- avoiding the taint that any GameTooltip:AddLine() from addon code causes on
+				-- MoneyFrame layout dimensions (silverWidth etc.).
+				tt = self.supplementalTooltip or GameTooltip
 			end
 			if nil ~= value2 then
 				tt:AddDoubleLine(value, value2)
@@ -1579,10 +1582,9 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			end
 		end,
 
-		-- On retail this is called via TooltipDataProcessor.AddTooltipPostCall (secure
-		-- context), so tooltip:AddLine() here does not taint GameTooltip.
-		-- On classic it fires via HookScript("OnTooltipSetUnit") — classic lacks the
-		-- Blizzard code that fails on tainted GameTooltip dimensions.
+		-- Called via TooltipDataProcessor.AddTooltipPostCall (retail) or HookScript("OnTooltipSetUnit")
+		-- (classic).  In both cases tooltip:AddLine() is safe: on retail, tooltip:Show() (which
+		-- triggers layout recalculation) is called by Blizzard after all callbacks in secure context.
 		_CheckNPCTooltip = function(tooltip)
 			if (not UnitIsPlayer("mouseover") or true) then
 				-- check if this npc drops a quest item
@@ -1604,15 +1606,10 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 										end
 									end
 									if nil ~= tooltipMessage then
-										local leftStr = format("|TInterface\\MINIMAP\\ObjectIcons:0:0:0:0:128:128:16:32:16:32|t %s", tooltipMessage)
-										tooltip:AddLine(leftStr)
+										tooltip:AddLine(format("|TInterface\\MINIMAP\\ObjectIcons:0:0:0:0:128:128:16:32:16:32|t %s", tooltipMessage))
 									end
 								end
 							end
-							-- Do NOT call tooltip:Show() here.  TooltipDataProcessor shows
-							-- the tooltip after all post-call callbacks complete.  Calling
-							-- Show() explicitly from addon code triggers MoneyFrame layout
-							-- recalculation and can taint silverWidth / frameWidth.
 						end
 					end
 				end
@@ -1620,9 +1617,9 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 		end,
 
 		-- Called by TooltipDataProcessor.AddTooltipPostCall for Enum.TooltipDataType.Quest on
-		-- retail.  Appends Wholly's status and requirement info to the GameTooltip that Blizzard
-		-- is already showing for the quest, giving one combined tooltip instead of two.
-		-- Runs inside securecallfunction so tooltip:AddLine() is taint-safe.
+		-- retail.  Writes Wholly's status and requirement lines directly into the quest tooltip.
+		-- This is safe: tooltip:Show() (which triggers layout recalculation) is called by
+		-- Blizzard after all callbacks, in secure context, so no taint occurs.
 		_CheckQuestTooltip = function(tooltip, tooltipData)
 			if not WhollyDatabase.displaysBlizzardQuestTooltips then return end
 			local questId = tooltipData and tooltipData.id
@@ -1631,12 +1628,14 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			-- at the NPC-section calls without crashing.
 			local filterCode = Grail:ClassificationOfQuestCode(questId, nil, WhollyDatabase.buggedQuestsConsideredUnobtainable)
 			local dummyFrame = { statusCode = filterCode }
-			-- onlyAddingTooltipToGameTooltip=true routes every _AddLine call to GameTooltip
-			-- and suppresses SetOwner / ClearLines / SetHyperlink / quest-name header so we
-			-- only append Wholly's unique content below what Blizzard already showed.
+			-- onlyAddingTooltipToGameTooltip=true suppresses SetOwner/SetHyperlink/quest-name/
+			-- description/rewards (Blizzard already shows those).  supplementalTooltip redirects
+			-- every _AddLine call into the tooltip being populated (the approved pattern).
+			Wholly.supplementalTooltip = tooltip
 			Wholly.onlyAddingTooltipToGameTooltip = true
 			Wholly:_PopulateTooltipForQuest(dummyFrame, questId)
 			Wholly.onlyAddingTooltipToGameTooltip = false
+			Wholly.supplementalTooltip = nil
 		end,
 
 		---
@@ -2908,18 +2907,16 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 						Wholly:_PopulateTooltipForQuest(frame, questId)
 						GameTooltip:Show()
 					else
-						-- Retail: QuestMapLogTitleButton_OnEnter builds the GameTooltip via
-						-- SetText/AddLine (not SetHyperlink), so TooltipDataType.Quest never
-						-- fires and _CheckQuestTooltip is never called for the quest log.
-						-- Show Wholly's tooltip anchored immediately below GameTooltip so
-						-- the two appear as one seamless combined tooltip.
-						Wholly.tooltip:SetOwner(UIParent, "ANCHOR_NONE")
-						Wholly.briefQuestTooltip = true
+						-- Retail: append Wholly's status lines directly into GameTooltip.
+						-- onlyAddingTooltipToGameTooltip=true skips SetOwner/ClearLines and the
+						-- quest name/description — Blizzard's handler already showed those.
+						-- We then call Show() to resize the tooltip to fit the new lines.
+						Wholly.supplementalTooltip = GameTooltip
+						Wholly.onlyAddingTooltipToGameTooltip = true
 						Wholly:_PopulateTooltipForQuest(frame, questId)
-						Wholly.briefQuestTooltip = false
-						Wholly.tooltip:ClearAllPoints()
-						Wholly.tooltip:SetPoint("TOP", GameTooltip, "BOTTOM", 0, 0)
-						Wholly.tooltip:Show()
+						Wholly.onlyAddingTooltipToGameTooltip = false
+						Wholly.supplementalTooltip = nil
+						GameTooltip:Show()
 					end
 				end
 			end
@@ -3205,14 +3202,12 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			self.currentTt = 1
 			questId = tonumber(questId)
 			if not self.onlyAddingTooltipToGameTooltip then
-				if not self.briefQuestTooltip then
-					self.tt[1]:SetOwner(frame, "ANCHOR_RIGHT")
-				end
+				self.tt[1]:SetOwner(frame, "ANCHOR_RIGHT")
 				self.tt[1]:ClearLines()
 			end
 			if nil == questId then return end
 			if not self.onlyAddingTooltipToGameTooltip then
-				if not Grail.existsClassic and not self.briefQuestTooltip then
+				if not Grail.existsClassic then
 					self.tt[1]:SetHyperlink(format("quest:%d", questId))
 				else
 					self:_AddLine(self:_QuestName(questId))
@@ -3482,33 +3477,38 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			end
 
 			-- Technically we should be able to fetch quest reward information for quests that are not in our quest log
-			self:_AddLine(" ")
-			self:_AddLine(self.s.QUEST_REWARDS .. ":")
-			local rewardXp = 0
-			if not Grail.existsClassic then
-				rewardXp = GetQuestLogRewardXP(questId)
-			end
-			if 0 ~= rewardXp then
-				self:_AddLine(strformat(self.s.GAIN_EXPERIENCE_FORMAT, rewardXp))
-			end
-			local rewardMoney = GetQuestLogRewardMoney(questId)
-			if 0 ~= rewardMoney then
-				self:_AddLine(GetCoinTextureString(rewardMoney))
-			end
-			local numberRewardCurrencies = 0
-			if GetNumQuestLogRewardCurrencies then
+			-- Skip when appending to GameTooltip: Blizzard already shows rewards, and calling GetQuestLogRewardMoney /
+			-- GetQuestLogRewardXP from addon code taints the returned money value, which then propagates into
+			-- Blizzard's MoneyFrame_Update and causes "arithmetic on a secret number (tainted by 'Wholly')".
+			if not self.onlyAddingTooltipToGameTooltip then
+				self:_AddLine(" ")
+				self:_AddLine(self.s.QUEST_REWARDS .. ":")
+				local rewardXp = 0
 				if not Grail.existsClassic then
-					numberRewardCurrencies = GetNumQuestLogRewardCurrencies(questId)
+					rewardXp = GetQuestLogRewardXP(questId)
 				end
-			else
-				local info = C_QuestInfoSystem.GetQuestRewardCurrencies(questId)
-				if info then
-					self:_AddLine(info.name, info.totalRewardAmount, info.texture)
+				if 0 ~= rewardXp then
+					self:_AddLine(strformat(self.s.GAIN_EXPERIENCE_FORMAT, rewardXp))
 				end
-			end
-			for counter = 1, numberRewardCurrencies do
-				local currencyName, currencyTexture, currencyCount = GetQuestLogRewardCurrencyInfo(counter, questId)
-				self:_AddLine(currencyName, currencyCount, currencyTexture)
+				local rewardMoney = GetQuestLogRewardMoney(questId)
+				if 0 ~= rewardMoney then
+					self:_AddLine(GetCoinTextureString(rewardMoney))
+				end
+				local numberRewardCurrencies = 0
+				if GetNumQuestLogRewardCurrencies then
+					if not Grail.existsClassic then
+						numberRewardCurrencies = GetNumQuestLogRewardCurrencies(questId)
+					end
+				else
+					local info = C_QuestInfoSystem.GetQuestRewardCurrencies(questId)
+					if info then
+						self:_AddLine(info.name, info.totalRewardAmount, info.texture)
+					end
+				end
+				for counter = 1, numberRewardCurrencies do
+					local currencyName, currencyTexture, currencyCount = GetQuestLogRewardCurrencyInfo(counter, questId)
+					self:_AddLine(currencyName, currencyCount, currencyTexture)
+				end
 			end
 --	TODO:	Determine whether these API work properly for quests because we are getting Wholly displaying values
 --			that seem to be for the previous quest dealt with.  It is as if the internal counter that Blizzard is
@@ -5132,7 +5132,11 @@ end
 
             local parentFrame = pin.originalParentFrame
 			-- find all quests in range of hover
-            local mx, my = pin:GetPosition()
+			-- Use the stored database coordinates (same scale as npc.x/npc.y) rather than
+			-- pin:GetPosition(), which returns secret numbers from the protected map canvas
+			-- subsystem.  Arithmetic on secret numbers taints the result with 'Wholly' and
+			-- causes errors in Blizzard's AreaPOI tooltip code.
+			local mx, my = pin.xcoord, pin.ycoord
 			local npcList = {}
 			local npcNames = {}
 
@@ -5146,7 +5150,7 @@ end
 				if nil ~= locations then
 					for _, npc in pairs(locations) do
 						if nil ~= npc.x then
-                            local dist = sqrt( (mx - npc.x/100)^2 + (my - npc.y/100)^2 )
+                            local dist = sqrt( (mx - npc.x)^2 + (my - npc.y)^2 )
 --							if dist <= 0.02 or (NxMap1 == parentFrame and npc.id == pin.npcId) then
 							if dist <= 0.02 then
 								if not npcList[npc.id] then
