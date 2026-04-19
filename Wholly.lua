@@ -1622,6 +1622,10 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 		-- Blizzard after all callbacks, in secure context, so no taint occurs.
 		_CheckQuestTooltip = function(tooltip, tooltipData)
 			if not WhollyDatabase.displaysBlizzardQuestTooltips then return end
+			-- When the Wholly panel tooltip calls SetHyperlink, TooltipDataProcessor fires this
+			-- callback.  But _PopulateTooltipForQuest already adds Wholly lines after SetHyperlink
+			-- returns, so skip here to avoid adding them twice.
+			if tooltip == Wholly.tooltip then return end
 			local questId = tooltipData and tooltipData.id
 			if not questId then return end
 			-- Build a minimal frame stand-in so _PopulateTooltipForQuest can read statusCode
@@ -2885,39 +2889,15 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			self:_NPCInfoSectionCore(heading, table, button, meetsCriteria, true)
 		end,
 
+		-- Classic only: called from hooksecurefunc("QuestLogTitleButton_OnEnter", ...).
+		-- Retail uses the QuestMapLogTitleButton_OnEnter hook in _SetupBlizzardQuestLogSupport.
 		_OnEnterBlizzardQuestButton = function(blizzardQuestButton)
-			if WhollyDatabase.displaysBlizzardQuestTooltips then
-				local frame = blizzardQuestButton
-				local questId = blizzardQuestButton.questID
-				-- Prior to BfA beta 26567 this check and reassigning of questId was not needed.
-				-- Now in 26610 it is not needed anymore.
---				if Grail.battleForAzeroth then
---					local questTitle, level, questTag, suggestedGroup, isHeader, isCollapsed, isComplete, isDaily, theQuestId, startEvent = Grail:GetQuestLogTitle(blizzardQuestButton.questLogIndex)
---					questId = theQuestId
---				end
-				if Grail.existsClassic then
-					local questLogIndex = blizzardQuestButton:GetID() + FauxScrollFrame_GetOffset(QuestLogListScrollFrame)
-					local questTitle, level, questTag, suggestedGroup, isHeader, isCollapsed, isComplete, isDaily, theQuestId, startEvent = Grail:GetQuestLogTitle(questLogIndex)
-					questId = theQuestId
-					frame = not isHeader and blizzardQuestButton or nil
-				end
-				if nil ~= frame then
-					if Grail.existsClassic then
-						-- Classic: write directly to GameTooltip (no taint issues there).
-						Wholly:_PopulateTooltipForQuest(frame, questId)
-						GameTooltip:Show()
-					else
-						-- Retail: append Wholly's status lines directly into GameTooltip.
-						-- onlyAddingTooltipToGameTooltip=true skips SetOwner/ClearLines and the
-						-- quest name/description — Blizzard's handler already showed those.
-						-- We then call Show() to resize the tooltip to fit the new lines.
-						Wholly.supplementalTooltip = GameTooltip
-						Wholly.onlyAddingTooltipToGameTooltip = true
-						Wholly:_PopulateTooltipForQuest(frame, questId)
-						Wholly.onlyAddingTooltipToGameTooltip = false
-						Wholly.supplementalTooltip = nil
-						GameTooltip:Show()
-					end
+			if WhollyDatabase.displaysBlizzardQuestTooltips and Grail.existsClassic then
+				local questLogIndex = blizzardQuestButton:GetID() + FauxScrollFrame_GetOffset(QuestLogListScrollFrame)
+				local questTitle, level, questTag, suggestedGroup, isHeader, isCollapsed, isComplete, isDaily, questId = Grail:GetQuestLogTitle(questLogIndex)
+				if not isHeader then
+					Wholly:_PopulateTooltipForQuest(blizzardQuestButton, questId)
+					GameTooltip:Show()
 				end
 			end
 		end,
@@ -4468,23 +4448,33 @@ end
 		_SetupBlizzardQuestLogSupport = function(self)
 			-- Make it so the Blizzard quest log can display our tooltips
 			if not Grail.existsClassic then
-				if QuestMapLogTitleButton_OnEnter then
-					hooksecurefunc("QuestMapLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
-					hooksecurefunc("QuestMapLogTitleButton_OnLeave", function() Wholly.tooltip:Hide() end)
-				end
-				-- Now since the Blizzard UI has probably created a quest frame before I get
-				-- the chance to hook the function I need to go through all the quest frames
-				-- and hook them too.
-				local titles = QuestMapFrame and
-				               QuestMapFrame.QuestsFrame and
-				               QuestMapFrame.QuestsFrame.Contents and
-				               QuestMapFrame.QuestsFrame.Contents.Titles
-				if titles then
-					for i = 1, #(titles) do
-						titles[i]:HookScript("OnEnter", Wholly._OnEnterBlizzardQuestButton)
-						titles[i]:HookScript("OnLeave", function() Wholly.tooltip:Hide() end)
+				-- Retail: hook QuestMapLogTitleButton_OnEnter (fires AFTER GameTooltip:Show()
+				-- returns) and show our supplemental info in our OWN tooltip (tt[1]) anchored
+				-- below GameTooltip.  We never write to GameTooltip from addon context —
+				-- any GameTooltip:AddLine() call in addon context taints its internal minimum-
+				-- width value, which later causes "attempt to compare a secret value" when
+				-- AreaPOI hover calls GameTooltip_InsertFrame.
+				hooksecurefunc("QuestMapLogTitleButton_OnEnter", function(button)
+					if not WhollyDatabase.displaysBlizzardQuestTooltips then return end
+					local questID = button.info and button.info.questID
+					if not questID then return end
+					local filterCode = Grail:ClassificationOfQuestCode(questID, nil, WhollyDatabase.buggedQuestsConsideredUnobtainable)
+					local dummyFrame = { statusCode = filterCode }
+					local ourTooltip = Wholly.tt[1]
+					ourTooltip:SetOwner(GameTooltip, "ANCHOR_BOTTOMLEFT")
+					ourTooltip:ClearLines()
+					Wholly.supplementalTooltip = ourTooltip
+					Wholly.onlyAddingTooltipToGameTooltip = true
+					Wholly:_PopulateTooltipForQuest(dummyFrame, questID)
+					Wholly.onlyAddingTooltipToGameTooltip = false
+					Wholly.supplementalTooltip = nil
+					if ourTooltip:NumLines() > 0 then
+						ourTooltip:Show()
 					end
-				end
+				end)
+				hooksecurefunc("QuestMapLogTitleButton_OnLeave", function()
+					Wholly.tt[1]:Hide()
+				end)
 			else
 				if QuestLogTitleButton_OnEnter then
 					hooksecurefunc("QuestLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
