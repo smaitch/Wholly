@@ -455,6 +455,7 @@
 --			Optimizes quest sorting and caches zone data to prevent hitting display limits.
 --			Adds integration with the Immersion addon.
 --			Corrects highlighting for selected zones in wide panel.
+--			Adds ability to show new profession requirements based not only on level but also by release.
 --
 --	Known Issues
 --
@@ -3065,19 +3066,47 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				local notString = questCode == 'n' and "!" or ""
 				return format("|c%s%s |r|cff%.2x%.2x%.2x%s%s|r", colorCode, CLASS, classColor.r*255, classColor.g*255, classColor.b*255, notString, localizedGenderClassName)
 			elseif questCode == 'P' then
-				local meetsRequirement, actualSkillLevel = GRAIL:ProfessionExceeds(subcode, numeric)
 				local levelCode
-				if meetsRequirement then
-					colorCode = WDB.color['C']
-					levelCode = WDB.color['C']
-				elseif actualSkillLevel ~= GRAIL.NO_SKILL then
-					colorCode = WDB.color['C']
-					levelCode = WDB.color['P']
+				if subcode == '' then
+					-- New format: numeric encodes skillLineID*1000 + minLevel
+					local lineId = math.floor(numeric / 1000)
+					local minLev  = numeric % 1000
+					local meetsRequirement, actualSkillLevel = GRAIL:ProfessionSkillLineExceeds(lineId, minLev)
+					local lineName = tostring(lineId)
+					if C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoBySkillLineID then
+						local info = C_TradeSkillUI.GetProfessionInfoBySkillLineID(lineId)
+						if info and info.professionName and info.professionName ~= '' then lineName = info.professionName end
+					end
+					if meetsRequirement then
+						colorCode = WDB.color['C']
+						levelCode = WDB.color['C']
+					elseif actualSkillLevel > 0 then
+						colorCode = WDB.color['C']
+						levelCode = WDB.color['P']
+					else
+						colorCode = WDB.color['P']
+						levelCode = WDB.color['P']
+					end
+					if minLev > 0 then
+						return format("|c%s%s|r |c%s%d|r [%s]", colorCode, lineName, levelCode, minLev, self.s.PROFESSIONS)
+					else
+						return format("|c%s%s|r [%s]", colorCode, lineName, self.s.PROFESSIONS)
+					end
 				else
-					colorCode = WDB.color['P']
-					levelCode = WDB.color['P']
+					-- Original format: Pxyyy
+					local meetsRequirement, actualSkillLevel = GRAIL:ProfessionExceeds(subcode, numeric)
+					if meetsRequirement then
+						colorCode = WDB.color['C']
+						levelCode = WDB.color['C']
+					elseif actualSkillLevel ~= GRAIL.NO_SKILL then
+						colorCode = WDB.color['C']
+						levelCode = WDB.color['P']
+					else
+						colorCode = WDB.color['P']
+						levelCode = WDB.color['P']
+					end
+					return format("|c%s%s|r |c%s%d|r [%s]", colorCode, GRAIL.professionMapping[subcode], levelCode, numeric, self.s.PROFESSIONS)
 				end
-				return format("|c%s%s|r |c%s%d|r [%s]", colorCode, GRAIL.professionMapping[subcode], levelCode, numeric, self.s.PROFESSIONS)
 			elseif questCode == 'Q' or questCode == 'q' then
 				local comparison = questCode == 'Q' and ">=" or '<'
 				return format("|c%s%s %s %s|r", colorCode, self.s.CURRENTLY_EQUIPPED, comparison, self.s.ILEVEL)
@@ -3626,6 +3655,8 @@ end
 				numeric = Grail:GarrisonBuildingLevelString(numeric)
 			elseif ('K' == code or 'k' == code) then
 				if numeric > 100000000 then numeric = numeric - 100000000 end
+			elseif 'P' == code then
+				numeric = ''	-- level (and profession name) are already embedded in the pretty string
 			end
 			-- If this is a bare numeric prereq quest ID and the target quest has unverified prereqs,
 			-- prefix the quest ID on the right with a green check (verified) or red ? (unverified).
