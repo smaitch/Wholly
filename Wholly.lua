@@ -456,6 +456,9 @@
 --			Adds integration with the Immersion addon.
 --			Corrects highlighting for selected zones in wide panel.
 --			Adds ability to show new profession requirements based not only on level but also by release.
+--		094	Corrects some issues that would cause taint.
+--			The prerequisite notification system needs to be enabled under user control because it taints the action button the objective tracker has, causing it to not work.  Reloading the interface usually resets the taint, and activating the item from the bags usually works as well.
+--			The ability for Wholly to hide Blizzard map pins of any type has been disabled due to taint issues.
 --
 --	Known Issues
 --
@@ -484,6 +487,42 @@ end
 
 local function colorize(colorCode, text)
 	return "|c" .. colorCode .. text .. "|r"
+end
+
+--	File-scope local: called via securecallfunction so that CreateScrollBoxListLinearView and
+--	the mixin/pool machinery it touches are written from clean execution, not from tainted
+--	PLAYER_LOGIN execution.  The anonymous lambda originally here was itself a tainted closure
+--	(created inside _SetupScrollFrame after reading _G["Wholly"]), which caused 15k+ taint entries
+--	in CallbackRegistry / ScrollBox prototype fields.
+local function _WhollyCreateScrollBox(scrollFrameName, frame, sizeX, sizeY, offsetX, offsetY)
+	local scrollFrame = CreateFrame("Frame", scrollFrameName, frame)
+	scrollFrame:SetSize(sizeX, sizeY)
+	scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", offsetX, offsetY)
+
+	local scrollBox = CreateFrame("Frame", scrollFrameName.."ScrollBox", scrollFrame, "WowScrollBoxList")
+	scrollBox:SetAllPoints(scrollFrame)
+
+	local scrollBarBg = CreateFrame("Frame", nil, scrollFrame)
+	scrollBarBg:SetPoint("TOPLEFT",    scrollFrame, "TOPRIGHT",    0, 0)
+	scrollBarBg:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 0, 0)
+	scrollBarBg:SetWidth(18)
+	local scrollBarBgTex = scrollBarBg:CreateTexture(nil, "BACKGROUND")
+	scrollBarBgTex:SetAllPoints()
+	scrollBarBgTex:SetColorTexture(0.06, 0.06, 0.06, 1.0)
+
+	local scrollBar = CreateFrame("EventFrame", scrollFrameName.."ScrollBar", scrollBarBg, "MinimalScrollBar")
+	scrollBar:SetPoint("TOPLEFT",     scrollBarBg, "TOPLEFT",     0, -4)
+	scrollBar:SetPoint("BOTTOMRIGHT", scrollBarBg, "BOTTOMRIGHT", 0,  4)
+
+	local view = CreateScrollBoxListLinearView()
+	view:SetElementExtent(16)
+	ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
+	scrollFrame.scrollBox     = scrollBox
+	scrollFrame.scrollBoxView = view
+	scrollFrame.scrollBar     = scrollBar
+	scrollFrame.buttons       = {}
+	scrollFrame.useScrollBox  = true
+	return scrollFrame
 end
 
 local CloseDropDownMenus					= CloseDropDownMenus
@@ -611,6 +650,163 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 		return frame
 	end
 
+	-- File-scope functions used by _SetupMapPinsProvider.  These MUST be local
+	-- functions defined at this scope (before Wholly = {}) so that they are clean
+	-- values captured as upvalues — NOT written from addon (insecure) code at
+	-- call time.  secureexecuterange does not strip the caller's incoming taint;
+	-- if mapPinsProvider.RefreshAllData were a tainted field, iterating providers
+	-- via secureexecuterange would propagate Wholly's execution taint into ALL
+	-- data-provider callbacks, causing AddWorldQuest to write tainted questID on
+	-- WorldQuestPins and crashing GameTooltip_AddQuest with "reading field 'name'".
+	local function WhollyMapPinsProvider_RemoveAllData(self)
+		self:GetMap():RemoveAllPinsByTemplate(Wholly.mapPinsTemplateName)
+	end
+	local function WhollyMapPinsProvider_RefreshAllData(self, fromOnShow)
+		-- Wrap everything in securecallfunction for two reasons:
+		--   1. Strip any incoming execution taint (e.g. when _UpdatePins is called
+		--      from an insecure config button OnClick handler).
+		--   2. Contain any taint generated inside (e.g. from reading a WhollyDatabase
+		--      field that was written by a config button click this session).
+		--      secureexecuterange does NOT isolate taint between iterations; without
+		--      this wrapper any taint we generate bleeds into the next provider's
+		--      RefreshAllData callback.  When AreaPOIDataProvider runs tainted it
+		--      creates tainted AreaPOI pin references; hovering them causes the
+		--      UIWidgetManager to read widgetInfo.bottomPadding from a tainted table
+		--      and then do arithmetic on a secret textHeight, crashing with
+		--      "reading field bottomPadding" / "arithmetic on secret value".
+		--      securecallfunction restores the caller's clean execution state on
+		--      return, so secureexecuterange continues to the next provider cleanly.
+		securecallfunction(function()
+			-- Outer securecallfunction: strips incoming caller taint (e.g. when
+			-- secureexecuterange calls us after another provider generated taint) and
+			-- restores the caller's clean execution state on return, preventing taint
+			-- from bleeding to the next provider in the secureexecuterange loop.
+			WhollyMapPinsProvider_RemoveAllData(self)   -- runs clean; outer scf stripped caller taint
+			if WhollyDatabase.displaysMapPins then
+				-- Reading WhollyDatabase fields may taint execution here if a config
+				-- button wrote to them this session.  Capture uiMapID now (a plain
+				-- integer from C; clean even from tainted context) then strip that taint
+				-- before entering _DoPlaceMapPins so that every AcquirePin call inside
+				-- runs from clean execution.
+				--
+				-- Why this matters: AcquirePin → MarkCanvasDirty writes
+				-- ScrollContainer.currentScale/ScrollX/ScrollY = nil.  If those writes
+				-- happen from tainted execution the nils are permanently tainted values.
+				-- Later, QuestDataProvider (running clean) calls AcquirePin →
+				-- MarkCanvasDirty → reads tainted currentScale → execution taints →
+				-- reads secret targetScrollY → "reading field targetScrollY" crash.
+				-- Tainted AcquirePin also creates tainted pin frame references; hovering
+				-- an AreaPOI that overlaps a Wholly pin causes AddSuppressedPinsToTooltip
+				-- to clone the tainted Wholly pin frame → "compare secret number value".
+				local uiMapID = self:GetMap():GetMapID()
+				if not uiMapID then return end
+				Wholly.zoneInfo.pins.mapId = uiMapID
+				securecallfunction(function()
+					-- Inner securecallfunction: strips any taint accumulated above
+					-- (from reading WhollyDatabase fields) before AcquirePin is called.
+					Wholly:_DoPlaceMapPins(self:GetMap(), uiMapID)
+				end)
+				-- Outer securecallfunction context is CLEAN here: WhollyDatabase.displaysMapPins
+				-- is clean (written via securecallfunction in all OnClick handlers), so reading
+				-- it above did not taint the outer context; inner scf restores the outer context
+				-- on return.  Re-write ScrollContainer fields cleanly to overwrite any tainted
+				-- nils that MarkCanvasDirty may have stored during _DoPlaceMapPins when Grail
+				-- data tables were tainted (e.g. by a "/grail savepins" slash command).
+				-- Without this, AreaPOIDataProvider's clean MarkCanvasDirty reads the tainted
+				-- nil for currentScale, taints execution, and writes a tainted self.style on the
+				-- AreaPOI pin, causing "reading field bottomPadding" / "arithmetic on secret
+				-- value" / "compare secret value" crashes on hover.
+				local sc = self:GetMap().ScrollContainer
+				if sc then
+					sc.currentScale = nil
+					sc.currentScrollX = nil
+					sc.currentScrollY = nil
+				end
+			else
+				Wholly.mapCountLine = ""
+			end
+		end)
+	end
+
+	-- Create the map pins provider at FILE SCOPE (clean execution, before any PLAYER_LOGIN
+	-- tainted code runs).  This ensures ALL fields copied from MapCanvasDataProviderMixin —
+	-- especially SignalEvent and OnAdded, which Blizzard_MapCanvas.lua reads via
+	-- secureexecuterange — are CLEAN VALUES.
+	--
+	-- Why file scope is required (and securecallfunction alone is not sufficient):
+	--   An anonymous lambda passed to securecallfunction is itself CREATED in tainted
+	--   execution (the PLAYER_LOGIN handler).  The resulting closure object is a tainted
+	--   value.  When securecallfunction calls it, the Lua VM reads the closure's upvalue
+	--   slots as part of executing the closure body; reading any slot of a tainted closure
+	--   object retaints execution before CreateFromMixins can finish copying the mixin
+	--   fields cleanly.  The C-level CreateFromMixins then makes tainted writes for all
+	--   subsequent fields (including OnAdded, SignalEvent), defeating the protection.
+	--
+	--   A file-scope local function (or an object created here at file scope) is created
+	--   in clean execution: its closure object and all upvalue slots are clean values.
+	--   securecallfunction (or direct file-scope execution) can therefore call it without
+	--   any upvalue read retainting execution.
+	--
+	-- Create the provider using setmetatable / __index instead of CreateFromMixins.
+	-- CreateFromMixins COPIES every mixin field into the new table (in tainted addon
+	-- context), making each field a tainted value — including SignalEvent, which
+	-- Blizzard_MapCanvas.lua:117 reads via secureexecuterange.  A tainted SignalEvent
+	-- means that reading it taints execution, causing every subsequent provider in the
+	-- secureexecuterange loop to run tainted.
+	--
+	-- With setmetatable + __index, SignalEvent (and OnAdded, GetMap, etc.) are NOT
+	-- direct fields on our table — they live in MapCanvasDataProviderMixin (Blizzard's
+	-- clean table).  When secureexecuterange reads provider.SignalEvent, the __index
+	-- lookup returns MapCanvasDataProviderMixin.SignalEvent — a clean Blizzard value —
+	-- so execution does NOT taint.
+	--
+	-- Our own methods (RemoveAllData, RefreshAllData) are stored directly so that our
+	-- custom behaviour is used instead of the mixin's no-ops.
+	local _whollyMapPinsProvider = setmetatable(
+		{
+			RemoveAllData = WhollyMapPinsProvider_RemoveAllData,
+			RefreshAllData = WhollyMapPinsProvider_RefreshAllData,
+		},
+		{ __index = MapCanvasDataProviderMixin }
+	)
+	WorldMapFrame:AddDataProvider(_whollyMapPinsProvider)
+
+	-- File-scope wrapper so _SetupWhollyQuestPanel runs from clean execution.
+	-- PLAYER_LOGIN is always tainted execution (addon event handlers are insecure).
+	-- Calling Wholly:_SetupWhollyQuestPanel() directly from PLAYER_LOGIN means all
+	-- frame creation inside it (CreateFrame, CreateScrollBoxListLinearView, Mixin
+	-- prototype writes) runs in tainted execution, permanently tainting those shared
+	-- prototype fields.  A file-scope named function has a clean closure object;
+	-- securecallfunction can call it without retainting from upvalue reads, so every
+	-- frame and mixin created inside _SetupWhollyQuestPanel is written from clean
+	-- execution.  This also makes the anonymous lambda inside _SetupScrollFrame (line
+	-- 5070) a clean closure when securecallfunction calls it, since _SetupScrollFrame
+	-- runs from within the clean _WhollySetupQuestPanel execution.
+	local function _WhollySetupQuestPanel()
+		Wholly:_SetupWhollyQuestPanel()
+	end
+
+	-- File-scope wrapper so _SetupSearchFrame runs from clean execution.
+	-- Same reasoning as _WhollySetupQuestPanel above: creates frames with BackdropTemplate
+	-- and FontString mixins that must be created from clean execution to avoid permanently
+	-- tainting the mixin prototype fields that Blizzard's secure code reads later.
+	local function _WhollySetupSearchFrame()
+		Wholly:_SetupSearchFrame()
+	end
+
+	-- File-scope helper: creates a ScrollBox DataProvider and assigns it.
+	-- Called via securecallfunction(_, scrollBox, flatList) so that CreateDataProvider
+	-- and SetDataProvider run from clean execution even when ScrollFrame_Update is
+	-- invoked from a tainted event handler (e.g. ZONE_CHANGED_NEW_AREA).
+	-- NOTE: if flatList itself is a tainted table reference (built during tainted
+	-- ScrollFrame_Update), reading flatList[i] inside here will retaint execution;
+	-- that is an inherent limit of the taint model for data flowing from tainted
+	-- execution.  However the function itself remains a clean closure, ensuring that
+	-- no additional permanent taint is introduced beyond what the data carries.
+	local function _WhollyScrollBoxSetDataProvider(scrollBox, flatList)
+		scrollBox:SetDataProvider(CreateDataProvider(flatList))
+	end
+
 	Wholly = {
 
 		cachedMapCounts = {},
@@ -710,21 +906,44 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 --									WorldMapFrame_Update()
 								end,
 		ToggleWorldMapFrameMixin = function(provider, shouldHide)
+			-- Feature disabled: hiding Blizzard data providers is inherently taint-risky.
+			-- Any path that calls RemoveAllData() on a Blizzard provider from tainted
+			-- execution corrupts that provider's pin pool, making subsequent Acquire()
+			-- calls return tainted pin references.  Reading any field from a tainted pin
+			-- reference (e.g. pin.questID in TaskPOI_OnEnter) then taints GameTooltip
+			-- rendering code, causing "reading field name" and "arithmetic on secret value"
+			-- crashes.  Leave all code below intact for potential future re-enablement.
+			if true then return end
+			-- IMPORTANT: Do NOT write to mixin.RefreshAllData from insecure (addon) code.
+			-- Any write to that field — whether a no-op or a restore of the original —
+			-- taints the field.  secureexecuterange reads dataProvider.RefreshAllData when
+			-- iterating providers; reading the tainted field propagates Wholly's execution
+			-- taint into the RefreshAllData callback.  All pins acquired during that tainted
+			-- callback then carry tainted fields (questID, poiInfo, etc.).  Hovering those
+			-- pins later reads the tainted field, propagating taint into GameTooltip rendering
+			-- code and crashing EmbeddedItemTooltip_UpdateSize / UIWidget text setup.
+			--
+			-- NOTE: The hiddenProviders approach (tracking which Blizzard providers the
+			-- user wants hidden and calling mixin:RemoveAllData() on them) has been
+			-- disabled.  Any call to RemoveAllData() on a Blizzard provider from tainted
+			-- execution corrupts that provider's pin pool and causes hover crashes.
+			-- The entire ToggleWorldMapFrameMixin body is disabled via early return;
+			-- Wholly.hiddenProviders is never populated.
+			securecallfunction(function(p, sh)
+				if not Wholly.hiddenProviders then
+					Wholly.hiddenProviders = {}
+				end
+				Wholly.hiddenProviders[p] = sh
+			end, provider, shouldHide)
 			local mixins = Wholly.GetMapProvidersForMixin(WorldMapFrame, provider)
 			if nil ~= mixins then
-				Wholly.mixinsRefreshAllData = Wholly.mixinsRefreshAllData or {} 	-- key is the provider, value is its original implementation of RefreshAllData
-				if nil == Wholly.mixinsRefreshAllData[provider] then
-					Wholly.mixinsRefreshAllData[provider] = provider.RefreshAllData
-				end
-				for _, mixin in pairs(mixins) do
-					if shouldHide then
-						mixin.RefreshAllData = function(fromOnShow) end
-						mixin:RemoveAllData()
-					else
-						mixin.RefreshAllData = Wholly.mixinsRefreshAllData[provider]
-						mixin:RefreshAllData(false)
+				if shouldHide then
+					for _, mixin in pairs(mixins) do
+						securecallfunction(function(m) m:RemoveAllData() end, mixin)
 					end
 				end
+				-- For shouldHide = false: do nothing. Blizzard's natural event system will
+				-- repopulate pins on the next map refresh (via secure secureexecuterange).
 			end
 		end,
 		configurationScript17 = function(self)
@@ -795,6 +1014,10 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 										end
 									end
 								end,
+		configurationScript27 = function(self)
+									-- Prereq tracker module toggle requires a reload to take effect.
+									print(Wholly.s.PREREQ_TRACKER_RELOAD)
+								end,
 		coordinates = nil,
 		currentFrame = nil,
 		currentMaximumTooltipLines = 50,
@@ -837,6 +1060,7 @@ if nil == Wholly or Wholly.versionNumber < Wholly_File_Version then
 				self:BreadcrumbUpdate(frame)
 			end,
 			['QUEST_GREETING'] = function(self, frame)
+				if not com_mithrandir_whollyQuestInfoFrameText then return end
 				com_mithrandir_whollyQuestInfoFrameText:SetText("")
 				com_mithrandir_whollyQuestInfoBuggedFrameText:SetText("")
 				com_mithrandir_whollyBreadcrumbFrame:Hide()
@@ -875,24 +1099,12 @@ self.checkedGrailVersion = true
 
 					self:_RegisterSlashCommand()
 
-					self:_SetupWhollyQuestPanel()
-
-					self:_SetupSearchFrame()
-
-com_mithrandir_whollyFrameTitleText:SetText("Wholly ".. com_mithrandir_whollyFrameTitleText:GetText())
-com_mithrandir_whollyFrameWideTitleText:SetText("Wholly ".. com_mithrandir_whollyFrameWideTitleText:GetText())
-
-self.toggleButton = CreateFrame("Button", "com_mithrandir_whollyFrameHiddenToggleButton", com_mithrandir_whollyFrame, "SecureHandlerClickTemplate")
-self.toggleButton:SetAttribute("_onclick", [=[
-local parent = self:GetParent()
-if parent:IsShown() then
-parent:Hide()
-else
-parent:Show()
-end
-]=])
-
-self.currentFrame = com_mithrandir_whollyFrame
+					-- Create a simple (non-secure) hidden toggle button now so that other
+					-- systems (LDB, minimap icons, macros) have a frame to click on.
+					-- The actual Wholly panel frames are created lazily on first open via
+					-- _EnsureUICreated(), which is called from ToggleUI().
+					self.toggleButton = CreateFrame("Button", "com_mithrandir_whollyFrameHiddenToggleButton", UIParent)
+					self.toggleButton:SetScript("OnClick", function() Wholly:ToggleUI() end)
 
 -- The frame is not allowing button presses to things just on the outside of its bounds so we move the hit rect
 --frame:SetHitRectInsets(0, 32, 0, 84)
@@ -921,68 +1133,32 @@ if Grail.existsClassic then
 	end)
 end
 
--- Dragonflight introduces new tool tip processing
+-- Tooltip processing hooks.
 if TooltipDataProcessor then
 	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, Wholly._CheckNPCTooltip)
-	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Quest, Wholly._CheckQuestTooltip)
+	-- Path 1: quest tooltips shown via the ProcessInfo/SetHyperlink pipeline — quest links
+	-- in chat, Wholly's own gossip quest ID display, etc.  tooltipData.id is the questID.
+	-- The tooltip frame may be GameTooltip or a Wholly-owned frame; _ShowSupplementalQuestTooltip
+	-- guards the latter.
+	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Quest, function(tooltip, tooltipData)
+		Wholly:_ShowSupplementalQuestTooltip(tooltip, tooltipData and tooltipData.id)
+	end)
 else
 	GameTooltip:HookScript("OnTooltipSetUnit", Wholly._CheckNPCTooltip)
 end
-
-					self:_SetupBlizzardQuestLogSupport()
-					self:_SetupQuestInfoFrame()
-
-				-- Create the bugged quest info frame (moved from Wholly.xml)
-				do
-					local f = CreateFrame("Frame", "com_mithrandir_whollyQuestInfoBuggedFrame", QuestFrame)
-					f:SetSize(180, 14)
-					f:EnableMouse(true)
-					local fs = f:CreateFontString("com_mithrandir_whollyQuestInfoBuggedFrameText", "BACKGROUND", "GameFontNormal")
-					fs:SetSize(180, 20)
-					fs:SetJustifyH("LEFT")
-					fs:SetText("None")
-				end
-
-				-- Create the breadcrumb frame (moved from Wholly.xml)
-				do
-					local f = CreateFrame("Frame", "com_mithrandir_whollyBreadcrumbFrame", QuestFrame)
-					f:SetSize(360, 128)
-					f:EnableMouse(true)
-					f:SetFrameStrata("MEDIUM")
-					f:Hide()
-					f:SetScript("OnMouseDown", function(self) Wholly:BreadcrumbClick(self) end)
-					f:SetScript("OnEnter", function(self) Wholly:BreadcrumbEnter(self) end)
-					f:SetScript("OnLeave", function(self) Wholly.tooltip:Hide() end)
-					local tex = f:CreateTexture(nil, "ARTWORK")
-					tex:SetTexture("Interface\\TUTORIALFRAME\\UI-TutorialFrame-QuestGiver")
-					tex:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
-					local msg = f:CreateFontString("com_mithrandir_whollyBreadcrumbFrameMessage", "ARTWORK", "GameFontHighlightMedium")
-					msg:SetSize(300, 22)
-					msg:SetJustifyH("LEFT")
-					msg:SetText("Breadcrumb Quest Available")
-					msg:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 75, 54)
-				end
-
--- Our frame positions are wrong for MoP, so we change them here.
-com_mithrandir_whollyQuestInfoBuggedFrame:SetPoint("TOPLEFT", QuestFrame, "TOPLEFT", 100, -35)
-if Grail.existsClassic then
-com_mithrandir_whollyBreadcrumbFrame:SetPoint("TOPLEFT", QuestFrame, "BOTTOMLEFT", 16, 70)
-else
-com_mithrandir_whollyBreadcrumbFrame:SetPoint("TOPLEFT", QuestFrame, "BOTTOMLEFT", 16, -10)
-end
-
-if "deDE" == GetLocale() then
-com_mithrandir_whollyFramePreferencesButton:SetText("Einstellungen")
-end
-if "ruRU" == GetLocale() then
-com_mithrandir_whollyFrameSortButton:SetText("Сортировать")
-end
-
-com_mithrandir_whollyFrameSwitchZoneButton:SetText(self.s.MAP)
-com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
-
-					-- Integrate into Immersion, which replaces the quest frame
-					self:_SetupImmersionIntegration()
+-- Bridge for Path 2: world quest pins call GameTooltip_AddQuest(questData) directly,
+-- bypassing the ProcessInfo pipeline entirely, so AddTooltipPostCall never fires for them.
+-- questData is the pin object (TaskPOI pin etc.) whose .questID field holds the quest ID;
+-- GameTooltip is the frame being populated.
+hooksecurefunc("GameTooltip_AddQuest", function(questData)
+	Wholly:_ShowSupplementalQuestTooltip(GameTooltip, questData.questID)
+end)
+-- Hide tt[1] whenever GameTooltip hides.
+GameTooltip:HookScript("OnHide", function()
+	if Wholly.tt and Wholly.tt[1] then
+		Wholly.tt[1]:Hide()
+	end
+end)
 
 					local Grail = Grail
 					local TomTom = TomTom
@@ -1072,6 +1248,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 					frame:RegisterEvent("QUEST_PROGRESS")
 					frame:RegisterEvent("QUEST_TURNED_IN")			-- for prereq verify tracker module
 					frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")	-- this is for the panel
+					self:_SetupQuestFrameOverlays()					-- quest ID label, bugged label, breadcrumb — needed before first QUEST_DETAIL
 					self:UpdateBreadcrumb()							-- sets up registration of events for breadcrumbs based on user preferences
 					if not WDB.shouldNotRestoreDirectionalArrows then
 						self:_ReinstateDirectionalArrows()
@@ -1119,10 +1296,6 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 						end
 					end
 
-					if not MenuUtil then
-						self.easyMenuFrame = CreateFrame("Frame", "com_mithrandir_whollyEasyMenu", self.currentFrame, "UIDropDownMenuTemplate")
-						self.easyMenuFrame:Hide()
-					end
 					StaticPopupDialogs["com_mithrandir_whollyTagDelete"] = {
 						text = CONFIRM_COMPACT_UNIT_FRAME_PROFILE_DELETION,
 						button1 = ACCEPT,
@@ -1138,7 +1311,6 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 						}
 
 					self:_InitializeLevelOneData()
-					if WDB.useWidePanel then self:ToggleCurrentFrame() end
 
 --				end	-- matching the if arg1 == "Wholly" then
 			end,
@@ -1146,12 +1318,14 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				self.zoneInfo.zone.mapId = Grail.GetCurrentMapAreaID()
 				self:UpdateCoordinateSystem()
 				self:_RefreshPrereqVerifyActive()
-				if Wholly.prereqModule then
-					Wholly.prereqModule:MarkDirty()
-				else
-					-- Defer one tick so ObjectiveTrackerManager.Init() runs first
-					-- (it also defers via ContinueAfterAllEvents on PLAYER_ENTERING_WORLD)
-					C_Timer.After(0, function() Wholly:_SetupPrereqVerifyModule() end)
+				if WhollyDatabase.usesPrereqTrackerModule then
+					if Wholly.prereqModule then
+						Wholly.prereqModule:MarkDirty()
+					else
+						-- Defer one tick so ObjectiveTrackerManager.Init() runs first
+						-- (it also defers via ContinueAfterAllEvents on PLAYER_ENTERING_WORLD)
+						C_Timer.After(0, function() Wholly:_SetupPrereqVerifyModule() end)
+					end
 				end
 			end,
 			['ZONE_CHANGED_NEW_AREA'] = function(self, frame)
@@ -1159,10 +1333,16 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				local Grail = Grail
 
 				self.zoneInfo.zone.mapId = Grail.GetCurrentMapAreaID()
-				if WDB.updatesWorldMapOnZoneChange and WorldMapFrame:IsVisible() then
-					WorldMapFrame:SetMapID(self.zoneInfo.zone.mapId)
---					OpenWorldMap(self.zoneInfo.zone.mapId)	-- does not work on Classic, Blizzard errors
-				end
+				-- NOTE: Do NOT call WorldMapFrame:SetMapID() or OpenWorldMap() here.
+				-- Any such call from addon (insecure) context causes SetMapID → OnMapChanged
+				-- → secureexecuterange → AreaPOIDataProvider:RefreshAllData → AcquirePin →
+				-- OnAcquired to run with Wholly's execution taint.  That taints pin.poiInfo,
+				-- which then taints execution when the user hovers an AreaPOI, crashing the
+				-- UIWidget text rendering (Blizzard_UIWidgetTemplateTextWithState.lua:35).
+				-- secureexecuterange does NOT strip the caller's incoming taint.
+				-- The updatesWorldMapOnZoneChange preference is kept for the quest-panel
+				-- and pin-filtering side-effects (via configurationScript1), but the actual
+				-- map navigation on zone-change cannot be done from addon code safely.
 				self:UpdateQuestCaches(false, false, WDB.updatesPanelWhenZoneChanges, true)
 
                 --	When first entering a zone for the first time the NPCs need to be studied to see whether their
@@ -1323,6 +1503,8 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			['PANEL_UPDATES'] = "Quest log panel updates when zones change",
 			['SHOW_BREADCRUMB'] = "Display breadcrumb quest information on Quest Frame",
 			['SHOW_BREADCRUMB_MESSAGE'] = "Display breadcrumb message in chat",
+			['PREREQ_TRACKER_MODULE'] = "Show prerequisite quests in Objective Tracker (reload required)",
+			['PREREQ_TRACKER_RELOAD'] = "Wholly: Prerequisite tracker module change takes effect after /reload",
 			['SHOW_LOREMASTER'] = "Show only Loremaster quests",
 			['ENABLE_COORDINATES'] = "Enable player coordinates",
 			['ACHIEVEMENT_COLORS'] = "Show achievement completion colors",
@@ -1516,6 +1698,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 		end,
 
 		BreadcrumbUpdate = function(self, frame, shouldHide)
+			if not com_mithrandir_whollyQuestInfoFrameText then return end
 			local questId = self:_BreadcrumbQuestId()
 			com_mithrandir_whollyQuestInfoFrameText:SetText(questId)
 			self:UpdateBuggedText(questId)
@@ -1617,30 +1800,83 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			end
 		end,
 
-		-- Called by TooltipDataProcessor.AddTooltipPostCall for Enum.TooltipDataType.Quest on
-		-- retail.  Writes Wholly's status and requirement lines directly into the quest tooltip.
-		-- This is safe: tooltip:Show() (which triggers layout recalculation) is called by
-		-- Blizzard after all callbacks, in secure context, so no taint occurs.
-		_CheckQuestTooltip = function(tooltip, tooltipData)
+		-- Single unified routine for all supplemental quest tooltip display.
+		-- Called from two paths:
+		--   1. TooltipDataProcessor.AddTooltipPostCall(Quest) — SetHyperlink/ProcessInfo path
+		--      (quest links in chat, Wholly's own gossip quest ID display, etc.)
+		--   2. hooksecurefunc("GameTooltip_AddQuest") bridge — world quest pins, which call
+		--      GameTooltip_AddQuest directly and bypass the ProcessInfo pipeline entirely
+		--
+		-- Path 3 (QuestMapLogTitleButton_OnEnter) is handled inline in
+		-- _SetupBlizzardQuestLogSupport rather than here, because that path runs in secure
+		-- context (hooksecurefunc) where SetOwner(GameTooltip, ...) is safe.
+		--
+		-- Defers via C_Timer.After(0) so tooltip:Show() has completed before we position
+		-- tt[1] below it.  Uses SetOwner(UIParent, "ANCHOR_NONE") + explicit SetPoint rather
+		-- than SetOwner(tooltip, "ANCHOR_BOTTOMLEFT"), because passing GameTooltip as the
+		-- owner argument from insecure context (C_Timer callbacks are always insecure) taints
+		-- GameTooltipMoneyFrame1 via internal WoW layout writes, causing
+		-- "reading field info" / "arithmetic on a secret value" taint errors in
+		-- MoneyFrame_Update whenever a loot-alert tooltip with money is subsequently shown.
+		_ShowSupplementalQuestTooltip = function(self, tooltip, questId)
 			if not WhollyDatabase.displaysBlizzardQuestTooltips then return end
-			-- When the Wholly panel tooltip calls SetHyperlink, TooltipDataProcessor fires this
-			-- callback.  But _PopulateTooltipForQuest already adds Wholly lines after SetHyperlink
-			-- returns, so skip here to avoid adding them twice.
+			-- Skip Wholly's own tooltip frames.  Those cases (e.g. gossip quest ID hover,
+			-- which calls tt[1]:SetHyperlink) are managed directly by the initiating code
+			-- and do not need supplemental content added via hooks.
 			if tooltip == Wholly.tooltip then return end
-			local questId = tooltipData and tooltipData.id
 			if not questId then return end
-			-- Build a minimal frame stand-in so _PopulateTooltipForQuest can read statusCode
-			-- at the NPC-section calls without crashing.
-			local filterCode = Grail:ClassificationOfQuestCode(questId, nil, WhollyDatabase.buggedQuestsConsideredUnobtainable)
-			local dummyFrame = { statusCode = filterCode }
-			-- onlyAddingTooltipToGameTooltip=true suppresses SetOwner/SetHyperlink/quest-name/
-			-- description/rewards (Blizzard already shows those).  supplementalTooltip redirects
-			-- every _AddLine call into the tooltip being populated (the approved pattern).
-			Wholly.supplementalTooltip = tooltip
-			Wholly.onlyAddingTooltipToGameTooltip = true
-			Wholly:_PopulateTooltipForQuest(dummyFrame, questId)
-			Wholly.onlyAddingTooltipToGameTooltip = false
-			Wholly.supplementalTooltip = nil
+			-- Do NOT call ClassificationOfQuestCode here (before the C_Timer), because this
+			-- function is called from hooksecurefunc("GameTooltip_AddQuest", ...) which fires
+			-- from tainted OnEnter execution.  Calling ClassificationOfQuestCode from tainted
+			-- execution causes StatusCode to cache a TAINTED INTEGER in Grail.questStatuses.
+			-- Once cached, every subsequent StatusCode call for that questID returns the
+			-- tainted value, which poisons _ClassifyQuestsInMap even inside securecallfunction,
+			-- making AcquirePin → MarkCanvasDirty write tainted nils to ScrollContainer, which
+			-- then taints AreaPOI pin creation and causes bottomPadding/secret value crashes.
+			-- The fix: defer the call into the C_Timer securecallfunction body so it runs
+			-- from clean execution and any StatusCode result cached is clean.
+			C_Timer.After(0, function()
+				-- Wrap everything in securecallfunction so all writes to Wholly fields
+				-- (supplementalTooltip, onlyAddingTooltipToGameTooltip) and all frame
+				-- operations are clean.  C_Timer callbacks always run from insecure
+				-- (tainted) execution context; without this wrapper:
+				--   1. Wholly.supplementalTooltip and onlyAddingTooltipToGameTooltip
+				--      are written taintedly and become permanently tainted.
+				--   2. Subsequent secure code that reads them (via _AddLine) has its
+				--      execution tainted, which propagates into any _UpdatePins call,
+				--      causing tainted RefreshAllData execution and tainted pin creation.
+				--   3. Tainted pin references in suppressed-pin lists corrupted the
+				--      WorldQuestPin pool's inactiveObjects table with tainted pin
+				--      references.  The next pool:Acquire() returned a tainted pin, and
+				--      reading taintedPin.questID in TaskPOI_OnEnter tainted execution,
+				--      causing GameTooltip_AddQuest to crash with "reading field 'name'".
+				securecallfunction(function()
+					local filterCode = Grail:ClassificationOfQuestCode(questId, nil, WhollyDatabase.buggedQuestsConsideredUnobtainable)
+					local dummyFrame = { statusCode = filterCode }
+					if not tooltip:IsShown() then return end
+					local ourTooltip = Wholly.tt[1]
+					ourTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+					ourTooltip:ClearAllPoints()
+					-- Use absolute coordinates rather than anchoring relative to tooltip
+					-- (GameTooltip), because passing GameTooltip as an anchor frame from
+					-- insecure context taints GameTooltip's layout dimensions, causing
+					-- EmbeddedItemTooltip_UpdateSize to fail with "arithmetic on secret
+					-- value" when world quest pins are hovered.  With securecallfunction
+					-- this risk is gone, but we keep UIParent anchoring for clarity.
+					local x = tooltip:GetLeft()
+					local y = tooltip:GetBottom()
+					ourTooltip:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
+					ourTooltip:ClearLines()
+					Wholly.supplementalTooltip = ourTooltip
+					Wholly.onlyAddingTooltipToGameTooltip = true
+					Wholly:_PopulateTooltipForQuest(dummyFrame, questId)
+					Wholly.onlyAddingTooltipToGameTooltip = false
+					Wholly.supplementalTooltip = nil
+					if ourTooltip:NumLines() > 0 then
+						ourTooltip:Show()
+					end
+				end)
+			end)
 		end,
 
 		---
@@ -1894,8 +2130,22 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 				button:SetPoint("TOPLEFT", panel, "TOPLEFT", (indentLevel * 200) + 8 + wellOffset, (lineLevel * -22) + 18 + offset)
 				if self.configuration[panel.name][i][2] then
 					button:SetScript("OnClick", function(self)
-													WhollyDatabase[Wholly.configuration[panel.name][i][2]] = self:GetChecked()
-													Wholly[Wholly.configuration[panel.name][i][3]](self)
+													-- OnClick fires from tainted (insecure) execution.  Capturing fieldName
+													-- and scriptName from the config table (written at load time = clean values)
+													-- and checked from GetChecked() (C API return = always clean) lets us
+													-- write WhollyDatabase cleanly via securecallfunction.  Without this,
+													-- every WhollyDatabase filter field written here becomes permanently
+													-- tainted for the session, and _ClassifyQuestsInMap/_FilterQuests
+													-- reading those fields re-taint execution inside _DoPlaceMapPins,
+													-- causing AcquirePin to run tainted, MarkCanvasDirty to write tainted
+													-- nils into ScrollContainer, and AreaPOI pin pool corruption on hover.
+													local fieldName = Wholly.configuration[panel.name][i][2]
+													local scriptName = Wholly.configuration[panel.name][i][3]
+													local checked = self:GetChecked()
+													securecallfunction(function()
+														WhollyDatabase[fieldName] = checked
+														Wholly[scriptName](self)
+													end)
 												end)
 					if nil ~= self.configuration[panel.name][i][5] then
 						self[self.configuration[panel.name][i][5]] = button
@@ -2822,6 +3072,7 @@ com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
 			db.displaysMapPinsTurninIncomplete = false
 			db.hidesImmersionRelatedQuests = false
 			db.hidesImmersionAttribution = false
+			db.usesPrereqTrackerModule = false
 			db.version = Wholly.versionNumber
 			WhollyDatabase = db
 			return db
@@ -3973,11 +4224,13 @@ end
 
 		ScrollFrameOne_Update = function(self, preserveScroll)
 			self = Wholly
+			if not self.currentFrame then return end	-- UI not created yet (lazy init)
 			self:ScrollFrameGeneral_Update(self.levelOneData, com_mithrandir_whollyFrameWideScrollOneFrame, preserveScroll)
 		end,
 
 		ScrollFrameTwo_Update = function(self, preserveScroll)
 			self = Wholly
+			if not self.currentFrame then return end	-- UI not created yet (lazy init)
 			self:_InitializeLevelTwoData()
 			self:ScrollFrameGeneral_Update(self.levelTwoData, com_mithrandir_whollyFrameWideScrollTwoFrame, preserveScroll)
 		end,
@@ -4246,6 +4499,7 @@ end
 
 		ScrollFrame_Update = function(self)
 			self = Wholly
+			if not self.currentFrame then return end	-- UI not created yet (lazy init)
 			self:_FilterPanelQuests()
 			local questsInMap = self.filteredPanelQuests
 			local numEntries = #questsInMap
@@ -4266,8 +4520,12 @@ end
 						prettyString = self:_PrettyQuestString(entry),
 					})
 				end
-				local provider = CreateDataProvider(flatList)
-				mainScrollFrame.scrollBox:SetDataProvider(provider)
+				-- _WhollyScrollBoxSetDataProvider is a file-scope named function (clean
+				-- closure).  Pass scrollBox and flatList as arguments so they are not
+				-- captured as upvalues of a tainted lambda.  CreateDataProvider and
+				-- SetDataProvider run from clean execution, minimising tainted writes to
+				-- the DataProvider's internal fields.
+				securecallfunction(_WhollyScrollBoxSetDataProvider, mainScrollFrame.scrollBox, flatList)
 				return
 			end
 
@@ -4479,29 +4737,41 @@ end
 		_SetupBlizzardQuestLogSupport = function(self)
 			-- Make it so the Blizzard quest log can display our tooltips
 			if not Grail.existsClassic then
-				-- Retail: hook QuestMapLogTitleButton_OnEnter (fires AFTER GameTooltip:Show()
-				-- returns) and show our supplemental info in our OWN tooltip (tt[1]) anchored
-				-- below GameTooltip.  We never write to GameTooltip from addon context —
-				-- any GameTooltip:AddLine() call in addon context taints its internal minimum-
-				-- width value, which later causes "attempt to compare a secret value" when
-				-- AreaPOI hover calls GameTooltip_InsertFrame.
+				-- Path 3: the Blizzard quest log on the world map uses its own direct tooltip
+				-- path (neither ProcessInfo nor GameTooltip_AddQuest), so neither of the other
+				-- two paths fires.  Hook OnEnter/OnLeave directly.
+				--
+				-- QuestMapLogTitleButton_OnEnter is a normal (non-protected) OnEnter handler
+				-- and runs from TAINTED execution (mouse hover).  hooksecurefunc inherits
+				-- whatever context the hooked function was called from — it does NOT make
+				-- the callback secure.  Without securecallfunction:
+				--   • ClassificationOfQuestCode → StatusCode runs tainted → caches a TAINTED
+				--     INTEGER in Grail.questStatuses; subsequent StatusCode calls return the
+				--     tainted value, which poisons _ClassifyQuestsInMap even inside inner scf.
+				--   • Wholly.supplementalTooltip and onlyAddingTooltipToGameTooltip are
+				--     written taintedly and become permanently tainted fields.
+				-- GameTooltip is already shown when OnEnter fires, so we can call
+				-- SetOwner(GameTooltip, ...) synchronously inside securecallfunction —
+				-- no C_Timer deferral needed.
 				hooksecurefunc("QuestMapLogTitleButton_OnEnter", function(button)
-					if not WhollyDatabase.displaysBlizzardQuestTooltips then return end
-					local questID = button.info and button.info.questID
-					if not questID then return end
-					local filterCode = Grail:ClassificationOfQuestCode(questID, nil, WhollyDatabase.buggedQuestsConsideredUnobtainable)
-					local dummyFrame = { statusCode = filterCode }
-					local ourTooltip = Wholly.tt[1]
-					ourTooltip:SetOwner(GameTooltip, "ANCHOR_BOTTOMLEFT")
-					ourTooltip:ClearLines()
-					Wholly.supplementalTooltip = ourTooltip
-					Wholly.onlyAddingTooltipToGameTooltip = true
-					Wholly:_PopulateTooltipForQuest(dummyFrame, questID)
-					Wholly.onlyAddingTooltipToGameTooltip = false
-					Wholly.supplementalTooltip = nil
-					if ourTooltip:NumLines() > 0 then
-						ourTooltip:Show()
-					end
+					securecallfunction(function()
+						if not WhollyDatabase.displaysBlizzardQuestTooltips then return end
+						local questID = button.info and button.info.questID
+						if not questID then return end
+						local filterCode = Grail:ClassificationOfQuestCode(questID, nil, WhollyDatabase.buggedQuestsConsideredUnobtainable)
+						local dummyFrame = { statusCode = filterCode }
+						local ourTooltip = Wholly.tt[1]
+						ourTooltip:SetOwner(GameTooltip, "ANCHOR_BOTTOMLEFT")
+						ourTooltip:ClearLines()
+						Wholly.supplementalTooltip = ourTooltip
+						Wholly.onlyAddingTooltipToGameTooltip = true
+						Wholly:_PopulateTooltipForQuest(dummyFrame, questID)
+						Wholly.onlyAddingTooltipToGameTooltip = false
+						Wholly.supplementalTooltip = nil
+						if ourTooltip:NumLines() > 0 then
+							ourTooltip:Show()
+						end
+					end)
 				end)
 				hooksecurefunc("QuestMapLogTitleButton_OnLeave", function()
 					Wholly.tt[1]:Hide()
@@ -4630,32 +4900,12 @@ end
 		end,
 
 		_SetupMapPinsProvider = function(self)
-			self.mapPinsProvider = CreateFromMixins(MapCanvasDataProviderMixin)
-		
-			self.mapPinsProvider.RemoveAllData = function(self)
-				self:GetMap():RemoveAllPinsByTemplate(Wholly.mapPinsTemplateName)
-			end
-			
-			self.mapPinsProvider.RefreshAllData = function(self, fromOnShow)
-				self:RemoveAllData()
-				if WhollyDatabase.displaysMapPins then
-					local uiMapID = self:GetMap():GetMapID()
-					if not uiMapID then return end
-					Wholly.zoneInfo.pins.mapId = uiMapID
-					local pinMap = self:GetMap()
-					Wholly.pendingPinRefreshSeq = (Wholly.pendingPinRefreshSeq or 0) + 1
-					local seq = Wholly.pendingPinRefreshSeq
-					C_Timer.After(0, function()
-						if Wholly.pendingPinRefreshSeq == seq then
-							Wholly:_DoPlaceMapPins(pinMap, uiMapID)
-						end
-					end)
-				else
-					Wholly.mapCountLine = ""        -- do not display a tooltip for pins we are not showing
-				end
-			end
-			
-			WorldMapFrame:AddDataProvider(self.mapPinsProvider)
+			-- _whollyMapPinsProvider was created at file scope using setmetatable so that
+			-- Blizzard-inherited methods (SignalEvent, OnAdded, GetMap, etc.) are found
+			-- via __index → MapCanvasDataProviderMixin rather than being stored as tainted
+			-- direct fields.  WorldMapFrame:AddDataProvider() was also called at file scope.
+			-- This method only needs to publish the provider reference on Wholly itself.
+			Wholly.mapPinsProvider = _whollyMapPinsProvider
 		end,
 
 		_SetupMapPinsProviderPin = function(self)
@@ -4700,7 +4950,7 @@ end
 																		if button == "RightButton" then
 																			Wholly:_OpenInterfaceOptions()
 																		else
-																			Wholly.currentFrame:Show()
+																			Wholly:ToggleUI()
 																		end
 																	end,
 																	OnTooltipShow = function(tooltip)
@@ -4723,8 +4973,12 @@ end
 																						if Wholly.pairedCoordinatesButton then
 																							Wholly.pairedCoordinatesButton:Click()
 																						else
-																							WhollyDatabase.enablesPlayerCoordinates = not WhollyDatabase.enablesPlayerCoordinates
-																							Wholly:UpdateCoordinateSystem()
+																							-- Wrap so the WhollyDatabase write is clean (see config checkbox
+																							-- handler comment for the full explanation).
+																							securecallfunction(function()
+																								WhollyDatabase.enablesPlayerCoordinates = not WhollyDatabase.enablesPlayerCoordinates
+																								Wholly:UpdateCoordinateSystem()
+																							end)
 																						end
 																					end,
 																					OnTooltipShow = function(tooltip)
@@ -4835,37 +5089,12 @@ end
 				--	Modern Retail path: use the ScrollBox / ScrollBar API introduced in Dragonflight.
 				--	A named frame is still created so that global references (e.g.
 				--	com_mithrandir_whollyFrameScrollFrame) resolve correctly.
-				scrollFrame = CreateFrame("Frame", scrollFrameName, frame)
-				scrollFrame:SetSize(sizeX, sizeY)
-				scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", offsetX, offsetY)
-
-				local scrollBox = CreateFrame("Frame", scrollFrameName.."ScrollBox", scrollFrame, "WowScrollBoxList")
-				scrollBox:SetAllPoints(scrollFrame)
-
-				--	Dark band that covers the old texture scrollbar-track artwork and gives the
-				--	MinimalScrollBar a proper background, matching the Blizzard quest-panel style.
-				local scrollBarBg = CreateFrame("Frame", nil, scrollFrame)
-				scrollBarBg:SetPoint("TOPLEFT",    scrollFrame, "TOPRIGHT",    0, 0)
-				scrollBarBg:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 0, 0)
-				scrollBarBg:SetWidth(18)
-				local scrollBarBgTex = scrollBarBg:CreateTexture(nil, "BACKGROUND")
-				scrollBarBgTex:SetAllPoints()
-				scrollBarBgTex:SetColorTexture(0.06, 0.06, 0.06, 1.0)
-
-				local scrollBar = CreateFrame("EventFrame", scrollFrameName.."ScrollBar", scrollBarBg, "MinimalScrollBar")
-				scrollBar:SetPoint("TOPLEFT",     scrollBarBg, "TOPLEFT",     0, -4)
-				scrollBar:SetPoint("BOTTOMRIGHT", scrollBarBg, "BOTTOMRIGHT", 0,  4)
-
-				local view = CreateScrollBoxListLinearView()
-				view:SetElementExtent(16)		-- button height matches the XML template
-
-				ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
-
-				scrollFrame.scrollBox     = scrollBox
-				scrollFrame.scrollBoxView = view
-				scrollFrame.scrollBar     = scrollBar
-				scrollFrame.buttons       = {}		-- kept for guards elsewhere (always empty in this path)
-				scrollFrame.useScrollBox  = true
+				--
+				--	Use a file-scope local function (not an anonymous lambda) so the closure
+				--	object itself is clean.  A lambda created here would be tainted because
+				--	_SetupScrollFrame is called after reading _G["Wholly"], making every closure
+				--	created inside it a tainted object that securecallfunction cannot sanitize.
+				scrollFrame = securecallfunction(_WhollyCreateScrollBox, scrollFrameName, frame, sizeX, sizeY, offsetX, offsetY)
 			else
 				--	Classic fallback: use the legacy HybridScrollFrame API.
 				scrollFrame = CreateFrame("ScrollFrame", scrollFrameName, frame, "HybridScrollFrameTemplate")
@@ -5304,8 +5533,12 @@ end
 			-- 3 Quest level, then type, then alphabetical
 			-- 4 Quest type (and then alphabetical)
 			-- 5 Quest type, then level, then alphabetical
-			WhollyDatabase.currentSortingMode = WhollyDatabase.currentSortingMode + 1
-			if (WhollyDatabase.currentSortingMode > 5) then WhollyDatabase.currentSortingMode = 1 end
+			-- Wrap so the WhollyDatabase write is clean (see config checkbox
+			-- handler comment for the full explanation).
+			securecallfunction(function()
+				WhollyDatabase.currentSortingMode = WhollyDatabase.currentSortingMode + 1
+				if (WhollyDatabase.currentSortingMode > 5) then WhollyDatabase.currentSortingMode = 1 end
+			end)
 			self:ScrollFrame_Update_WithCombatCheck()
 			self:SortButtonLeave(frame)	-- to update the tooltip with the new sorting info
 			self:SortButtonEnter(frame)	-- to update the tooltip with the new sorting info
@@ -5494,8 +5727,101 @@ end
 			end
 		end,
 
+		---
+		--	Creates the Wholly quest panel UI on first call; subsequent calls are no-ops.
+		--	Deferred from PLAYER_LOGIN to avoid tainting ScrollBox/CallbackRegistry mixin
+		--	prototype fields during the login sequence (before shared systems are stable).
+		-- Creates the small QuestFrame overlay frames (quest ID label, bugged label, breadcrumb).
+		-- These are parented to QuestFrame and have no dependency on the main Wholly panel, so
+		-- they are set up at PLAYER_LOGIN rather than lazily.  Safe to call more than once (each
+		-- frame has its own nil guard).
+		_SetupQuestFrameOverlays = function(self)
+			self:_SetupQuestInfoFrame()
+
+			if nil == com_mithrandir_whollyQuestInfoBuggedFrame then
+				local f = CreateFrame("Frame", "com_mithrandir_whollyQuestInfoBuggedFrame", QuestFrame)
+				f:SetSize(180, 14)
+				f:EnableMouse(true)
+				local fs = f:CreateFontString("com_mithrandir_whollyQuestInfoBuggedFrameText", "BACKGROUND", "GameFontNormal")
+				fs:SetSize(180, 20)
+				fs:SetJustifyH("LEFT")
+				fs:SetText("None")
+				com_mithrandir_whollyQuestInfoBuggedFrame:SetPoint("TOPLEFT", QuestFrame, "TOPLEFT", 100, -35)
+			end
+
+			if nil == com_mithrandir_whollyBreadcrumbFrame then
+				local f = CreateFrame("Frame", "com_mithrandir_whollyBreadcrumbFrame", QuestFrame)
+				f:SetSize(360, 128)
+				f:EnableMouse(true)
+				f:SetFrameStrata("MEDIUM")
+				f:Hide()
+				f:SetScript("OnMouseDown", function(self) Wholly:BreadcrumbClick(self) end)
+				f:SetScript("OnEnter", function(self) Wholly:BreadcrumbEnter(self) end)
+				f:SetScript("OnLeave", function(self) Wholly.tooltip:Hide() end)
+				local tex = f:CreateTexture(nil, "ARTWORK")
+				tex:SetTexture("Interface\\TUTORIALFRAME\\UI-TutorialFrame-QuestGiver")
+				tex:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
+				local msg = f:CreateFontString("com_mithrandir_whollyBreadcrumbFrameMessage", "ARTWORK", "GameFontHighlightMedium")
+				msg:SetSize(300, 22)
+				msg:SetJustifyH("LEFT")
+				msg:SetText("Breadcrumb Quest Available")
+				msg:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 75, 54)
+				if Grail.existsClassic then
+					com_mithrandir_whollyBreadcrumbFrame:SetPoint("TOPLEFT", QuestFrame, "BOTTOMLEFT", 16, 70)
+				else
+					com_mithrandir_whollyBreadcrumbFrame:SetPoint("TOPLEFT", QuestFrame, "BOTTOMLEFT", 16, -10)
+				end
+			end
+		end,
+
+		_EnsureUICreated = function(self)
+			if self.currentFrame then return end	-- already created
+
+			-- Create the main panel frames and the search frame.
+			securecallfunction(_WhollySetupQuestPanel)
+			securecallfunction(_WhollySetupSearchFrame)
+
+			-- Set window titles (FontStrings were created inside _WhollySetupQuestPanel).
+			com_mithrandir_whollyFrameTitleText:SetText("Wholly ".. com_mithrandir_whollyFrameTitleText:GetText())
+			com_mithrandir_whollyFrameWideTitleText:SetText("Wholly ".. com_mithrandir_whollyFrameWideTitleText:GetText())
+
+			-- Re-parent the toggle button onto the main frame now that the frame exists.
+			self.toggleButton:ClearAllPoints()
+			self.toggleButton:SetParent(com_mithrandir_whollyFrame)
+
+			self.currentFrame = com_mithrandir_whollyFrame
+
+			self:_SetupBlizzardQuestLogSupport()
+			-- QuestFrame overlays are already created at PLAYER_LOGIN; these calls are no-ops.
+			self:_SetupQuestFrameOverlays()
+
+			if "deDE" == GetLocale() then
+				com_mithrandir_whollyFramePreferencesButton:SetText("Einstellungen")
+			end
+			if "ruRU" == GetLocale() then
+				com_mithrandir_whollyFrameSortButton:SetText("Сортировать")
+			end
+
+			com_mithrandir_whollyFrameSwitchZoneButton:SetText(self.s.MAP)
+			com_mithrandir_whollyFrameWideSwitchZoneButton:SetText(self.s.MAP)
+
+			-- Integrate into Immersion, which replaces the quest frame.
+			self:_SetupImmersionIntegration()
+
+			-- easyMenuFrame needs self.currentFrame as its parent.
+			if not MenuUtil then
+				self.easyMenuFrame = CreateFrame("Frame", "com_mithrandir_whollyEasyMenu", self.currentFrame, "UIDropDownMenuTemplate")
+				self.easyMenuFrame:Hide()
+			end
+
+			-- Switch to wide panel if the user had that preference saved.
+			local WDB = WhollyDatabase
+			if WDB and WDB.useWidePanel then self:ToggleCurrentFrame() end
+		end,
+
 		ToggleUI = function(self)
-			if not self.currentFrame then print(format(self.s.REQUIRES_FORMAT, requiredGrailVersion)) return end
+			if not self.checkedGrailVersion then print(format(self.s.REQUIRES_FORMAT, requiredGrailVersion)) return end
+			self:_EnsureUICreated()
 			if not InCombatLockdown() then
 				if self.currentFrame:IsShown() then
 					self.currentFrame:Hide()
@@ -5510,12 +5836,14 @@ end
 		UpdateBreadcrumb = function(self)
 			if WhollyDatabase.displaysBreadcrumbs or WhollyDatabase.displaysBreadcrumbMessages then
 				self.notificationFrame:RegisterEvent("QUEST_DETAIL")
-				if QuestFrame:IsVisible() then
+				if com_mithrandir_whollyBreadcrumbFrame and QuestFrame:IsVisible() then
 					self:ShowBreadcrumbInfo()
 				end
 			else
 				self.notificationFrame:UnregisterEvent("QUEST_DETAIL")
-				com_mithrandir_whollyBreadcrumbFrame:Hide()
+				if com_mithrandir_whollyBreadcrumbFrame then
+					com_mithrandir_whollyBreadcrumbFrame:Hide()
+				end
 			end
 		end,
 
@@ -5541,8 +5869,14 @@ end
 		end,
 
         _UpdatePins = function(self, forceUpdate)
-			if WorldMapFrame:IsVisible() then
-            	self.mapPinsProvider:RefreshAllData()
+			-- Call RefreshAllData via securecallfunction so that insecure callers
+			-- (config button OnClick handlers) cannot taint pin frame references.
+			-- WhollyMapPinsProvider_RefreshAllData is a file-scope local defined
+			-- before Wholly is constructed, so it is always a clean function value.
+			if WorldMapFrame:IsVisible() and self.mapPinsProvider then
+				securecallfunction(function()
+					self.mapPinsProvider:RefreshAllData()
+				end)
 			end
         end,
 
@@ -6898,6 +7232,7 @@ end
 		{ S.HIDE_ID_ON_QUEST_FRAME, 'hidesIDOnQuestPanel', 'configurationScript24' },
 		{ S.SHOW_BREADCRUMB, 'displaysBreadcrumbs', 'configurationScript5' },
 		{ S.SHOW_BREADCRUMB_MESSAGE, 'displaysBreadcrumbMessages', 'configurationScript5' },
+		{ S.PREREQ_TRACKER_MODULE, 'usesPrereqTrackerModule', 'configurationScript27' },
 		{ S.SHOW_LOREMASTER, 'showsLoremasterOnly', 'configurationScript4' },
 		{ S.ENABLE_COORDINATES, 'enablesPlayerCoordinates', 'configurationScript8', nil, 'pairedCoordinatesButton' },
 		{ S.ACHIEVEMENT_COLORS, 'showsAchievementCompletionColors', 'configurationScript1' },
@@ -7086,6 +7421,96 @@ Wholly._CheckPrereqVerifyOutOfOrder = function(self)
 	end
 end
 
+-- Defined at file scope (clean execution context) so that module.LayoutContents is a
+-- clean field.  _SetupPrereqVerifyModule runs inside a C_Timer callback (always tainted);
+-- any function defined there via "function module:LayoutContents()" would be written as a
+-- TAINTED field.  When the ObjectiveTrackerContainer iterates all modules in a plain Lua
+-- for-loop, reading that tainted field taints execution for the rest of the loop, including
+-- Blizzard's QuestObjectiveTracker update, which taints SetAttribute("questLogIndex", …),
+-- causing UseQuestLogSpecialItem() to be blocked when the user clicks the quest item button.
+local function WhollyPrereqModule_LayoutContents(self)
+	local active = Wholly.prereqVerifyActive or {}
+	for _, targetQuestId in ipairs(active) do
+		local block = self:GetBlock(targetQuestId)
+		local questName = Grail:QuestName(targetQuestId) or C_QuestLog.GetTitleForQuestID(targetQuestId) or tostring(targetQuestId)
+		block:SetHeader(questName)
+
+		local allPrereqs = Grail.questVerifyAllPrereqs and Grail.questVerifyAllPrereqs[targetQuestId] or {}
+		local unverified = Grail.questUnverifiedPrereqs and Grail.questUnverifiedPrereqs[targetQuestId] or {}
+		local unverifiedSet = {}
+		for _, uid in ipairs(unverified) do unverifiedSet[uid] = true end
+
+		-- Verified (known required) prereqs first, then unverified ones
+		local verified, uncertain = {}, {}
+		for _, prereqId in ipairs(allPrereqs) do
+			if prereqId ~= 0 then
+				if unverifiedSet[prereqId] then
+					tinsert(uncertain, prereqId)
+				else
+					tinsert(verified, prereqId)
+				end
+			end
+		end
+
+		local lineId = 1
+		local function addPrereqLine(prereqId, isUncertain)
+			local done = Grail:IsQuestFlaggedCompleted(prereqId)
+			local prereqName = Grail:QuestName(prereqId) or C_QuestLog.GetTitleForQuestID(prereqId) or tostring(prereqId)
+			local label
+			if done then
+				label = prereqName
+			elseif isUncertain then
+				label = "|cffaaaaaa->|r " .. prereqName  -- -> in grey for uncertain
+			else
+				label = "-> " .. prereqName  -- -> for confirmed-required
+			end
+			local color = done and OBJECTIVE_TRACKER_COLOR["Complete"] or OBJECTIVE_TRACKER_COLOR["Normal"]
+			block:AddObjective(lineId, label, nil, true, OBJECTIVE_DASH_STYLE_HIDE, color)
+			lineId = lineId + 1
+		end
+
+		for _, prereqId in ipairs(verified) do addPrereqLine(prereqId, false) end
+		for _, prereqId in ipairs(uncertain) do addPrereqLine(prereqId, true) end
+
+		block:AddObjective(lineId, "|cff00ff00Check quest NPC to confirm|r",
+			nil, true, OBJECTIVE_DASH_STYLE_HIDE, OBJECTIVE_TRACKER_COLOR["Normal"])
+
+		if not self:LayoutBlock(block) then break end
+	end
+end
+
+-- File-scope named function for use with securecallfunction in _SetupPrereqVerifyModule.
+-- Defined here (NOT as an anonymous lambda) so that WhollyPrereqModule_LayoutContents is a
+-- clean function value (file-scope = not created inside a tainted event-handler closure).
+--
+-- ORDERING IS CRITICAL.  Two things retaint execution inside securecallfunction:
+--   (a) Reading WhollyPrereqModule_LayoutContents — a file-scope Wholly upvalue, tainted.
+--   (b) module.Header.Text:SetText() → SecureUtil.lua ScaleTextToFit → writes baseLineHeight.
+-- Both happen before any Blizzard code we care about IF we put them first.
+-- Correct order:
+--   1. SetModuleContainer  → writes module.parentContainer cleanly (execution still clean here)
+--   2. module:MarkDirty()  → reads clean parentContainer → clean cascade to ObjectiveTracker
+--   3. module.LayoutContents = WhollyPrereqModule_LayoutContents  (retaints — but writes done)
+--   4. SetText, prereqModule  (tainted — OK, no clean writes needed after this)
+local function WhollyPrereqModule_Setup()
+	local module = CreateFrame("Frame", "WhollyPrereqTrackerModule",
+		ObjectiveTrackerFrame, "ObjectiveTrackerModuleTemplate")
+	module.uiOrder = 0
+	module.headerText = "Wholly"
+	-- SetModuleContainer and MarkDirty must run in clean context — before any tainted
+	-- upvalue is read.  WhollyPrereqModule_LayoutContents is a tainted upvalue, so it
+	-- must be assigned AFTER these two calls.
+	ObjectiveTrackerManager:SetModuleContainer(module, ObjectiveTrackerFrame)
+	module:MarkDirty()
+	-- From here execution retaints (reading tainted upvalue / ScaleTextToFit hook).
+	-- That is fine because all critical field writes are already done above.
+	module.LayoutContents = WhollyPrereqModule_LayoutContents
+	if module.Header and module.Header.Text then
+		module.Header.Text:SetText("Wholly")
+	end
+	Wholly.prereqModule = module
+end
+
 ---
 --  Called once, deferred one tick after PLAYER_ENTERING_WORLD so that
 --  ObjectiveTrackerManager.Init() (which also defers via ContinueAfterAllEvents) has run.
@@ -7094,74 +7519,12 @@ Wholly._SetupPrereqVerifyModule = function(self)
 	if Wholly.prereqModule then return end
 	if not ObjectiveTrackerManager then return end
 
-	local module = CreateFrame("Frame", "WhollyPrereqTrackerModule",
-		ObjectiveTrackerFrame, "ObjectiveTrackerModuleTemplate")
-
-	-- Place this module first (Blizzard modules use uiOrder 1-11)
-	module.uiOrder = 0
-
-	-- Set the module header text
-	module.headerText = "Wholly"
-	if module.Header and module.Header.Text then
-		module.Header.Text:SetText("Wholly")
-	end
-
-	-- Override LayoutContents to populate blocks for each verification-active quest
-	function module:LayoutContents()
-		local active = Wholly.prereqVerifyActive or {}
-		for _, targetQuestId in ipairs(active) do
-			local block = self:GetBlock(targetQuestId)
-			local questName = Grail:QuestName(targetQuestId) or C_QuestLog.GetTitleForQuestID(targetQuestId) or tostring(targetQuestId)
-			block:SetHeader(questName)
-
-			local allPrereqs = Grail.questVerifyAllPrereqs and Grail.questVerifyAllPrereqs[targetQuestId] or {}
-			local unverified = Grail.questUnverifiedPrereqs and Grail.questUnverifiedPrereqs[targetQuestId] or {}
-			local unverifiedSet = {}
-			for _, uid in ipairs(unverified) do unverifiedSet[uid] = true end
-
-			-- Verified (known required) prereqs first, then unverified ones
-			local verified, uncertain = {}, {}
-			for _, prereqId in ipairs(allPrereqs) do
-				if prereqId ~= 0 then
-					if unverifiedSet[prereqId] then
-						tinsert(uncertain, prereqId)
-					else
-						tinsert(verified, prereqId)
-					end
-				end
-			end
-
-			local lineId = 1
-			local function addPrereqLine(prereqId, isUncertain)
-				local done = Grail:IsQuestFlaggedCompleted(prereqId)
-				local prereqName = Grail:QuestName(prereqId) or C_QuestLog.GetTitleForQuestID(prereqId) or tostring(prereqId)
-				local label
-				if done then
-					label = prereqName
-				elseif isUncertain then
-					label = "|cffaaaaaa->|r " .. prereqName  -- -> in grey for uncertain
-				else
-					label = "-> " .. prereqName  -- -> for confirmed-required
-				end
-				local color = done and OBJECTIVE_TRACKER_COLOR["Complete"] or OBJECTIVE_TRACKER_COLOR["Normal"]
-				block:AddObjective(lineId, label, nil, true, OBJECTIVE_DASH_STYLE_HIDE, color)
-				lineId = lineId + 1
-			end
-
-			for _, prereqId in ipairs(verified) do addPrereqLine(prereqId, false) end
-			for _, prereqId in ipairs(uncertain) do addPrereqLine(prereqId, true) end
-
-			block:AddObjective(lineId, "|cff00ff00Check quest NPC to confirm|r",
-				nil, true, OBJECTIVE_DASH_STYLE_HIDE, OBJECTIVE_TRACKER_COLOR["Normal"])
-
-			if not self:LayoutBlock(block) then break end
-		end
-	end
-
-	ObjectiveTrackerManager:SetModuleContainer(module, ObjectiveTrackerFrame)
-	Wholly.prereqModule = module
+	-- This function runs from a tainted C_Timer callback.  Pass the file-scope named
+	-- function WhollyPrereqModule_Setup to securecallfunction rather than an anonymous
+	-- lambda.  See the comment above WhollyPrereqModule_Setup for why the named function
+	-- approach is necessary.
+	securecallfunction(WhollyPrereqModule_Setup)
 	self:_RefreshPrereqVerifyActive()
-	module:MarkDirty()
 end
 
 
