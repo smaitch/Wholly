@@ -1690,9 +1690,14 @@ end)
 			local Grail = Grail
 
 			-- Check the make sure the questId we are attempting to use makes sense with the title, otherwise
-			-- the questId is incorrect and we need to try to get it
-			if questName ~= self:_QuestName(questId) then
-				questId = Grail:QuestIdFromNPCOrName(questName, nil, true)
+			-- the questId is incorrect and we need to try to get it.
+			-- Guard: skip the name lookup when questName is nil/empty (NO NAME quests have no Blizzard
+			-- title, so GetTitleText() returns nil; comparing nil ~= "NO NAME" would trigger the lookup
+			-- and QuestIdFromNPCOrName(nil) returns nil, clobbering questId and causing the tooltip to
+			-- show nothing).  Also avoid assigning nil back if the lookup finds nothing.
+			if questName and questName ~= "" and questName ~= self:_QuestName(questId) then
+				local found = Grail:QuestIdFromNPCOrName(questName, nil, true)
+				if found then questId = found end
 			end
 			return questId
 		end,
@@ -3305,8 +3310,8 @@ end)
 				local name = GRAIL:NPCName(numeric) or tostring(numeric)
 				local itemString = (questCode == 'k') and self.s.ITEM_LACK or self.s.ITEM
 				local count = tonumber(subcode)
-				local countString = count and "("..count..") " or ""
-				return format("|c%s%s|r %s[%s]", colorCode, name, countString, itemString)
+				local countString = (count and count > 1) and " x"..count or ""
+				return format("|c%s%s|r [%s]%s", colorCode, name, itemString, countString)
 			elseif questCode == 'L' or questCode == 'l' then
 				local lessThanString = (questCode == 'l') and "<" or ""
 				return format("|c%s%s %s%d|r", colorCode, self.s.LEVEL, lessThanString, numeric)
@@ -3468,7 +3473,13 @@ end)
 			if nil == questId then return end
 			if not self.onlyAddingTooltipToGameTooltip then
 				if not Grail.existsClassic then
-					self.tt[1]:SetHyperlink(format("quest:%d", questId))
+					-- Only call SetHyperlink when Grail has a name for this quest.
+					-- For NO NAME quests, SetHyperlink produces no data and can leave the
+					-- tooltip frame in a state where it won't show; skipping it lets the
+					-- Grail metadata below populate the tooltip normally.
+					if nil ~= Grail:QuestName(questId) then
+						self.tt[1]:SetHyperlink(format("quest:%d", questId))
+					end
 				else
 					self:_AddLine(self:_QuestName(questId))
 					local description = Grail.quest.description[questId]
