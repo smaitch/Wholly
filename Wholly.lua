@@ -459,6 +459,8 @@
 --		094	Corrects some issues that would cause taint.
 --			The prerequisite notification system needs to be enabled under user control because it taints the action button the objective tracker has, causing it to not work.  Reloading the interface usually resets the taint, and activating the item from the bags usually works as well.
 --			The ability for Wholly to hide Blizzard map pins of any type has been disabled due to taint issues.
+--			Corrects quest panel tooltips for quests with no Blizzard API data (NO NAME) to show available Wholly information.
+--			Changes item prerequisite display to show required count as x{n} after [Item] rather than ({n}) before.
 --
 --	Known Issues
 --
@@ -1111,6 +1113,7 @@ self.checkedGrailVersion = true
 
 					self:_SetupLibDataBroker()
 					self:_SetupTooltip()
+					self:_SetupBlizzardQuestLogSupport()
 					self:_SetupWorldMapWhollyButton()
 
 -- On Classic, reparent the tooltip to WorldMapFrame so it is visible when the
@@ -5802,7 +5805,7 @@ end
 
 			self.currentFrame = com_mithrandir_whollyFrame
 
-			self:_SetupBlizzardQuestLogSupport()
+			-- _SetupBlizzardQuestLogSupport is already called at PLAYER_LOGIN; no-op here.
 			-- QuestFrame overlays are already created at PLAYER_LOGIN; these calls are no-ops.
 			self:_SetupQuestFrameOverlays()
 
