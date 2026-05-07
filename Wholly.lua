@@ -461,6 +461,7 @@
 --			The ability for Wholly to hide Blizzard map pins of any type has been disabled due to taint issues.
 --			Corrects quest panel tooltips for quests with no Blizzard API data (NO NAME) to show available Wholly information.
 --			Changes item prerequisite display to show required count as x{n} after [Item] rather than ({n}) before.
+--		095 Corrects hooking GameTooltip_AddQuest to ensure it exists.
 --
 --	Known Issues
 --
@@ -1153,9 +1154,11 @@ end
 -- bypassing the ProcessInfo pipeline entirely, so AddTooltipPostCall never fires for them.
 -- questData is the pin object (TaskPOI pin etc.) whose .questID field holds the quest ID;
 -- GameTooltip is the frame being populated.
-hooksecurefunc("GameTooltip_AddQuest", function(questData)
-	Wholly:_ShowSupplementalQuestTooltip(GameTooltip, questData.questID)
-end)
+if GameTooltip_AddQuest then
+	hooksecurefunc("GameTooltip_AddQuest", function(questData)
+		Wholly:_ShowSupplementalQuestTooltip(GameTooltip, questData.questID)
+	end)
+end
 -- Hide tt[1] whenever GameTooltip hides.
 GameTooltip:HookScript("OnHide", function()
 	if Wholly.tt and Wholly.tt[1] then
@@ -3149,15 +3152,17 @@ end)
 			self:_NPCInfoSectionCore(heading, table, button, meetsCriteria, true)
 		end,
 
-		-- Classic only: called from hooksecurefunc("QuestLogTitleButton_OnEnter", ...).
-		-- Retail uses the QuestMapLogTitleButton_OnEnter hook in _SetupBlizzardQuestLogSupport.
+		-- Old-style Classic only: called from hooksecurefunc("QuestLogTitleButton_OnEnter", ...).
+		-- Newer Classic (1.15+) and retail use the QuestMapLogTitleButton_OnEnter hook in _SetupBlizzardQuestLogSupport.
 		_OnEnterBlizzardQuestButton = function(blizzardQuestButton)
 			if WhollyDatabase.displaysBlizzardQuestTooltips and Grail.existsClassic then
 				local questLogIndex = blizzardQuestButton:GetID() + FauxScrollFrame_GetOffset(QuestLogListScrollFrame)
 				local questTitle, level, questTag, suggestedGroup, isHeader, isCollapsed, isComplete, isDaily, questId = Grail:GetQuestLogTitle(questLogIndex)
 				if not isHeader then
 					Wholly:_PopulateTooltipForQuest(blizzardQuestButton, questId)
-					GameTooltip:Show()
+					if Wholly.tt[1]:NumLines() > 0 then
+						Wholly.tt[1]:Show()
+					end
 				end
 			end
 		end,
@@ -4749,8 +4754,10 @@ end
 		end,
 
 		_SetupBlizzardQuestLogSupport = function(self)
-			-- Make it so the Blizzard quest log can display our tooltips
-			if not Grail.existsClassic then
+			-- Make it so the Blizzard quest log can display our tooltips.
+			-- Classic 1.15+ adopted the retail-style quest log buttons, so we check for
+			-- function existence rather than existsClassic to handle both old and new Classic.
+			if QuestMapLogTitleButton_OnEnter then
 				-- Path 3: the Blizzard quest log on the world map uses its own direct tooltip
 				-- path (neither ProcessInfo nor GameTooltip_AddQuest), so neither of the other
 				-- two paths fires.  Hook OnEnter/OnLeave directly.
@@ -4790,10 +4797,13 @@ end
 				hooksecurefunc("QuestMapLogTitleButton_OnLeave", function()
 					Wholly.tt[1]:Hide()
 				end)
-			else
-				if QuestLogTitleButton_OnEnter then
-					hooksecurefunc("QuestLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
-				end
+			end
+			if QuestLogTitleButton_OnEnter then
+				-- Old-style Classic quest log (pre-1.15 dual-pane UI).
+				hooksecurefunc("QuestLogTitleButton_OnEnter", Wholly._OnEnterBlizzardQuestButton)
+				hooksecurefunc("QuestLogTitleButton_OnLeave", function()
+					Wholly.tt[1]:Hide()
+				end)
 			end
 		end,
 
