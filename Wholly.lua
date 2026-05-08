@@ -7389,7 +7389,9 @@ Wholly._RefreshPrereqVerifyActive = function(self)
 		   not (C_QuestLog and C_QuestLog.IsOnQuest and C_QuestLog.IsOnQuest(questId)) then
 			local allDone = true
 			for _, prereqId in ipairs(allPrereqs) do
-				if prereqId ~= 0 and not Grail:IsQuestFlaggedCompleted(prereqId) then
+				if prereqId ~= 0
+				   and not Grail:IsQuestFlaggedCompleted(prereqId)
+				   and not (C_QuestLog and C_QuestLog.IsComplete and C_QuestLog.IsComplete(prereqId)) then
 					allDone = false
 					break
 				end
@@ -7479,6 +7481,7 @@ local function WhollyPrereqModule_LayoutContents(self)
 		local lineId = 1
 		local function addPrereqLine(prereqId, isUncertain)
 			local done = Grail:IsQuestFlaggedCompleted(prereqId)
+				or (C_QuestLog and C_QuestLog.IsComplete and C_QuestLog.IsComplete(prereqId) or false)
 			local prereqName = Grail:QuestName(prereqId) or C_QuestLog.GetTitleForQuestID(prereqId) or tostring(prereqId)
 			local label
 			if done then
@@ -7549,6 +7552,17 @@ Wholly._SetupPrereqVerifyModule = function(self)
 	-- approach is necessary.
 	securecallfunction(WhollyPrereqModule_Setup)
 	self:_RefreshPrereqVerifyActive()
+
+	-- Watch QUEST_LOG_UPDATE so the tracker appears as soon as all prereq quest objectives
+	-- are complete in the log (not just after they are turned in).  A dedicated frame is
+	-- used because the main Wholly QUEST_LOG_UPDATE handler is a one-shot that unregisters
+	-- itself after the first fire.
+	local questLogWatcher = CreateFrame("Frame")
+	questLogWatcher:RegisterEvent("QUEST_LOG_UPDATE")
+	questLogWatcher:SetScript("OnEvent", function()
+		Wholly:_RefreshPrereqVerifyActive()
+		if Wholly.prereqModule then Wholly.prereqModule:MarkDirty() end
+	end)
 end
 
 
