@@ -462,6 +462,8 @@
 --			Corrects quest panel tooltips for quests with no Blizzard API data (NO NAME) to show available Wholly information.
 --			Changes item prerequisite display to show required count as x{n} after [Item] rather than ({n}) before.
 --		095 Corrects hooking GameTooltip_AddQuest to ensure it exists.
+--			Adds filtering all profession quests.
+--			Makes quest filtering preferences two columns.
 --
 --	Known Issues
 --
@@ -476,6 +478,19 @@ local strsplit, strfind, strformat, strsub, strgmatch = strsplit, string.find, s
 local bitband = bit.band
 local tablesort = table.sort
 local mathmax, mathmin, sqrt = math.max, math.min, math.sqrt
+
+local professionQuestSet = nil
+local function _EnsureProfessionQuestSet()
+	if professionQuestSet then return end
+	professionQuestSet = {}
+	if Grail.professionToMapAreaMapping then
+		for _, areaId in pairs(Grail.professionToMapAreaMapping) do
+			for _, qId in ipairs(Grail.indexedQuests[areaId] or {}) do
+				professionQuestSet[qId] = true
+			end
+		end
+	end
+end
 
 local normalColor = "ffffd200"
 local redColor    = "ffff0000"
@@ -1183,6 +1198,7 @@ end)
 						tinsert(Wholly.configuration.Wholly, { S.PET_BATTLES, 'showsPetBattleQuests', 'configurationScript1' })
 					end
 						tinsert(Wholly.configuration.Wholly, { S.PVP, 'showsPVPQuests', 'configurationScript1' })
+					tinsert(Wholly.configuration.Wholly, { S.PROFESSION_QUESTS, 'showsProfessionQuests', 'configurationScript1' })
 					if Grail.capabilities.usesWorldQuests then
 						tinsert(Wholly.configuration.Wholly, { S.WORLD_QUEST, 'showsWorldQuests', 'configurationScript1', nil, nil, 'O' })
 					end
@@ -2106,6 +2122,17 @@ end)
 				return 
 			end
 
+			-- pre-pass: count non-indented lines to decide if two-column layout is needed
+			local totalLines = 0
+			for j = 1, #self.configuration[panel.name] do
+				if not self.configuration[panel.name][j][4] then
+					totalLines = totalLines + 1
+				end
+			end
+			local columnSplit = (nil == panelParentName) and totalLines > 15 and math.ceil(totalLines / 2) or nil
+			local columnX = 0
+			local columnBaseLine = 0
+
 			for i = 1, #self.configuration[panel.name] do
 				if self.configuration[panel.name][i][2] then
 					button = CreateFrame("CheckButton", parent.."Button"..i, panel)
@@ -2127,18 +2154,23 @@ end)
 				else
 					indentLevel = 0
 					lineLevel = lineLevel + 1
+					if columnSplit and columnX == 0 and lineLevel > columnSplit then
+						columnX = 230
+						columnBaseLine = lineLevel - 1
+					end
 				end
+				local cl = lineLevel - columnBaseLine
 				wellOffset = 0
 				if self.configuration[panel.name][i][6] then
 					local well = self:_ColorWell(i, panel)
 					well.swatch:SetVertexColor(self:_ColorInfoFromCode(self.configuration[panel.name][i][6]))
 					well:ClearAllPoints()
-					well:SetPoint("TOPLEFT", panel, "TOPLEFT", (indentLevel * 200) + 6 , (lineLevel * -22) + 14 + offset)
+					well:SetPoint("TOPLEFT", panel, "TOPLEFT", columnX + (indentLevel * 200) + 6, (cl * -22) + 14 + offset)
 					well:Show()
 					self.colorWells[i] = well
 				end
 				if self.configuration[panel.name][i][2] then wellOffset = 12 end
-				button:SetPoint("TOPLEFT", panel, "TOPLEFT", (indentLevel * 200) + 8 + wellOffset, (lineLevel * -22) + 18 + offset)
+				button:SetPoint("TOPLEFT", panel, "TOPLEFT", columnX + (indentLevel * 200) + 8 + wellOffset, (cl * -22) + 18 + offset)
 				if self.configuration[panel.name][i][2] then
 					button:SetScript("OnClick", function(self)
 													-- OnClick fires from tainted (insecure) execution.  Capturing fieldName
@@ -2482,6 +2514,7 @@ end)
 			if not WDB.showsInvasionQuests and Grail:IsInvasionQuest(questId) then return false end
 			if not WDB.showsAccountWideQuests and Grail:IsAccountWide(questId) then return false end
 			if not WDB.showsWarbandCompletedQuests and Grail:IsQuestFlaggedCompletedOnAccount(questId) then return false end
+			if not WDB.showsProfessionQuests then _EnsureProfessionQuestSet(); if professionQuestSet[questId] then return false end end
 			return true
 		end,
 
@@ -3078,6 +3111,7 @@ end)
 			db.showsInvasionQuests = true
 			db.showsAccountWideQuests = true
 			db.showsWarbandCompletedQuests = true
+			db.showsProfessionQuests = true
 			db.loadDateData = true
 			db.displaysMapPinsTurnin = true
 			db.displaysMapPinsTurninIncomplete = false
@@ -4879,6 +4913,9 @@ end
 			if WDB.version < 94 then
 				WDB.hidesImmersionRelatedQuests = false
 				WDB.hidesImmersionAttribution = false
+			end
+			if WDB.version < 95 then
+				WDB.showsProfessionQuests = true
 			end
 			WDB.version = Wholly.versionNumber
 
@@ -7157,6 +7194,7 @@ end
 	S['DUNGEON'] = CALENDAR_TYPE_DUNGEON								-- "Dungeon"
 	S['RAID'] = CALENDAR_TYPE_RAID										-- "Raid"
 	S['PVP'] = CALENDAR_TYPE_PVP										-- "PvP"
+	S['PROFESSION_QUESTS'] = TRADE_SKILLS								-- "Professions"
 	S['GROUP'] = CHANNEL_CATEGORY_GROUP									-- "Group"
 	S['HEROIC'] = PLAYER_DIFFICULTY2									-- "Heroic"
 	S['SCENARIO'] = GUILD_CHALLENGE_TYPE4								-- "Scenario"
