@@ -1810,10 +1810,17 @@ end)
 								for i = 1, #(kindsOfNPC), 1 do
 									local tooltipMessage = nil
 									if kindsOfNPC[i][1] == Grail.NPC_TYPE_KILL then
-										tooltipMessage = format(Wholly.s.KILL_TO_START_FORMAT, Wholly:_QuestName(questId))
+										local questName = Wholly:_QuestName(questId)
+										if questName then
+											tooltipMessage = format(Wholly.s.KILL_TO_START_FORMAT, questName)
+										end
 									elseif kindsOfNPC[i][1] == Grail.NPC_TYPE_DROP then
 										if Wholly:_DroppedItemMatchesQuest(kindsOfNPC[i][2], questId) then
-											tooltipMessage = format(Wholly.s.DROP_TO_START_FORMAT, Grail:NPCName(kindsOfNPC[i][2]), Wholly:_QuestName(questId))
+											local npcName = Grail:NPCName(kindsOfNPC[i][2])
+											local dropQuestName = Wholly:_QuestName(questId)
+											if npcName and dropQuestName then
+												tooltipMessage = format(Wholly.s.DROP_TO_START_FORMAT, npcName, dropQuestName)
+											end
 										end
 									end
 									if nil ~= tooltipMessage then
