@@ -1799,7 +1799,7 @@ end)
 		_CheckNPCTooltip = function(tooltip)
 			if (not UnitIsPlayer("mouseover") or true) then
 				-- check if this npc drops a quest item
-				local ok, id = pcall(Grail.GetNPCId, Grail, false, true)	-- only "mouseover" will be used
+				local ok, id = Grail._Safe(Grail.GetNPCId, Grail, false, true)	-- only "mouseover" will be used
 				if not ok then return end
 				local qs = id and Wholly.npcs[tonumber(id)] or nil
 				if nil ~= qs then
@@ -3421,7 +3421,7 @@ end)
 			elseif questCode == 'S' or questCode == 's' then
 				local skillName
 				if numeric > 200000000 then
-					skillName = GRAIL:NPCName(numeric)
+					skillName = GRAIL:NPCName(numeric) or "NO NAME"
 				else
 					skillName = self:GetSpellInfo(numeric)
 				end
@@ -3448,7 +3448,7 @@ end)
 			elseif questCode == 'a' or questCode == 'b' or questCode == '^' then
 				return format("|c%s"..AVAILABLE_QUEST.."|r", colorCode)
 			elseif questCode == '@' then
-				return format("|c%s%s %s %d|r", colorCode, GRAIL:NPCName(100000000 + subcode), self.s.LEVEL, numeric)
+				return format("|c%s%s %s %d|r", colorCode, GRAIL:NPCName(100000000 + subcode) or "NO NAME", self.s.LEVEL, numeric)
 			elseif questCode == '#' then
 				return format(GARRISON_MISSION_TIME, colorize(colorCode, GRAIL:MissionName(numeric) or numeric))
 --				return format("Mission Needed: |c%s%s|r", colorCode, GRAIL:MissionName(numeric))	-- GARRISON_MISSION_TIME
@@ -3807,13 +3807,20 @@ end)
 				if not Grail.existsClassic then
 					rewardXp = GetQuestLogRewardXP(questId)
 				end
-				if 0 ~= rewardXp then
-					self:_AddLine(strformat(self.s.GAIN_EXPERIENCE_FORMAT, rewardXp))
-				end
+				-- rewardXp/rewardMoney may be secret numbers (see comment above); comparing or
+				-- formatting a secret value raises a hard Lua error, so guard the whole
+				-- compare+format+display sequence with the shared taint-safe wrapper.
+				Grail._Safe(function()
+					if 0 ~= rewardXp then
+						self:_AddLine(strformat(self.s.GAIN_EXPERIENCE_FORMAT, rewardXp))
+					end
+				end)
 				local rewardMoney = GetQuestLogRewardMoney(questId)
-				if 0 ~= rewardMoney then
-					self:_AddLine(GetCoinTextureString(rewardMoney))
-				end
+				Grail._Safe(function()
+					if 0 ~= rewardMoney then
+						self:_AddLine(GetCoinTextureString(rewardMoney))
+					end
+				end)
 				local numberRewardCurrencies = 0
 				if GetNumQuestLogRewardCurrencies then
 					if not Grail.existsClassic then
