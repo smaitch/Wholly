@@ -1857,7 +1857,14 @@ end)
 			-- Skip Wholly's own tooltip frames.  Those cases (e.g. gossip quest ID hover,
 			-- which calls tt[1]:SetHyperlink) are managed directly by the initiating code
 			-- and do not need supplemental content added via hooks.
-			if tooltip == Wholly.tooltip then return end
+			-- Also skip Grail's own private verification tooltips (Grail.tooltip,
+			-- Grail.tooltipNPC): /grail verifyquests, verifyquest, vq, and verifynpc all
+			-- populate these via SetHyperlink to read back the server-verified title, which
+			-- otherwise makes this hook show a supplemental tooltip for every quest scanned.
+			-- Matched by name prefix so any future Grail-internal tooltip frame following the
+			-- same "com_mithrandir_grailTooltip*" naming convention is covered automatically.
+			local tooltipName = tooltip.GetName and tooltip:GetName()
+			if tooltip == Wholly.tooltip or (tooltipName and tooltipName:find("^com_mithrandir_grailTooltip")) then return end
 			if not questId then return end
 			-- Do NOT call ClassificationOfQuestCode here (before the C_Timer), because this
 			-- function is called from hooksecurefunc("GameTooltip_AddQuest", ...) which fires
