@@ -5338,7 +5338,7 @@ end
 				local offsetX, offsetY = 0, 0
 				
 				local closeButton = CreateFrame("Button", frameName.."CloseButton", frame, "UIPanelCloseButton")
-				if Grail.existsClassic then
+				if Grail.existsClassic and not Grail.existsForever then
 					closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 2 + offsetX, -8)
 				else
 					closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2 + offsetX, -12)
