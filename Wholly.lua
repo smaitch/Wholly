@@ -464,6 +464,7 @@
 --		095 Corrects hooking GameTooltip_AddQuest to ensure it exists.
 --			Adds filtering all profession quests.
 --			Makes quest filtering preferences two columns.
+--			Adds initial support for Forever.
 --
 --	Known Issues
 --
