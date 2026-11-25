@@ -1170,7 +1170,7 @@ end
 -- bypassing the ProcessInfo pipeline entirely, so AddTooltipPostCall never fires for them.
 -- questData is the pin object (TaskPOI pin etc.) whose .questID field holds the quest ID;
 -- GameTooltip is the frame being populated.
-if GameTooltip_AddQuest then
+if type(GameTooltip_AddQuest) == "function" then
 	hooksecurefunc("GameTooltip_AddQuest", function(questData)
 		Wholly:_ShowSupplementalQuestTooltip(GameTooltip, questData.questID)
 	end)
@@ -2107,9 +2107,7 @@ end)
 				panel.parent = panelParentName
 			end
 			panel:Hide()
-			if InterfaceOptions_AddCategory then
-				InterfaceOptions_AddCategory(panel)
-			else
+			if Settings and Settings.RegisterCanvasLayoutCategory then
 				-- When panelParentName is nil we are dealing with the top-level
 				if nil == panelParentName then
 					local category, layout = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
@@ -2118,6 +2116,8 @@ end)
 				else
 					local subcategory = Settings.RegisterCanvasLayoutSubcategory(Wholly.settingsCategory, panel, panel.name)
 				end
+			elseif InterfaceOptions_AddCategory then
+				InterfaceOptions_AddCategory(panel)
 			end
 			local parent = panel:GetName()
 			local indentLevel
@@ -3270,11 +3270,11 @@ end)
 		--	For some odd reason, if the options have never been opened they will default to opening to a Blizzard
 		--	option and not the desired one.  So a brutal workaround is to call it twice, which seems to do the job.
 		_OpenInterfaceOptions = function(self)
-			if InterfaceOptionsFrame_OpenToCategory then
-				InterfaceOptionsFrame_OpenToCategory("Wholly")
-				InterfaceOptionsFrame_OpenToCategory("Wholly")
-			else
+			if Wholly.settingsCategory then
 				Settings.OpenToCategory(Wholly.settingsCategory.ID)
+			elseif InterfaceOptionsFrame_OpenToCategory then
+				InterfaceOptionsFrame_OpenToCategory("Wholly")
+				InterfaceOptionsFrame_OpenToCategory("Wholly")
 			end
 		end,
 
